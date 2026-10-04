@@ -25,7 +25,7 @@ function buildScenario() {
 }
 
 async function startSession(scenario: ReturnType<typeof buildScenario>, userId = USER_ID) {
-  return scenario.issuer.startSession({ userId, deviceName: 'test device' });
+  return scenario.issuer.startSession({ userId, deviceName: 'test device', isMfaVerified: false });
 }
 
 async function captureError(action: Promise<unknown>): Promise<unknown> {

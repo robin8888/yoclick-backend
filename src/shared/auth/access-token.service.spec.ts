@@ -104,6 +104,91 @@ describe('AccessTokenService', () => {
     expect(first.tokenId).not.toBe(second.tokenId);
   });
 
+  describe('second factor', () => {
+    it('marks a normal token as password-only: it does not satisfy MFA-protected routes', async () => {
+      const service = buildService();
+
+      const claims = await service.verify((await service.issue(USER_ID)).token);
+
+      expect(claims.isMfaVerified).toBe(false);
+    });
+
+    it('marks a token issued after a verified code, with the standard amr claim', async () => {
+      const service = buildService();
+
+      const { token } = await service.issue(USER_ID, { isMfaVerified: true });
+
+      const claims = await service.verify(token);
+      const payload = JSON.parse(
+        Buffer.from(token.split('.')[1] ?? '', 'base64url').toString('utf8'),
+      ) as { amr: string[] };
+      expect(claims.isMfaVerified).toBe(true);
+      expect(payload.amr).toEqual(['pwd', 'otp']);
+    });
+
+    it('cannot be faked by adding an amr claim to an unsigned or re-signed token', async () => {
+      const service = buildService();
+      const forged = `${toBase64Url({ alg: 'none' })}.${toBase64Url({
+        sub: USER_ID,
+        iss: ISSUER,
+        aud: AUDIENCE,
+        amr: ['pwd', 'otp'],
+        exp: Math.floor(Date.now() / 1000) + SECONDS_IN_AN_HOUR,
+      })}.`;
+
+      const error = await captureRejection(service.verify(forged));
+
+      expect(error).toMatchObject({ code: 'UNAUTHENTICATED' });
+    });
+
+    it('issues a challenge token that is valid for about five minutes', async () => {
+      const service = buildService();
+      const issuedAt = Date.now();
+
+      const { token, expiresAt } = await service.issueMfaChallenge(USER_ID);
+
+      expect(await service.verifyMfaChallenge(token)).toEqual({ userId: USER_ID });
+      const lifetimeSeconds = Math.round((expiresAt.getTime() - issuedAt) / 1000);
+      expect(lifetimeSeconds).toBeGreaterThanOrEqual(298);
+      expect(lifetimeSeconds).toBeLessThanOrEqual(302);
+    });
+
+    it('never accepts a challenge token as an access token (different audience)', async () => {
+      const service = buildService();
+      const { token } = await service.issueMfaChallenge(USER_ID);
+
+      const error = await captureRejection(service.verify(token));
+
+      expect(error).toMatchObject({ code: 'UNAUTHENTICATED' });
+    });
+
+    it('never accepts an access token as a challenge token', async () => {
+      const service = buildService();
+      const { token } = await service.issue(USER_ID);
+
+      const error = await captureRejection(service.verifyMfaChallenge(token));
+
+      expect(error).toMatchObject({ code: 'SESSION_INVALID', httpStatus: 401 });
+    });
+
+    it('rejects a tampered or garbage challenge with the same 401', async () => {
+      const service = buildService();
+      const { token } = await service.issueMfaChallenge(USER_ID);
+      const [header, , signature] = token.split('.');
+      const forgedPayload = toBase64Url({ sub: 'attacker-id', iss: ISSUER });
+
+      for (const invalid of [
+        `${header ?? ''}.${forgedPayload}.${signature ?? ''}`,
+        'garbage',
+        '',
+      ]) {
+        expect(await captureRejection(service.verifyMfaChallenge(invalid))).toMatchObject({
+          code: 'SESSION_INVALID',
+        });
+      }
+    });
+  });
+
   describe('rejects with 401 UNAUTHENTICATED, always the same error so nothing can be probed', () => {
     const keyPair = generateBase64Ed25519KeyPair();
     const service = buildService(keyPair);

@@ -23,7 +23,7 @@ describe('access control: authentication, tenancy and roles', () => {
   let adminOfCenterB: string;
 
   async function bearerFor(userId: string): Promise<Record<string, string>> {
-    const { token } = await accessTokenService.issue(userId);
+    const { token } = await accessTokenService.issue(userId, { isMfaVerified: true });
     return { authorization: `Bearer ${token}` };
   }
 
@@ -179,6 +179,31 @@ describe('access control: authentication, tenancy and roles', () => {
 
     it('lets the owner into the admin area', async () => {
       const response = await get('/v1/probe-guards/admin-area', ownerOfCenterA, centerAId);
+
+      expect(response.statusCode).toBe(200);
+    });
+
+    it('requires a second-factor session to act as owner or admin (SEC-47)', async () => {
+      const { token } = await accessTokenService.issue(ownerOfCenterA, { isMfaVerified: false });
+
+      const response = await application.inject({
+        method: 'GET',
+        url: '/v1/probe-guards/admin-area',
+        headers: { authorization: `Bearer ${token}`, 'x-center-id': centerAId },
+      });
+
+      expect(response.statusCode).toBe(403);
+      expect(response.json()).toMatchObject({ code: 'MFA_REQUIRED' });
+    });
+
+    it('does not ask staff for a second factor', async () => {
+      const { token } = await accessTokenService.issue(staffOfCenterA, { isMfaVerified: false });
+
+      const response = await application.inject({
+        method: 'GET',
+        url: '/v1/probe-guards/staff-area',
+        headers: { authorization: `Bearer ${token}`, 'x-center-id': centerAId },
+      });
 
       expect(response.statusCode).toBe(200);
     });

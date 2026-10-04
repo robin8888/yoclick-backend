@@ -1,4 +1,5 @@
 import {
+  InMemoryMfaRepository,
   InMemorySessionRepository,
   InMemoryUserAccountRepository,
   RecordingEmailSender,
@@ -7,7 +8,13 @@ import { type AccessTokenService } from '../../../shared/auth/access-token.servi
 import { type PasswordHasher } from '../../../shared/auth/password-hasher';
 import { MAX_FAILED_LOGIN_ATTEMPTS } from '../domain/login-policy';
 import { AccountSecurityNotifier } from './account-security-notifier';
-import { LoginUseCase } from './login.use-case';
+import { LoginFailureRecorder } from './login-failure-recorder';
+import {
+  LoginUseCase,
+  type AuthenticatedLogin,
+  type LoginCommand,
+  type LoginResult,
+} from './login.use-case';
 import { SessionIssuer } from './session-issuer';
 
 const EMAIL = 'ana@gmail.com';
@@ -36,14 +43,28 @@ function buildScenario(options: { needsRehash?: boolean } = {}) {
   const accessTokens = {
     issue: (userId: string) =>
       Promise.resolve({ token: `access-for-${userId}`, expiresAt: new Date(Date.now() + 600_000) }),
+    issueMfaChallenge: (userId: string) =>
+      Promise.resolve({ token: `challenge-${userId}`, expiresAt: new Date(Date.now() + 300_000) }),
   } as unknown as AccessTokenService;
-  const login = new LoginUseCase(
+  const mfa = new InMemoryMfaRepository();
+  const loginUseCase = new LoginUseCase(
     users,
     hasher,
     new SessionIssuer(sessions, accessTokens),
-    new AccountSecurityNotifier(emails),
+    new LoginFailureRecorder(users, new AccountSecurityNotifier(emails)),
+    mfa,
   );
-  return { users, sessions, emails, login, spendTime };
+  /** La mayoría de los casos esperan una sesión abierta: este envoltorio la exige y la estrecha de tipo. */
+  const login = {
+    execute: async (command: LoginCommand): Promise<AuthenticatedLogin> =>
+      requireAuthenticated(await loginUseCase.execute(command)),
+  };
+  return { users, sessions, emails, login, loginUseCase, mfa, spendTime };
+}
+
+function requireAuthenticated(result: LoginResult): AuthenticatedLogin {
+  if (result.kind !== 'authenticated') throw new Error('Expected an authenticated login');
+  return result;
 }
 
 async function captureError(action: Promise<unknown>): Promise<unknown> {
@@ -238,5 +259,86 @@ describe('LoginUseCase', () => {
     await login.execute({ email: EMAIL, password: PASSWORD, deviceName: null });
 
     expect(users.accounts.get(EMAIL)?.passwordHash).toBe(`rehashed:${PASSWORD}`);
+  });
+
+  describe('accounts with a second factor', () => {
+    function enableSecondFactor(scenario: ReturnType<typeof buildScenario>): void {
+      scenario.mfa.factors.set(USER_ID, {
+        encryptedSecret: 'encrypted',
+        isConfirmed: true,
+        lastUsedStep: null,
+        recoveryCodes: [],
+      });
+    }
+
+    it('does not open a session with the password alone: it asks for the code', async () => {
+      const scenario = buildScenario();
+      enableSecondFactor(scenario);
+
+      const result = await scenario.loginUseCase.execute({
+        email: EMAIL,
+        password: PASSWORD,
+        deviceName: null,
+      });
+
+      expect(result.kind).toBe('mfa_required');
+      expect(scenario.sessions.tokens).toHaveLength(0);
+    });
+
+    it('hands back a challenge token valid for a few minutes, and no access or refresh token', async () => {
+      const scenario = buildScenario();
+      enableSecondFactor(scenario);
+
+      const result = await scenario.loginUseCase.execute({
+        email: EMAIL,
+        password: PASSWORD,
+        deviceName: null,
+      });
+
+      expect(result).toMatchObject({ kind: 'mfa_required' });
+      expect(JSON.stringify(result)).not.toContain('accessToken');
+      expect(JSON.stringify(result)).not.toContain('refreshToken');
+    });
+
+    it('still treats a wrong password exactly like for any other account', async () => {
+      const scenario = buildScenario();
+      enableSecondFactor(scenario);
+
+      const error = await captureError(
+        scenario.loginUseCase.execute({
+          email: EMAIL,
+          password: 'wrong password!!',
+          deviceName: null,
+        }),
+      );
+
+      expect(error).toMatchObject(INVALID_CREDENTIALS);
+    });
+
+    it('treats a factor that was never confirmed as no second factor at all', async () => {
+      const scenario = buildScenario();
+      scenario.mfa.factors.set(USER_ID, {
+        encryptedSecret: 'encrypted',
+        isConfirmed: false,
+        lastUsedStep: null,
+        recoveryCodes: [],
+      });
+
+      const result = await scenario.loginUseCase.execute({
+        email: EMAIL,
+        password: PASSWORD,
+        deviceName: null,
+      });
+
+      expect(result.kind).toBe('authenticated');
+    });
+
+    it('opens password-only sessions as such, not marked as second-factor verified', async () => {
+      const { login, sessions } = buildScenario();
+
+      await login.execute({ email: EMAIL, password: PASSWORD, deviceName: null });
+
+      expect(sessions.tokens[0]?.isMfaVerified).toBe(false);
+    });
   });
 });

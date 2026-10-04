@@ -21,6 +21,8 @@ function fillPlaceholderEnvironment(): void {
   process.env['JWT_ACCESS_PUBLIC_KEY_BASE64'] ??= 'placeholder';
   process.env['AUTH_CODE_PEPPER_BASE64'] ??=
     Buffer.alloc(PLACEHOLDER_PEPPER_BYTES).toString('base64');
+  process.env['MFA_ENCRYPTION_KEY_BASE64'] ??=
+    Buffer.alloc(PLACEHOLDER_PEPPER_BYTES).toString('base64');
   process.env['LOG_LEVEL'] = 'silent';
 }
 

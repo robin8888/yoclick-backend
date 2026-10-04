@@ -1,6 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { v7 as generateUuidV7 } from 'uuid';
-import { AccessTokenService } from '../../../shared/auth/access-token.service';
+import {
+  AccessTokenService,
+  type IssuedAccessToken,
+} from '../../../shared/auth/access-token.service';
 import { MILLISECONDS_PER_HOUR } from '../../../shared/time/time-units';
 import { REFRESH_TOKEN_TTL_DAYS } from '../domain/login-policy';
 import { generateRefreshToken } from '../domain/refresh-token';
@@ -24,6 +27,8 @@ export interface SessionTokens {
 interface StartSessionInput {
   readonly userId: string;
   readonly deviceName: string | null;
+  /** La persona acaba de demostrar un segundo factor: las rutas de administración lo exigen. */
+  readonly isMfaVerified: boolean;
 }
 
 interface RotateSessionInput {
@@ -48,12 +53,16 @@ export class SessionIssuer {
       familyId: generateUuidV7(),
       tokenHash: refresh.tokenHash,
       deviceName: input.deviceName,
+      isMfaVerified: input.isMfaVerified,
     });
     await this.sessions.create(newToken);
-    return this.buildTokens(input.userId, refresh.token, newToken.expiresAt);
+    return this.buildTokens(input.userId, refresh.token, newToken);
   }
 
-  /** `null` si otra petición rotó este mismo token antes: el llamante lo trata como reutilización. */
+  /**
+   * `null` si otra petición rotó este mismo token antes: el llamante lo trata como reutilización.
+   * El nivel de autenticación de la sesión se hereda: renovar no sube ni baja de segundo factor.
+   */
   async rotateSession(input: RotateSessionInput): Promise<SessionTokens | null> {
     const refresh = generateRefreshToken();
     const newToken = this.buildToken({
@@ -61,6 +70,7 @@ export class SessionIssuer {
       familyId: input.current.familyId,
       tokenHash: refresh.tokenHash,
       deviceName: input.deviceName,
+      isMfaVerified: input.current.isMfaVerified,
     });
     const wasRotated = await this.sessions.rotate({
       currentTokenId: input.current.id,
@@ -68,11 +78,23 @@ export class SessionIssuer {
       now: input.now,
     });
     if (!wasRotated) return null;
-    return this.buildTokens(input.current.userId, refresh.token, newToken.expiresAt);
+    return this.buildTokens(input.current.userId, refresh.token, newToken);
+  }
+
+  /** Lo que recibe la app tras acertar la contraseña de una cuenta con segundo factor. */
+  async issueMfaChallenge(userId: string): Promise<IssuedAccessToken> {
+    return this.accessTokenService.issueMfaChallenge(userId);
+  }
+
+  async verifyMfaChallenge(challengeToken: string): Promise<{ readonly userId: string }> {
+    return this.accessTokenService.verifyMfaChallenge(challengeToken);
   }
 
   private buildToken(
-    fields: Pick<NewRefreshToken, 'userId' | 'familyId' | 'tokenHash' | 'deviceName'>,
+    fields: Pick<
+      NewRefreshToken,
+      'userId' | 'familyId' | 'tokenHash' | 'deviceName' | 'isMfaVerified'
+    >,
   ): NewRefreshToken {
     return {
       id: generateUuidV7(),
@@ -84,14 +106,16 @@ export class SessionIssuer {
   private async buildTokens(
     userId: string,
     refreshToken: string,
-    refreshTokenExpiresAt: Date,
+    stored: NewRefreshToken,
   ): Promise<SessionTokens> {
-    const accessToken = await this.accessTokenService.issue(userId);
+    const accessToken = await this.accessTokenService.issue(userId, {
+      isMfaVerified: stored.isMfaVerified,
+    });
     return {
       accessToken: accessToken.token,
       accessTokenExpiresAt: accessToken.expiresAt,
       refreshToken,
-      refreshTokenExpiresAt,
+      refreshTokenExpiresAt: stored.expiresAt,
     };
   }
 }

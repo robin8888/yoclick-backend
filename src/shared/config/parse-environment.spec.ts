@@ -5,6 +5,7 @@ const PRODUCTION_DATABASE_URL =
   'postgresql://yoclick_app:placeholder@db.internal:5432/yoclick?sslmode=require';
 const FAKE_KEY_BASE64 = Buffer.from('not-a-real-key').toString('base64');
 const FAKE_PEPPER_BASE64 = Buffer.alloc(32, 7).toString('base64');
+const FAKE_MFA_KEY_BASE64 = Buffer.alloc(32, 9).toString('base64');
 
 /** Entorno de desarrollo válido; cada test cambia solo lo que quiere probar. */
 function developmentEnvironment(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -13,6 +14,7 @@ function developmentEnvironment(overrides: Record<string, unknown> = {}): Record
     JWT_ACCESS_PRIVATE_KEY_BASE64: FAKE_KEY_BASE64,
     JWT_ACCESS_PUBLIC_KEY_BASE64: FAKE_KEY_BASE64,
     AUTH_CODE_PEPPER_BASE64: FAKE_PEPPER_BASE64,
+    MFA_ENCRYPTION_KEY_BASE64: FAKE_MFA_KEY_BASE64,
     ...overrides,
   };
 }
@@ -155,6 +157,32 @@ describe('parseEnvironment', () => {
       );
 
       expect(errorMessage).not.toContain(FAKE_KEY_BASE64);
+    });
+  });
+
+  describe('MFA encryption key', () => {
+    it.each([8, 16, 31, 33, 64])('rejects a key of %i bytes: AES-256 needs exactly 32', (size) => {
+      const wrongSize = Buffer.alloc(size, 1).toString('base64');
+
+      expect(() =>
+        parseEnvironment(developmentEnvironment({ MFA_ENCRYPTION_KEY_BASE64: wrongSize })),
+      ).toThrow(/MFA_ENCRYPTION_KEY_BASE64/);
+    });
+
+    it('is required', () => {
+      expect(() =>
+        parseEnvironment(developmentEnvironment({ MFA_ENCRYPTION_KEY_BASE64: undefined })),
+      ).toThrow(/MFA_ENCRYPTION_KEY_BASE64/);
+    });
+
+    it('never echoes the key', () => {
+      const wrongSize = Buffer.alloc(8, 1).toString('base64');
+
+      const errorMessage = captureErrorMessage(
+        developmentEnvironment({ MFA_ENCRYPTION_KEY_BASE64: wrongSize }),
+      );
+
+      expect(errorMessage).not.toContain(wrongSize);
     });
   });
 

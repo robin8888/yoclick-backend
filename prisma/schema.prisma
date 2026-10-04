@@ -86,6 +86,8 @@ model User {
   consents          Consent[]
   verificationCodes VerificationCode[]
   refreshTokens     RefreshToken[]
+  mfaFactor         MfaFactor?
+  mfaRecoveryCodes  MfaRecoveryCode[]
 
   @@map("users")
 }
@@ -197,10 +199,42 @@ model RefreshToken {
   expiresAt    DateTime  @map("expires_at") @db.Timestamptz
   revokedAt    DateTime? @map("revoked_at") @db.Timestamptz
   replacedById String?   @map("replaced_by_id") @db.Uuid
+  /// La sesión se abrió con segundo factor: se conserva en toda la familia al rotar.
+  mfaVerified  Boolean   @default(false) @map("mfa_verified")
 
   user User @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@index([familyId])
   @@map("refresh_tokens")
+}
+
+/// Segundo factor TOTP de una persona. El secreto va CIFRADO (AES-256-GCM), nunca en claro (SEC-70).
+model MfaFactor {
+  id              String    @id @db.Uuid
+  userId          String    @unique @map("user_id") @db.Uuid
+  secretEncrypted String    @map("secret_enc")
+  /// Hasta que se confirma con un primer código válido, el factor no cuenta ni se exige.
+  confirmedAt     DateTime? @map("confirmed_at") @db.Timestamptz
+  /// Último intervalo de 30 s aceptado: un código ya usado no sirve otra vez (anti-reutilización).
+  lastUsedStep    BigInt?   @map("last_used_step")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("mfa_factors")
+}
+
+/// Códigos de recuperación de un solo uso, por si se pierde el dispositivo. Solo se guarda su HMAC.
+model MfaRecoveryCode {
+  id        String    @id @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  codeHash  String    @map("code_hash")
+  usedAt    DateTime? @map("used_at") @db.Timestamptz
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("mfa_recovery_codes")
 }

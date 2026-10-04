@@ -5,6 +5,7 @@ const MAX_TCP_PORT = 65_535;
 const DEFAULT_PORT = 3000;
 const DEVELOPMENT_KEY_ID = 'dev-1';
 const MIN_PEPPER_BYTES = 32;
+const MFA_KEY_BYTES = 32;
 
 const LOG_LEVELS = ['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent'] as const;
 const VERBOSE_LOG_LEVELS: readonly string[] = ['trace', 'debug'];
@@ -42,6 +43,13 @@ const baseEnvironmentSchema = z.object({
     .refine(
       (value) => Buffer.from(value, 'base64').length >= MIN_PEPPER_BYTES,
       `must decode to at least ${String(MIN_PEPPER_BYTES)} bytes`,
+    ),
+  // Clave AES-256 con la que se cifran los secretos TOTP antes de guardarlos (SEC-70). Exactamente 32 bytes.
+  MFA_ENCRYPTION_KEY_BASE64: z
+    .string()
+    .refine(
+      (value) => Buffer.from(value, 'base64').length === MFA_KEY_BYTES,
+      `must decode to exactly ${String(MFA_KEY_BYTES)} bytes`,
     ),
   // Comprueba contraseñas contra filtraciones conocidas (k-anonymity, SEC-43). Solo se apaga sin red.
   PASSWORD_BREACH_CHECK: z.enum(['enabled', 'disabled']).default('enabled'),

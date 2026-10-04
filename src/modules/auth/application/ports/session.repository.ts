@@ -5,6 +5,8 @@ export interface NewRefreshToken {
   readonly familyId: string;
   readonly tokenHash: string;
   readonly deviceName: string | null;
+  /** La sesión se abrió con segundo factor; se conserva en toda la familia al rotar. */
+  readonly isMfaVerified: boolean;
   readonly expiresAt: Date;
 }
 
@@ -14,6 +16,7 @@ export interface StoredRefreshToken {
   readonly familyId: string;
   readonly expiresAt: Date;
   readonly revokedAt: Date | null;
+  readonly isMfaVerified: boolean;
 }
 
 export interface RotationRequest {

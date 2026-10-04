@@ -24,6 +24,7 @@ export class PrismaSessionRepository implements SessionRepository {
           familyId: newToken.familyId,
           tokenHash: newToken.tokenHash,
           deviceName: newToken.deviceName,
+          mfaVerified: newToken.isMfaVerified,
           expiresAt: newToken.expiresAt,
         },
       }),
@@ -31,12 +32,22 @@ export class PrismaSessionRepository implements SessionRepository {
   }
 
   async findByTokenHash(tokenHash: string): Promise<StoredRefreshToken | null> {
-    return this.tenantPrismaService.runInPublicContext((client) =>
+    const stored = await this.tenantPrismaService.runInPublicContext((client) =>
       client.refreshToken.findUnique({
         where: { tokenHash },
-        select: { id: true, userId: true, familyId: true, expiresAt: true, revokedAt: true },
+        select: {
+          id: true,
+          userId: true,
+          familyId: true,
+          expiresAt: true,
+          revokedAt: true,
+          mfaVerified: true,
+        },
       }),
     );
+    if (!stored) return null;
+    const { mfaVerified: wasMfaVerified, ...rest } = stored;
+    return { ...rest, isMfaVerified: wasMfaVerified };
   }
 
   async rotate(request: RotationRequest): Promise<boolean> {
@@ -55,6 +66,7 @@ export class PrismaSessionRepository implements SessionRepository {
           familyId: request.newToken.familyId,
           tokenHash: request.newToken.tokenHash,
           deviceName: request.newToken.deviceName,
+          mfaVerified: request.newToken.isMfaVerified,
           expiresAt: request.newToken.expiresAt,
         },
       });

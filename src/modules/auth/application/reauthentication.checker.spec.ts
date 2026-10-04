@@ -5,6 +5,7 @@ import {
 import { type PasswordHasher } from '../../../shared/auth/password-hasher';
 import { MAX_FAILED_LOGIN_ATTEMPTS } from '../domain/login-policy';
 import { AccountSecurityNotifier } from './account-security-notifier';
+import { LoginFailureRecorder } from './login-failure-recorder';
 import { ReauthenticationChecker } from './reauthentication.checker';
 
 const USER_ID = 'user-1';
@@ -26,7 +27,11 @@ function buildScenario() {
       Promise.resolve(storedHash === `hashed:${plain}`),
     spendTimeLikeAVerification: spendTime,
   } as unknown as PasswordHasher;
-  const checker = new ReauthenticationChecker(users, hasher, new AccountSecurityNotifier(emails));
+  const checker = new ReauthenticationChecker(
+    users,
+    hasher,
+    new LoginFailureRecorder(users, new AccountSecurityNotifier(emails)),
+  );
   return { users, emails, checker, spendTime };
 }
 

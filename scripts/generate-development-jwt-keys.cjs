@@ -38,6 +38,13 @@ if (isMissing('AUTH_CODE_PEPPER_BASE64')) {
   );
 }
 
+if (isMissing('MFA_ENCRYPTION_KEY_BASE64')) {
+  linesToAppend.push(
+    '# Clave AES-256 que cifra los secretos del doble factor (solo desarrollo)',
+    `MFA_ENCRYPTION_KEY_BASE64=${toBase64(randomBytes(PEPPER_BYTES))}`,
+  );
+}
+
 if (isMissing('ALLOW_DISPOSABLE_EMAILS')) {
   linesToAppend.push(
     '# Permite correos de usar y tirar (yopmail) para probar. En producción debe estar apagado.',

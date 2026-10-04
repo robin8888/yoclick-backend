@@ -1,5 +1,10 @@
 import { type BreachedPasswordChecker } from '../../src/modules/auth/application/ports/breached-password.checker';
 import {
+  type MfaConfirmation,
+  type MfaFactorState,
+  type MfaRepository,
+} from '../../src/modules/auth/application/ports/mfa.repository';
+import {
   type NewRefreshToken,
   type RotationRequest,
   type SessionRepository,
@@ -300,7 +305,97 @@ export class InMemorySessionRepository implements SessionRepository {
       userId: token.userId,
       familyId: token.familyId,
       expiresAt: token.expiresAt,
+      isMfaVerified: token.isMfaVerified,
       revokedAt: token.revokedAtMutable,
     };
+  }
+}
+
+interface StoredFactor {
+  encryptedSecret: string;
+  isConfirmed: boolean;
+  lastUsedStep: number | null;
+  recoveryCodes: { codeHash: string; usedAt: Date | null }[];
+}
+
+export class InMemoryMfaRepository implements MfaRepository {
+  readonly factors = new Map<string, StoredFactor>();
+  /** Personas que tienen un rol de propietaria o administración (para probar que no pueden desactivarlo). */
+  readonly administrativeUserIds = new Set<string>();
+
+  findFactor(userId: string): Promise<MfaFactorState | null> {
+    const factor = this.factors.get(userId);
+    return Promise.resolve(
+      factor
+        ? {
+            encryptedSecret: factor.encryptedSecret,
+            isConfirmed: factor.isConfirmed,
+            lastUsedStep: factor.lastUsedStep,
+          }
+        : null,
+    );
+  }
+
+  saveUnconfirmedFactor(userId: string, encryptedSecret: string): Promise<boolean> {
+    if (this.factors.get(userId)?.isConfirmed) return Promise.resolve(false);
+    this.factors.set(userId, {
+      encryptedSecret,
+      isConfirmed: false,
+      lastUsedStep: null,
+      recoveryCodes: [],
+    });
+    return Promise.resolve(true);
+  }
+
+  confirmFactor(userId: string, confirmation: MfaConfirmation): Promise<boolean> {
+    const factor = this.factors.get(userId);
+    if (!factor || factor.isConfirmed) return Promise.resolve(false);
+    factor.isConfirmed = true;
+    factor.lastUsedStep = confirmation.step;
+    factor.recoveryCodes = confirmation.recoveryCodeHashes.map((codeHash) => ({
+      codeHash,
+      usedAt: null,
+    }));
+    return Promise.resolve(true);
+  }
+
+  markStepUsed(userId: string, step: number): Promise<boolean> {
+    const factor = this.factors.get(userId);
+    if (!factor || (factor.lastUsedStep !== null && step <= factor.lastUsedStep)) {
+      return Promise.resolve(false);
+    }
+    factor.lastUsedStep = step;
+    return Promise.resolve(true);
+  }
+
+  consumeRecoveryCode(userId: string, codeHash: string, usedAt: Date): Promise<boolean> {
+    const code = this.factors
+      .get(userId)
+      ?.recoveryCodes.find(
+        (candidate) => candidate.codeHash === codeHash && candidate.usedAt === null,
+      );
+    if (!code) return Promise.resolve(false);
+    code.usedAt = usedAt;
+    return Promise.resolve(true);
+  }
+
+  replaceRecoveryCodes(userId: string, codeHashes: readonly string[]): Promise<void> {
+    const factor = this.factors.get(userId);
+    if (factor) factor.recoveryCodes = codeHashes.map((codeHash) => ({ codeHash, usedAt: null }));
+    return Promise.resolve();
+  }
+
+  countUnusedRecoveryCodes(userId: string): Promise<number> {
+    const codes = this.factors.get(userId)?.recoveryCodes ?? [];
+    return Promise.resolve(codes.filter((code) => code.usedAt === null).length);
+  }
+
+  deleteFactor(userId: string): Promise<void> {
+    this.factors.delete(userId);
+    return Promise.resolve();
+  }
+
+  holdsAdministrativeRole(userId: string): Promise<boolean> {
+    return Promise.resolve(this.administrativeUserIds.has(userId));
   }
 }

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PinoLogger } from 'nestjs-pino';
 import { PasswordHasher } from '../../shared/auth/password-hasher';
+import { SecretEncryptor } from '../../shared/crypto/secret-encryptor';
 import { type Environment } from '../../shared/config/environment.schema';
 import { ChangePasswordUseCase } from './application/change-password.use-case';
 import { ReauthenticationChecker } from './application/reauthentication.checker';
@@ -28,6 +29,20 @@ import { SessionIssuer } from './application/session-issuer';
 import { VerificationCodeChecker } from './application/verification-code-checker';
 import { VerificationCodeIssuer } from './application/verification-code-issuer';
 import { VerifyEmailUseCase } from './application/verify-email.use-case';
+import { ConfirmTotpUseCase } from './application/confirm-totp.use-case';
+import { DisableMfaUseCase } from './application/disable-mfa.use-case';
+import { GetMfaStatusUseCase } from './application/get-mfa-status.use-case';
+import { LoginFailureRecorder } from './application/login-failure-recorder';
+import { MfaActivator } from './application/mfa-activator';
+import { MFA_REPOSITORY } from './application/ports/mfa.repository';
+import { RecoveryCodeService } from './application/recovery-code-service';
+import { RegenerateRecoveryCodesUseCase } from './application/regenerate-recovery-codes.use-case';
+import { SecondFactorVerifier } from './application/second-factor-verifier';
+import { SetupTotpUseCase } from './application/setup-totp.use-case';
+import { VerifyMfaLoginUseCase } from './application/verify-mfa-login.use-case';
+import { MfaController } from './http/mfa.controller';
+import { PrismaMfaRepository } from './infrastructure/prisma-mfa.repository';
+import { TotpEngine } from './infrastructure/totp-engine';
 import { PasswordController } from './http/password.controller';
 import { RegistrationController } from './http/registration.controller';
 import { SessionController } from './http/session.controller';
@@ -40,9 +55,21 @@ import { PrismaVerificationCodeRepository } from './infrastructure/prisma-verifi
 import { PwnedPasswordsChecker } from './infrastructure/pwned-passwords.checker';
 
 @Module({
-  controllers: [RegistrationController, SessionController, PasswordController],
+  controllers: [RegistrationController, SessionController, PasswordController, MfaController],
   providers: [
     PasswordHasher,
+    SecretEncryptor,
+    TotpEngine,
+    RecoveryCodeService,
+    SecondFactorVerifier,
+    MfaActivator,
+    LoginFailureRecorder,
+    SetupTotpUseCase,
+    ConfirmTotpUseCase,
+    DisableMfaUseCase,
+    RegenerateRecoveryCodesUseCase,
+    GetMfaStatusUseCase,
+    VerifyMfaLoginUseCase,
     ClientAddressHasher,
     PasswordAcceptabilityChecker,
     RegistrationEligibilityChecker,
@@ -62,6 +89,7 @@ import { PwnedPasswordsChecker } from './infrastructure/pwned-passwords.checker'
     VerifyEmailUseCase,
     ResendEmailVerificationUseCase,
     { provide: USER_ACCOUNT_REPOSITORY, useClass: PrismaUserAccountRepository },
+    { provide: MFA_REPOSITORY, useClass: PrismaMfaRepository },
     { provide: SESSION_REPOSITORY, useClass: PrismaSessionRepository },
     { provide: VERIFICATION_CODE_REPOSITORY, useClass: PrismaVerificationCodeRepository },
     { provide: VERIFICATION_CODE_HASHER, useClass: HmacVerificationCodeHasher },

@@ -30,8 +30,9 @@ export class AuthenticationGuard implements CanActivate {
 
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const token = extractBearerToken(request.headers.authorization);
-    const { userId } = await this.accessTokenService.verify(token);
+    const { userId, isMfaVerified } = await this.accessTokenService.verify(token);
     request.authenticatedUserId = userId;
+    request.isMfaVerified = isMfaVerified;
     return true;
   }
 }

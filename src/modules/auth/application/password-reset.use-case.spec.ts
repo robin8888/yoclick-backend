@@ -134,6 +134,7 @@ describe('ResetPasswordUseCase', () => {
       familyId: 'family-1',
       tokenHash: 'hash-1',
       deviceName: null,
+      isMfaVerified: false,
       expiresAt: new Date(Date.now() + 1_000_000),
     });
     const code = await requestResetCode(scenario);

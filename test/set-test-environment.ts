@@ -21,6 +21,7 @@ process.env['JWT_ACCESS_PRIVATE_KEY_BASE64'] = testKeyPair.privateKeyBase64;
 process.env['JWT_ACCESS_PUBLIC_KEY_BASE64'] = testKeyPair.publicKeyBase64;
 process.env['JWT_KEY_ID'] = 'test-key';
 process.env['AUTH_CODE_PEPPER_BASE64'] = randomBytes(TEST_PEPPER_BYTES).toString('base64');
+process.env['MFA_ENCRYPTION_KEY_BASE64'] = randomBytes(TEST_PEPPER_BYTES).toString('base64');
 // Sin red en los tests: la comprobación de contraseñas filtradas se sustituye por un doble.
 process.env['PASSWORD_BREACH_CHECK'] = 'disabled';
 process.env['EMAIL_PROVIDER'] = 'console';

@@ -24,6 +24,15 @@ export const ERROR_CATALOG = {
   },
   PASSWORD_BREACHED: { title: 'Esa contraseña aparece en filtraciones. Elige otra' },
   VERIFICATION_CODE_INVALID: { title: 'El código no es válido o ha caducado' },
+  MFA_REQUIRED: {
+    title: 'Esta acción exige verificación en dos pasos. Actívala e inicia sesión de nuevo',
+  },
+  MFA_CODE_INVALID: { title: 'El código no es válido' },
+  MFA_ALREADY_ENABLED: { title: 'La verificación en dos pasos ya está activada' },
+  MFA_NOT_ENABLED: { title: 'La verificación en dos pasos no está activada' },
+  MFA_REQUIRED_FOR_ROLE: {
+    title: 'Tu rol exige verificación en dos pasos: no se puede desactivar',
+  },
   REAUTHENTICATION_FAILED: { title: 'La contraseña no es correcta' },
   ACCOUNT_OWNS_CENTER: {
     title: 'Antes de eliminar tu cuenta, cierra o traspasa el centro del que eres propietario',

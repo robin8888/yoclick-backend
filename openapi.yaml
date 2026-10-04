@@ -94,14 +94,42 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/LoginResponseDto"
+                oneOf:
+                  - $ref: "#/components/schemas/MfaLoginResponseDto"
+                  - $ref: "#/components/schemas/MfaChallengeResponseDto"
         default:
           description: Error RFC 9457
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ProblemDetailsDto"
-      summary: Inicia sesión con correo y contraseña. Un correo inexistente, una contraseña errónea y una cuenta bloqueada responden igual.
+      summary: "Inicia sesión con correo y contraseña. Un correo inexistente, una contraseña errónea y una cuenta bloqueada responden igual. Con segundo factor activo devuelve un desafío (`status: mfa_required`) en lugar de la sesión."
+      tags:
+        - auth
+  /v1/auth/mfa/verify:
+    post:
+      operationId: auth_verify_mfa
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MfaVerifyRequestDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MfaLoginResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      summary: Completa el inicio de sesión con el código de la app de autenticación o un código de recuperación. Cada código de la app sirve una sola vez.
       tags:
         - auth
   /v1/auth/refresh:
@@ -127,7 +155,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ProblemDetailsDto"
-      summary: Rota el refresh token y devuelve tokens nuevos. Reutilizar un token ya rotado revoca toda la sesión de ese dispositivo.
+      summary: Rota el refresh token y devuelve tokens nuevos. Reutilizar un token ya rotado revoca toda la sesión de ese dispositivo. Conserva el nivel de autenticación de la sesión (con o sin segundo factor).
       tags:
         - auth
   /v1/auth/logout:
@@ -206,6 +234,136 @@ paths:
       summary: Cambia la contraseña con el código (30 minutos, 5 intentos) y cierra la sesión en todos los dispositivos.
       tags:
         - auth
+  /v1/me/mfa:
+    get:
+      operationId: mfa_get_status
+      parameters: []
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MfaStatusResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Si el segundo factor está activo y cuántos códigos de recuperación quedan.
+      tags:
+        - mfa
+  /v1/me/mfa/totp/setup:
+    post:
+      operationId: mfa_setup_totp
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MfaSetupRequestDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MfaSetupResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: "Empieza a configurar la app de autenticación: devuelve el secreto y el URI para el QR. No cuenta hasta confirmarlo."
+      tags:
+        - mfa
+  /v1/me/mfa/totp/confirm:
+    post:
+      operationId: mfa_confirm_totp
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MfaConfirmRequestDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MfaConfirmResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Activa el segundo factor con el primer código de la app y entrega diez códigos de recuperación (una sola vez).
+      tags:
+        - mfa
+  /v1/me/mfa/disable:
+    post:
+      operationId: mfa_disable
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MfaProofRequestDto"
+      responses:
+        "204":
+          description: ""
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Desactiva el segundo factor. Pide la contraseña y un código. No disponible para propietarias y administradoras.
+      tags:
+        - mfa
+  /v1/me/mfa/recovery-codes/regenerate:
+    post:
+      operationId: mfa_regenerate_recovery_codes
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MfaProofRequestDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegeneratedRecoveryCodesResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Sustituye los códigos de recuperación por diez nuevos. Pide la contraseña y un código.
+      tags:
+        - mfa
   /v1/me:
     get:
       operationId: me_get_profile
@@ -543,27 +701,13 @@ components:
       required:
         - email
       additionalProperties: false
-    LoginRequestDto:
+    MfaLoginResponseDto:
       type: object
       properties:
-        email:
+        status:
           type: string
-          maxLength: 254
-        password:
-          type: string
-          minLength: 1
-          maxLength: 256
-        deviceName:
-          type: string
-          minLength: 1
-          maxLength: 100
-      required:
-        - email
-        - password
-      additionalProperties: false
-    LoginResponseDto:
-      type: object
-      properties:
+          enum:
+            - authenticated
         accessToken:
           type: string
         accessTokenExpiresAt:
@@ -593,11 +737,69 @@ components:
             - fullName
           additionalProperties: false
       required:
+        - status
         - accessToken
         - accessTokenExpiresAt
         - refreshToken
         - refreshTokenExpiresAt
         - user
+      additionalProperties: false
+    MfaChallengeResponseDto:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - mfa_required
+        mfaToken:
+          type: string
+        mfaTokenExpiresAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+      required:
+        - status
+        - mfaToken
+        - mfaTokenExpiresAt
+      additionalProperties: false
+    LoginRequestDto:
+      type: object
+      properties:
+        email:
+          type: string
+          maxLength: 254
+        password:
+          type: string
+          minLength: 1
+          maxLength: 256
+        deviceName:
+          type: string
+          minLength: 1
+          maxLength: 100
+      required:
+        - email
+        - password
+      additionalProperties: false
+    MfaVerifyRequestDto:
+      type: object
+      properties:
+        mfaToken:
+          type: string
+          minLength: 1
+          maxLength: 2048
+        code:
+          type: string
+          pattern: ^\d{6}$
+        recoveryCode:
+          type: string
+          minLength: 8
+          maxLength: 24
+        deviceName:
+          type: string
+          minLength: 1
+          maxLength: 100
+      required:
+        - mfaToken
       additionalProperties: false
     RefreshRequestDto:
       type: object
@@ -691,6 +893,90 @@ components:
             - password_changed
       required:
         - status
+      additionalProperties: false
+    MfaStatusResponseDto:
+      type: object
+      properties:
+        isEnabled:
+          type: boolean
+        recoveryCodesRemaining:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+      required:
+        - isEnabled
+        - recoveryCodesRemaining
+      additionalProperties: false
+    MfaSetupRequestDto:
+      type: object
+      properties:
+        password:
+          type: string
+          minLength: 1
+          maxLength: 256
+      required:
+        - password
+      additionalProperties: false
+    MfaSetupResponseDto:
+      type: object
+      properties:
+        secret:
+          type: string
+        provisioningUri:
+          type: string
+      required:
+        - secret
+        - provisioningUri
+      additionalProperties: false
+    MfaConfirmRequestDto:
+      type: object
+      properties:
+        code:
+          type: string
+          pattern: ^\d{6}$
+      required:
+        - code
+      additionalProperties: false
+    MfaConfirmResponseDto:
+      type: object
+      properties:
+        recoveryCodes:
+          minItems: 10
+          maxItems: 10
+          type: array
+          items:
+            type: string
+      required:
+        - recoveryCodes
+      additionalProperties: false
+    MfaProofRequestDto:
+      type: object
+      properties:
+        password:
+          type: string
+          minLength: 1
+          maxLength: 256
+        code:
+          type: string
+          pattern: ^\d{6}$
+        recoveryCode:
+          type: string
+          minLength: 8
+          maxLength: 24
+      required:
+        - password
+      additionalProperties: false
+    RegeneratedRecoveryCodesResponseDto:
+      type: object
+      properties:
+        recoveryCodes:
+          minItems: 10
+          maxItems: 10
+          type: array
+          items:
+            type: string
+      required:
+        - recoveryCodes
       additionalProperties: false
     ProfileResponseDto:
       type: object

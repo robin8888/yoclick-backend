@@ -2,9 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { PasswordHasher } from '../../../shared/auth/password-hasher';
 import { DomainError } from '../../../shared/errors/domain-error';
 import { HTTP_STATUS } from '../../../shared/errors/http-status';
-import { MILLISECONDS_PER_MINUTE } from '../../../shared/time/time-units';
-import { ACCOUNT_LOCK_DURATION_MINUTES, MAX_FAILED_LOGIN_ATTEMPTS } from '../domain/login-policy';
-import { AccountSecurityNotifier } from './account-security-notifier';
+import { LoginFailureRecorder } from './login-failure-recorder';
 import {
   USER_ACCOUNT_REPOSITORY,
   type UserAccount,
@@ -28,7 +26,7 @@ export class ReauthenticationChecker {
   constructor(
     @Inject(USER_ACCOUNT_REPOSITORY) private readonly users: UserAccountRepository,
     private readonly passwordHasher: PasswordHasher,
-    private readonly securityNotifier: AccountSecurityNotifier,
+    private readonly failureRecorder: LoginFailureRecorder,
   ) {}
 
   async assertPasswordIsCorrect(userId: string, plainPassword: string): Promise<UserAccount> {
@@ -43,25 +41,11 @@ export class ReauthenticationChecker {
 
     const isPasswordCorrect = await this.passwordHasher.verify(account.passwordHash, plainPassword);
     if (!isPasswordCorrect) {
-      await this.registerFailure(account, now);
+      await this.failureRecorder.record(account);
       throw reauthenticationFailedError();
     }
 
     await this.users.recordSuccessfulLogin(account.id, now);
     return account;
-  }
-
-  private async registerFailure(account: UserAccount, now: Date): Promise<void> {
-    const outcome = await this.users.recordFailedLogin(account.id, {
-      maxFailedAttempts: MAX_FAILED_LOGIN_ATTEMPTS,
-      lockDurationMs: ACCOUNT_LOCK_DURATION_MINUTES * MILLISECONDS_PER_MINUTE,
-      now,
-    });
-    if (outcome.isNowLocked) {
-      await this.securityNotifier.sendAccountLockedNotice({
-        email: account.email,
-        fullName: account.fullName,
-      });
-    }
   }
 }

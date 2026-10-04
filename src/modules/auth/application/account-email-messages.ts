@@ -82,6 +82,26 @@ export function buildPasswordChangedMessage(details: RecipientDetails): EmailMes
   };
 }
 
+/** Aviso de que se activó o desactivó el segundo factor: si no fue la persona, es la alarma de un acceso ajeno. */
+export function buildMfaChangedMessage(
+  details: RecipientDetails & { isEnabled: boolean },
+): EmailMessage {
+  return {
+    to: details.to,
+    subject: details.isEnabled
+      ? 'Has activado la verificación en dos pasos'
+      : 'Has desactivado la verificación en dos pasos',
+    textBody: [
+      `Hola, ${details.fullName}:`,
+      '',
+      details.isEnabled
+        ? 'La verificación en dos pasos de tu cuenta de Yoclick está activada. Guarda tus códigos de recuperación en un sitio seguro.'
+        : 'La verificación en dos pasos de tu cuenta de Yoclick se ha desactivado y hemos cerrado tu sesión en todos los dispositivos.',
+      'Si no has sido tú, cambia tu contraseña desde la pantalla de acceso y revisa la seguridad de tu correo.',
+    ].join('\n'),
+  };
+}
+
 export function buildPasswordResetMessage(details: VerificationCodeDetails): EmailMessage {
   return {
     to: details.to,
