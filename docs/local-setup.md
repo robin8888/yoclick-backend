@@ -42,3 +42,33 @@ idempotencia en PostgreSQL, detrás de interfaces para poder cambiarlo sin tocar
 
 `npm run test:e2e` aplica las migraciones a **yoclick_test** y vacía sus tablas entre pruebas. Se niega a ejecutarse si
 `TEST_DATABASE_URL` apunta a una base cuyo nombre no termine en `_test`.
+
+## Datos de demo
+
+```bash
+npm run db:seed        # idempotente: se puede ejecutar las veces que haga falta
+```
+
+Crea los 4 centros ficticios del prototipo y 21 cuentas. **Todas** tienen la misma contraseña de pruebas,
+`Nosnibor88` (es pública a propósito; por eso el seed se niega a ejecutarse con `NODE_ENV=production`).
+
+| Centro | Tipo | Color | Código |
+|---|---|---|---|
+| Studio Norte | estudio | #E4572E | `NORTE7` |
+| Forja Readaptación | readap | #2446C7 | `FORJA2` |
+| Kiné Lab | box | #C8F031 | `KINE24` |
+| Compás Escuela de Baile | baile | #7A3FE0 | `COMPAS` |
+
+Cuentas (sustituye `<centro>` por `studio-norte`, `forja-readaptacion`, `kine-lab` o `compas-escuela-de-baile`):
+
+| Rol | Correo |
+|---|---|
+| Propietario | `owner.<centro>@demo.yoclick.test` |
+| Administración | `admin.<centro>@demo.yoclick.test` |
+| Equipo | `staff.<centro>@demo.yoclick.test` |
+| Clientes | `client1.<centro>@demo.yoclick.test`, `client2.<centro>@demo.yoclick.test` |
+| Cliente en los 4 centros | `multi@demo.yoclick.test` |
+
+## Claves de los tokens
+
+`npm run keys:generate` crea el par de claves Ed25519 de desarrollo y lo añade a `.env` (no toca nada que ya exista).

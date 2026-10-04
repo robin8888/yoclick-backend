@@ -25,7 +25,8 @@
     "db:deploy": "prisma migrate deploy",
     "postinstall": "prisma generate",
     "openapi:gen": "nest build && node dist/openapi/generate-openapi.js",
-    "keys:generate": "node scripts/generate-development-jwt-keys.cjs"
+    "keys:generate": "node scripts/generate-development-jwt-keys.cjs",
+    "db:seed": "nest build && node dist/seed/run-seed.js"
   },
   "license": "UNLICENSED",
   "type": "commonjs",
@@ -41,6 +42,7 @@
     "@nestjs/throttler": "6.7.1",
     "@prisma/adapter-pg": "7.10.0",
     "@prisma/client": "7.10.0",
+    "argon2": "0.45.1",
     "fastify": "5.12.5",
     "jose": "6.2.12",
     "nestjs-pino": "4.6.1",
