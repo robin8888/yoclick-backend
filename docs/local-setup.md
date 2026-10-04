@@ -6,8 +6,8 @@ Requisitos: Node.js 22 o superior, npm y PostgreSQL 16 o superior instalado en e
 
 1. Conéctate como `postgres` (DBeaver u otro cliente).
 2. Ejecuta `scripts/database/01-create-roles-and-databases.sql` **sentencia a sentencia**, con tus propias contraseñas.
-3. Conéctate a `yoclick` y después a `yoclick_test` y ejecuta `scripts/database/02-enable-extensions.sql` en cada una.
-4. Comprueba el resultado con `scripts/database/03-verify-setup.sql`.
+3. Las extensiones (`btree_gist`, `citext`, `pgcrypto`) las crea la propia migración inicial: son extensiones de confianza y el dueño de la base puede crearlas.
+4. Comprueba los roles con `scripts/database/03-verify-setup.sql`.
 
 | Rol | Para qué | Puede |
 |---|---|---|
@@ -24,10 +24,11 @@ Requisitos: Node.js 22 o superior, npm y PostgreSQL 16 o superior instalado en e
 Copia `.env.example` a `.env` y rellénalo. El fichero `.env` está en `.gitignore`: **nunca** se sube ni se comparte.
 Las variables se validan al arrancar (zod): si falta alguna o es inválida, el proceso no arranca y dice cuál.
 
-## 3. Arrancar
+## 3. Migraciones y arranque
 
 ```bash
-npm install
+npm install                 # también genera el cliente de Prisma
+npm run db:migrate          # aplica las migraciones a la base yoclick (rol yoclick_migrator)
 npm run start:dev
 curl http://127.0.0.1:3000/health   # {"status":"ok"}
 ```
@@ -36,3 +37,8 @@ curl http://127.0.0.1:3000/health   # {"status":"ok"}
 
 No hace falta hasta API-3 (lista de espera y recordatorios). Hasta entonces el rate limit va en memoria y la
 idempotencia en PostgreSQL, detrás de interfaces para poder cambiarlo sin tocar los casos de uso.
+
+## Tests e2e
+
+`npm run test:e2e` aplica las migraciones a **yoclick_test** y vacía sus tablas entre pruebas. Se niega a ejecutarse si
+`TEST_DATABASE_URL` apunta a una base cuyo nombre no termine en `_test`.

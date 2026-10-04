@@ -1,0 +1,93 @@
+// Esquema inicial (API-004): identidad y tenant raíz. Las tablas de negocio se añaden por ticket.
+// Prisma no modela RLS ni EXCLUDE: viven en el SQL de cada migración (ver docs/spec/01-arquitectura.md).
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum CenterStatus {
+  trial
+  active
+  past_due
+  suspended
+
+  @@map("center_status")
+}
+
+enum MembershipRole {
+  owner
+  admin
+  staff
+  client
+
+  @@map("membership_role")
+}
+
+enum MembershipStatus {
+  invited
+  active
+  blocked
+  left
+
+  @@map("membership_status")
+}
+
+/// Persona con cuenta. Global (sin center_id): una persona puede tener varios centros.
+model User {
+  id              String    @id @db.Uuid
+  email           String    @unique @db.Citext
+  passwordHash    String    @map("password_hash")
+  fullName        String    @map("full_name")
+  emailVerifiedAt DateTime? @map("email_verified_at") @db.Timestamptz
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  memberships Membership[]
+
+  @@map("users")
+}
+
+/// Tenant raíz: un centro (gimnasio, academia...).
+model Center {
+  id         String       @id @db.Uuid
+  slug       String       @unique
+  name       String
+  sectorId   String       @map("sector_id")
+  brandColor String       @map("brand_color") @db.Char(7)
+  timezone   String       @default("Europe/Madrid")
+  joinCode   String       @unique @map("join_code") @db.Char(6)
+  status     CenterStatus @default(trial)
+  createdAt  DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime     @updatedAt @map("updated_at") @db.Timestamptz
+
+  memberships Membership[]
+
+  @@map("centers")
+}
+
+/// Pertenencia de un usuario a un centro con un rol.
+model Membership {
+  id        String           @id @db.Uuid
+  centerId  String           @map("center_id") @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  role      MembershipRole
+  status    MembershipStatus @default(active)
+  joinedAt  DateTime         @default(now()) @map("joined_at") @db.Timestamptz
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime         @updatedAt @map("updated_at") @db.Timestamptz
+
+  center Center @relation(fields: [centerId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([centerId, userId])
+  @@index([centerId, role])
+  @@index([userId])
+  @@map("memberships")
+}
