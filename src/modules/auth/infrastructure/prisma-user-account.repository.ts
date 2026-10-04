@@ -4,6 +4,8 @@ import { Prisma } from '../../../generated/prisma/client';
 import { TenantPrismaService } from '../../../shared/database/tenant-prisma.service';
 import {
   type CreateUserAccountResult,
+  type FailedLoginOutcome,
+  type LockoutPolicy,
   type NewUserAccount,
   type UserAccount,
   type UserAccountRepository,
@@ -33,6 +35,48 @@ export class PrismaUserAccountRepository implements UserAccountRepository {
           fullName: true,
           passwordHash: true,
           emailVerifiedAt: true,
+          failedLoginCount: true,
+          lockedUntil: true,
+        },
+      }),
+    );
+  }
+
+  async recordFailedLogin(userId: string, policy: LockoutPolicy): Promise<FailedLoginOutcome> {
+    return this.tenantPrismaService.runInUserContext(userId, async (client) => {
+      // El incremento es un UPDATE atómico y deja la fila bloqueada hasta el final de la transacción:
+      // dos intentos simultáneos no pueden pasarse del límite ni bloquear dos veces.
+      const { failedLoginCount } = await client.user.update({
+        where: { id: userId },
+        data: { failedLoginCount: { increment: 1 } },
+        select: { failedLoginCount: true },
+      });
+      if (failedLoginCount < policy.maxFailedAttempts) return { isNowLocked: false };
+
+      await client.user.update({
+        where: { id: userId },
+        data: {
+          failedLoginCount: 0,
+          lockedUntil: new Date(policy.now.getTime() + policy.lockDurationMs),
+        },
+      });
+      return { isNowLocked: true };
+    });
+  }
+
+  async recordSuccessfulLogin(
+    userId: string,
+    now: Date,
+    upgradedPasswordHash?: string,
+  ): Promise<void> {
+    await this.tenantPrismaService.runInUserContext(userId, (client) =>
+      client.user.update({
+        where: { id: userId },
+        data: {
+          failedLoginCount: 0,
+          lockedUntil: null,
+          lastLoginAt: now,
+          ...(upgradedPasswordHash && { passwordHash: upgradedPasswordHash }),
         },
       }),
     );

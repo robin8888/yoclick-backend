@@ -25,7 +25,7 @@ import { VerifyEmailRequestDto } from './dto/verify-email-request.dto';
 @ApiDefaultResponse({ type: ProblemDetailsDto, description: 'Error RFC 9457' })
 @Controller('auth')
 @Public()
-export class AuthController {
+export class RegistrationController {
   constructor(
     private readonly registerUser: RegisterUserUseCase,
     private readonly verifyEmail: VerifyEmailUseCase,

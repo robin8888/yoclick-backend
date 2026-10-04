@@ -65,19 +65,24 @@ enum MembershipStatus {
 
 /// Persona con cuenta. Global (sin center_id): una persona puede tener varios centros.
 model User {
-  id              String    @id @db.Uuid
-  email           String    @unique @db.Citext
-  passwordHash    String    @map("password_hash")
-  fullName        String    @map("full_name")
-  emailVerifiedAt DateTime? @map("email_verified_at") @db.Timestamptz
-  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  id               String    @id @db.Uuid
+  email            String    @unique @db.Citext
+  passwordHash     String    @map("password_hash")
+  fullName         String    @map("full_name")
+  emailVerifiedAt  DateTime? @map("email_verified_at") @db.Timestamptz
+  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz
+  /// Intentos de inicio de sesión fallidos seguidos; al llegar al límite se bloquea un rato.
+  failedLoginCount Int       @default(0) @map("failed_login_count")
+  lockedUntil      DateTime? @map("locked_until") @db.Timestamptz
+  lastLoginAt      DateTime? @map("last_login_at") @db.Timestamptz
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
   memberships       Membership[]
   idempotencyKeys   IdempotencyKey[]
   consents          Consent[]
   verificationCodes VerificationCode[]
+  refreshTokens     RefreshToken[]
 
   @@map("users")
 }
@@ -174,4 +179,25 @@ model VerificationCode {
 
   @@index([userId, purpose, createdAt])
   @@map("verification_codes")
+}
+
+/// Sesión larga de un dispositivo. El token es opaco y aleatorio (256 bits); aquí solo vive su SHA-256.
+/// Rota en cada uso: el anterior queda revocado y apunta al nuevo. Usar uno ya revocado delata un robo
+/// y revoca toda la familia (todos los tokens descendientes del mismo inicio de sesión).
+model RefreshToken {
+  id           String    @id @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  familyId     String    @map("family_id") @db.Uuid
+  tokenHash    String    @unique @map("token_hash")
+  deviceName   String?   @map("device_name")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  expiresAt    DateTime  @map("expires_at") @db.Timestamptz
+  revokedAt    DateTime? @map("revoked_at") @db.Timestamptz
+  replacedById String?   @map("replaced_by_id") @db.Uuid
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("refresh_tokens")
 }

@@ -16,4 +16,13 @@ export async function configureApplication(application: NestFastifyApplication):
     hsts: { maxAge: HSTS_MAX_AGE_SECONDS, includeSubDomains: true },
     contentSecurityPolicy: false,
   });
+  // Ninguna respuesta de esta API debe quedar en una caché compartida ni en el disco del dispositivo:
+  // llevan tokens y datos personales.
+  application
+    .getHttpAdapter()
+    .getInstance()
+    .addHook('onSend', async (_request, reply, payload) => {
+      void reply.header('cache-control', 'no-store');
+      return payload;
+    });
 }

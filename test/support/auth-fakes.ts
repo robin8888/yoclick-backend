@@ -1,6 +1,14 @@
 import { type BreachedPasswordChecker } from '../../src/modules/auth/application/ports/breached-password.checker';
 import {
+  type NewRefreshToken,
+  type RotationRequest,
+  type SessionRepository,
+  type StoredRefreshToken,
+} from '../../src/modules/auth/application/ports/session.repository';
+import {
   type CreateUserAccountResult,
+  type FailedLoginOutcome,
+  type LockoutPolicy,
   type NewUserAccount,
   type UserAccount,
   type UserAccountRepository,
@@ -38,10 +46,45 @@ export class InMemoryUserAccountRepository implements UserAccountRepository {
       fullName: newUser.fullName,
       passwordHash: newUser.passwordHash,
       emailVerifiedAt: null,
+      failedLoginCount: 0,
+      lockedUntil: null,
       consents: newUser.consents,
     });
     return Promise.resolve('created');
   }
+
+  recordFailedLogin(userId: string, policy: LockoutPolicy): Promise<FailedLoginOutcome> {
+    for (const [key, account] of this.accounts) {
+      if (account.id !== userId) continue;
+      const failedLoginCount = account.failedLoginCount + 1;
+      const isNowLocked = failedLoginCount >= policy.maxFailedAttempts;
+      this.accounts.set(key, {
+        ...account,
+        failedLoginCount: isNowLocked ? 0 : failedLoginCount,
+        lockedUntil: isNowLocked
+          ? new Date(policy.now.getTime() + policy.lockDurationMs)
+          : account.lockedUntil,
+      });
+      return Promise.resolve({ isNowLocked });
+    }
+    return Promise.resolve({ isNowLocked: false });
+  }
+
+  recordSuccessfulLogin(userId: string, now: Date, upgradedPasswordHash?: string): Promise<void> {
+    for (const [key, account] of this.accounts) {
+      if (account.id !== userId) continue;
+      this.accounts.set(key, {
+        ...account,
+        failedLoginCount: 0,
+        lockedUntil: null,
+        passwordHash: upgradedPasswordHash ?? account.passwordHash,
+      });
+      this.lastLoginAt.set(userId, now);
+    }
+    return Promise.resolve();
+  }
+
+  readonly lastLoginAt = new Map<string, Date>();
 
   markEmailVerified(userId: string, verifiedAt: Date): Promise<void> {
     for (const [key, account] of this.accounts) {
@@ -51,8 +94,17 @@ export class InMemoryUserAccountRepository implements UserAccountRepository {
     return Promise.resolve();
   }
 
-  seedAccount(account: UserAccount): void {
-    this.accounts.set(account.email.toLowerCase(), { ...account, consents: [] });
+  /** Para preparar una cuenta ya existente; los campos de bloqueo son opcionales. */
+  seedAccount(
+    account: Omit<UserAccount, 'failedLoginCount' | 'lockedUntil'> &
+      Partial<Pick<UserAccount, 'failedLoginCount' | 'lockedUntil'>>,
+  ): void {
+    this.accounts.set(account.email.toLowerCase(), {
+      failedLoginCount: 0,
+      lockedUntil: null,
+      ...account,
+      consents: [],
+    });
   }
 }
 
@@ -167,5 +219,69 @@ export class FakeBreachedPasswordChecker implements BreachedPasswordChecker {
 
   isBreached(plainPassword: string): Promise<boolean> {
     return Promise.resolve(this.breachedPasswords.includes(plainPassword));
+  }
+}
+
+interface StoredSessionToken extends StoredRefreshToken {
+  readonly tokenHash: string;
+  readonly deviceName: string | null;
+  replacedById: string | null;
+  revokedAtMutable: Date | null;
+}
+
+export class InMemorySessionRepository implements SessionRepository {
+  readonly tokens: StoredSessionToken[] = [];
+
+  create(newToken: NewRefreshToken): Promise<void> {
+    this.tokens.push({ ...newToken, revokedAt: null, revokedAtMutable: null, replacedById: null });
+    return Promise.resolve();
+  }
+
+  findByTokenHash(tokenHash: string): Promise<StoredRefreshToken | null> {
+    const stored = this.tokens.find((candidate) => candidate.tokenHash === tokenHash);
+    return Promise.resolve(stored ? this.asStored(stored) : null);
+  }
+
+  rotate(request: RotationRequest): Promise<boolean> {
+    const current = this.tokens.find((candidate) => candidate.id === request.currentTokenId);
+    if (!current || current.revokedAtMutable !== null) return Promise.resolve(false);
+    current.revokedAtMutable = request.now;
+    current.replacedById = request.newToken.id;
+    this.tokens.push({
+      ...request.newToken,
+      revokedAt: null,
+      revokedAtMutable: null,
+      replacedById: null,
+    });
+    return Promise.resolve(true);
+  }
+
+  revokeFamily(familyId: string, now: Date): Promise<void> {
+    for (const token of this.tokens) {
+      if (token.familyId === familyId) token.revokedAtMutable ??= now;
+    }
+    return Promise.resolve();
+  }
+
+  revokeAllOfUser(userId: string, now: Date): Promise<void> {
+    for (const token of this.tokens) {
+      if (token.userId === userId) token.revokedAtMutable ??= now;
+    }
+    return Promise.resolve();
+  }
+
+  activeTokensOf(userId: string): number {
+    return this.tokens.filter((token) => token.userId === userId && token.revokedAtMutable === null)
+      .length;
+  }
+
+  private asStored(token: StoredSessionToken): StoredRefreshToken {
+    return {
+      id: token.id,
+      userId: token.userId,
+      familyId: token.familyId,
+      expiresAt: token.expiresAt,
+      revokedAt: token.revokedAtMutable,
+    };
   }
 }

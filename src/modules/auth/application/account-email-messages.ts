@@ -51,6 +51,22 @@ export function buildAlreadyRegisteredMessage(details: RecipientDetails): EmailM
   };
 }
 
+/** Aviso al dueño de que su cuenta se ha bloqueado unos minutos tras muchos intentos fallidos. */
+export function buildAccountLockedMessage(details: RecipientDetails): EmailMessage {
+  return {
+    to: details.to,
+    subject: 'Hemos bloqueado tu cuenta unos minutos',
+    textBody: [
+      `Hola, ${details.fullName}:`,
+      '',
+      'Hemos detectado varios intentos fallidos de entrar en tu cuenta y la hemos bloqueado durante 15 minutos por seguridad.',
+      'Si has sido tú, espera ese tiempo y vuelve a probar. Si no, cambia tu contraseña desde la pantalla de acceso.',
+      '',
+      NEVER_SHARE,
+    ].join('\n'),
+  };
+}
+
 export function buildPasswordResetMessage(details: VerificationCodeDetails): EmailMessage {
   return {
     to: details.to,
