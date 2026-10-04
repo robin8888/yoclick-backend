@@ -727,6 +727,85 @@ paths:
       summary: Nombre, sector y color de un centro. Público y cacheable cinco minutos.
       tags:
         - centers
+  /v1/centers/{centerId}:
+    get:
+      operationId: centers_get_settings
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CenterSettingsResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Datos, horario, festivos y política de cancelación del centro. Devuelve ETag.
+      tags:
+        - centers
+    patch:
+      operationId: centers_update_settings
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: If-Match
+          in: header
+          description: El ETag que se leyó
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCenterSettingsRequestDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CenterSettingsResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: "Modifica datos del centro. Exige If-Match: 428 si falta, 412 si otra persona lo cambió antes."
+      tags:
+        - centers
   /health:
     get:
       operationId: health_check_liveness
@@ -1693,6 +1772,379 @@ components:
         - name
         - sectorId
         - brandColor
+      additionalProperties: false
+    CenterSettingsResponseDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        slug:
+          type: string
+        name:
+          type: string
+        sectorId:
+          type: string
+        brandColor:
+          type: string
+        timezone:
+          type: string
+        joinCode:
+          type: string
+        status:
+          type: string
+          enum:
+            - trial
+            - active
+            - past_due
+            - suspended
+        isListed:
+          type: boolean
+        city:
+          type: array
+          items:
+            type: string
+        address:
+          type: array
+          items:
+            type: string
+        latitude:
+          type: array
+          items:
+            type: number
+        longitude:
+          type: array
+          items:
+            type: number
+        openingHours:
+          type: object
+          properties:
+            mon:
+              maxItems: 4
+              type: array
+              items:
+                type: object
+                properties:
+                  opensAt:
+                    type: string
+                  closesAt:
+                    type: string
+                required:
+                  - opensAt
+                  - closesAt
+                additionalProperties: false
+            tue:
+              maxItems: 4
+              type: array
+              items:
+                type: object
+                properties:
+                  opensAt:
+                    type: string
+                  closesAt:
+                    type: string
+                required:
+                  - opensAt
+                  - closesAt
+                additionalProperties: false
+            wed:
+              maxItems: 4
+              type: array
+              items:
+                type: object
+                properties:
+                  opensAt:
+                    type: string
+                  closesAt:
+                    type: string
+                required:
+                  - opensAt
+                  - closesAt
+                additionalProperties: false
+            thu:
+              maxItems: 4
+              type: array
+              items:
+                type: object
+                properties:
+                  opensAt:
+                    type: string
+                  closesAt:
+                    type: string
+                required:
+                  - opensAt
+                  - closesAt
+                additionalProperties: false
+            fri:
+              maxItems: 4
+              type: array
+              items:
+                type: object
+                properties:
+                  opensAt:
+                    type: string
+                  closesAt:
+                    type: string
+                required:
+                  - opensAt
+                  - closesAt
+                additionalProperties: false
+            sat:
+              maxItems: 4
+              type: array
+              items:
+                type: object
+                properties:
+                  opensAt:
+                    type: string
+                  closesAt:
+                    type: string
+                required:
+                  - opensAt
+                  - closesAt
+                additionalProperties: false
+            sun:
+              maxItems: 4
+              type: array
+              items:
+                type: object
+                properties:
+                  opensAt:
+                    type: string
+                  closesAt:
+                    type: string
+                required:
+                  - opensAt
+                  - closesAt
+                additionalProperties: false
+          additionalProperties: false
+          nullable: true
+        holidays:
+          maxItems: 100
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+              label:
+                type: string
+                minLength: 1
+                maxLength: 60
+            required:
+              - date
+              - label
+            additionalProperties: false
+          nullable: true
+        cancelPolicy:
+          type: object
+          properties:
+            freeCancellationHours:
+              type: integer
+              minimum: 0
+              maximum: 168
+            lateCancellationConsumesCredit:
+              type: boolean
+          required:
+            - freeCancellationHours
+            - lateCancellationConsumesCredit
+          additionalProperties: false
+          nullable: true
+        trialEndsAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+          nullable: true
+      required:
+        - id
+        - slug
+        - name
+        - sectorId
+        - brandColor
+        - timezone
+        - joinCode
+        - status
+        - isListed
+        - city
+        - address
+        - latitude
+        - longitude
+        - openingHours
+        - holidays
+        - cancelPolicy
+        - trialEndsAt
+      additionalProperties: false
+    UpdateCenterSettingsRequestDto:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 80
+        brandColor:
+          type: string
+          pattern: ^#[0-9A-Fa-f]{6}$
+        timezone:
+          type: string
+          maxLength: 64
+        isListed:
+          type: boolean
+        city:
+          type: string
+          minLength: 1
+          maxLength: 200
+          nullable: true
+        address:
+          type: string
+          minLength: 1
+          maxLength: 200
+          nullable: true
+        latitude:
+          type: number
+          minimum: -90
+          maximum: 90
+          nullable: true
+        longitude:
+          type: number
+          minimum: -180
+          maximum: 180
+          nullable: true
+        openingHours:
+          type: object
+          properties:
+            mon:
+              maxItems: 4
+              type: array
+              items:
+                type: object
+                properties:
+                  opensAt:
+                    type: string
+                  closesAt:
+                    type: string
+                required:
+                  - opensAt
+                  - closesAt
+                additionalProperties: false
+            tue:
+              maxItems: 4
+              type: array
+              items:
+                type: object
+                properties:
+                  opensAt:
+                    type: string
+                  closesAt:
+                    type: string
+                required:
+                  - opensAt
+                  - closesAt
+                additionalProperties: false
+            wed:
+              maxItems: 4
+              type: array
+              items:
+                type: object
+                properties:
+                  opensAt:
+                    type: string
+                  closesAt:
+                    type: string
+                required:
+                  - opensAt
+                  - closesAt
+                additionalProperties: false
+            thu:
+              maxItems: 4
+              type: array
+              items:
+                type: object
+                properties:
+                  opensAt:
+                    type: string
+                  closesAt:
+                    type: string
+                required:
+                  - opensAt
+                  - closesAt
+                additionalProperties: false
+            fri:
+              maxItems: 4
+              type: array
+              items:
+                type: object
+                properties:
+                  opensAt:
+                    type: string
+                  closesAt:
+                    type: string
+                required:
+                  - opensAt
+                  - closesAt
+                additionalProperties: false
+            sat:
+              maxItems: 4
+              type: array
+              items:
+                type: object
+                properties:
+                  opensAt:
+                    type: string
+                  closesAt:
+                    type: string
+                required:
+                  - opensAt
+                  - closesAt
+                additionalProperties: false
+            sun:
+              maxItems: 4
+              type: array
+              items:
+                type: object
+                properties:
+                  opensAt:
+                    type: string
+                  closesAt:
+                    type: string
+                required:
+                  - opensAt
+                  - closesAt
+                additionalProperties: false
+          additionalProperties: false
+        holidays:
+          maxItems: 100
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+              label:
+                type: string
+                minLength: 1
+                maxLength: 60
+            required:
+              - date
+              - label
+            additionalProperties: false
+        cancelPolicy:
+          type: object
+          properties:
+            freeCancellationHours:
+              type: integer
+              minimum: 0
+              maximum: 168
+            lateCancellationConsumesCredit:
+              type: boolean
+          required:
+            - freeCancellationHours
+            - lateCancellationConsumesCredit
+          additionalProperties: false
       additionalProperties: false
     HealthResponseDto:
       type: object
