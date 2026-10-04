@@ -3,6 +3,7 @@ import { z } from 'zod';
 const MIN_TCP_PORT = 1;
 const MAX_TCP_PORT = 65_535;
 const DEFAULT_PORT = 3000;
+const DEVELOPMENT_KEY_ID = 'dev-1';
 
 const LOG_LEVELS = ['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent'] as const;
 const VERBOSE_LOG_LEVELS: readonly string[] = ['trace', 'debug'];
@@ -29,6 +30,11 @@ export const environmentSchema = z
     DATABASE_URL: z
       .string()
       .refine((value) => parseDatabaseUrl(value) !== null, 'must be a postgresql:// URL'),
+    // Par de claves Ed25519 (PEM en base64). La privada firma los tokens de acceso; solo la API la tiene.
+    JWT_ACCESS_PRIVATE_KEY_BASE64: z.string().min(1),
+    JWT_ACCESS_PUBLIC_KEY_BASE64: z.string().min(1),
+    // Identifica la clave en el token (`kid`) para poder rotarla sin cortar sesiones.
+    JWT_KEY_ID: z.string().min(1).default(DEVELOPMENT_KEY_ID),
   })
   .superRefine((environment, context) => {
     const isProduction = environment.NODE_ENV === 'production';
@@ -39,6 +45,14 @@ export const environmentSchema = z
         code: 'custom',
         path: ['LOG_LEVEL'],
         message: 'must be info or higher in production (verbose logs can leak data)',
+      });
+    }
+
+    if (environment.JWT_KEY_ID === DEVELOPMENT_KEY_ID) {
+      context.addIssue({
+        code: 'custom',
+        path: ['JWT_KEY_ID'],
+        message: 'must not be the development key id in production',
       });
     }
 

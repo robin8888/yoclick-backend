@@ -96,6 +96,13 @@ module.exports = tseslint.config(
           prefix: ['is', 'has', 'can', 'should', 'was', 'will'],
         },
         { selector: 'function', format: ['camelCase'], custom: NOT_A_VAGUE_NAME },
+        // Los decoradores de Nest (`@Public()`, `@Roles()`) son funciones con nombre en PascalCase.
+        {
+          selector: 'variable',
+          types: ['function'],
+          format: ['camelCase', 'PascalCase'],
+          custom: NOT_A_VAGUE_NAME,
+        },
         {
           selector: 'parameter',
           format: ['camelCase'],

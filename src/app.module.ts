@@ -4,6 +4,7 @@ import { APP_FILTER, APP_PIPE } from '@nestjs/core';
 import { LoggerModule } from 'nestjs-pino';
 import { ZodValidationPipe } from 'nestjs-zod';
 import { HealthModule } from './modules/health/health.module';
+import { AuthModule } from './shared/auth/auth.module';
 import { type Environment } from './shared/config/environment.schema';
 import { parseEnvironment } from './shared/config/parse-environment';
 import { DatabaseModule } from './shared/database/database.module';
@@ -22,6 +23,7 @@ import { buildLoggerOptions } from './shared/logging/build-logger-options';
         }),
     }),
     DatabaseModule,
+    AuthModule,
     HealthModule,
   ],
   providers: [

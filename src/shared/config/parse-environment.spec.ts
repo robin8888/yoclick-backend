@@ -3,75 +3,83 @@ import { parseEnvironment } from './parse-environment';
 const DEVELOPMENT_DATABASE_URL = 'postgresql://yoclick_app:placeholder@localhost:5432/yoclick';
 const PRODUCTION_DATABASE_URL =
   'postgresql://yoclick_app:placeholder@db.internal:5432/yoclick?sslmode=require';
+const FAKE_KEY_BASE64 = Buffer.from('not-a-real-key').toString('base64');
 
-function withDatabase(overrides: Record<string, unknown> = {}): Record<string, unknown> {
-  return { DATABASE_URL: DEVELOPMENT_DATABASE_URL, ...overrides };
+/** Entorno de desarrollo válido; cada test cambia solo lo que quiere probar. */
+function developmentEnvironment(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    DATABASE_URL: DEVELOPMENT_DATABASE_URL,
+    JWT_ACCESS_PRIVATE_KEY_BASE64: FAKE_KEY_BASE64,
+    JWT_ACCESS_PUBLIC_KEY_BASE64: FAKE_KEY_BASE64,
+    ...overrides,
+  };
+}
+
+function productionEnvironment(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return developmentEnvironment({
+    NODE_ENV: 'production',
+    DATABASE_URL: PRODUCTION_DATABASE_URL,
+    JWT_KEY_ID: 'prod-2026-10',
+    ...overrides,
+  });
+}
+
+function captureErrorMessage(rawEnvironment: Record<string, unknown>): string {
+  try {
+    parseEnvironment(rawEnvironment);
+  } catch (error) {
+    return String(error);
+  }
+  return '';
 }
 
 describe('parseEnvironment', () => {
-  it('applies safe defaults when nothing is configured', () => {
-    const environment = parseEnvironment(withDatabase());
+  it('applies safe defaults when only the required variables are set', () => {
+    const environment = parseEnvironment(developmentEnvironment());
 
-    expect(environment).toEqual({
-      DATABASE_URL: DEVELOPMENT_DATABASE_URL,
+    expect(environment).toMatchObject({
       NODE_ENV: 'development',
       HOST: '127.0.0.1',
       PORT: 3000,
       LOG_LEVEL: 'info',
+      JWT_KEY_ID: 'dev-1',
     });
   });
 
   it('coerces the port from a string, as environment variables always are', () => {
-    expect(parseEnvironment(withDatabase({ PORT: '8080' })).PORT).toBe(8080);
+    expect(parseEnvironment(developmentEnvironment({ PORT: '8080' })).PORT).toBe(8080);
   });
 
   it.each(['0', '65536', 'abc', '-1', '3000.5'])('rejects the invalid port %s', (invalidPort) => {
-    expect(() => parseEnvironment(withDatabase({ PORT: invalidPort }))).toThrow(/PORT/);
+    expect(() => parseEnvironment(developmentEnvironment({ PORT: invalidPort }))).toThrow(/PORT/);
   });
 
   it('rejects an unknown NODE_ENV instead of silently running as development', () => {
-    expect(() => parseEnvironment(withDatabase({ NODE_ENV: 'staging' }))).toThrow(/NODE_ENV/);
+    expect(() => parseEnvironment(developmentEnvironment({ NODE_ENV: 'staging' }))).toThrow(
+      /NODE_ENV/,
+    );
   });
 
   it('rejects verbose log levels in production because they can leak data', () => {
-    expect(() =>
-      parseEnvironment(
-        withDatabase({
-          NODE_ENV: 'production',
-          LOG_LEVEL: 'debug',
-          DATABASE_URL: PRODUCTION_DATABASE_URL,
-        }),
-      ),
-    ).toThrow(/LOG_LEVEL/);
+    expect(() => parseEnvironment(productionEnvironment({ LOG_LEVEL: 'debug' }))).toThrow(
+      /LOG_LEVEL/,
+    );
   });
 
-  it('accepts info logging in production', () => {
-    expect(
-      parseEnvironment(
-        withDatabase({
-          NODE_ENV: 'production',
-          LOG_LEVEL: 'info',
-          DATABASE_URL: PRODUCTION_DATABASE_URL,
-        }),
-      ).LOG_LEVEL,
-    ).toBe('info');
+  it('accepts a complete production environment', () => {
+    expect(parseEnvironment(productionEnvironment()).NODE_ENV).toBe('production');
   });
 
   it('lists every invalid variable at once so the operator fixes them in one pass', () => {
-    expect(() => parseEnvironment(withDatabase({ PORT: 'abc', NODE_ENV: 'staging' }))).toThrow(
-      /PORT[\s\S]*NODE_ENV|NODE_ENV[\s\S]*PORT/,
-    );
+    expect(() =>
+      parseEnvironment(developmentEnvironment({ PORT: 'abc', NODE_ENV: 'staging' })),
+    ).toThrow(/PORT[\s\S]*NODE_ENV|NODE_ENV[\s\S]*PORT/);
   });
 
   it('never echoes the rejected value, which could be a secret', () => {
     const secretLookingValue = 'sk_live_super_secret_value';
 
-    let errorMessage = '';
-    try {
-      parseEnvironment(withDatabase({ PORT: secretLookingValue }));
-    } catch (error) {
-      errorMessage = String(error);
-    }
+    const errorMessage = captureErrorMessage(developmentEnvironment({ PORT: secretLookingValue }));
 
     expect(errorMessage).toContain('PORT');
     expect(errorMessage).not.toContain(secretLookingValue);
@@ -79,21 +87,23 @@ describe('parseEnvironment', () => {
 
   describe('DATABASE_URL', () => {
     it('is required: the API cannot run without a database', () => {
-      expect(() => parseEnvironment({})).toThrow(/DATABASE_URL/);
+      expect(captureErrorMessage(developmentEnvironment({ DATABASE_URL: undefined }))).toContain(
+        'DATABASE_URL',
+      );
     });
 
     it.each(['not-a-url', 'mysql://user:pass@localhost/db', 'http://localhost'])(
       'rejects %s because it is not a PostgreSQL URL',
       (invalidDatabaseUrl) => {
-        expect(() => parseEnvironment({ DATABASE_URL: invalidDatabaseUrl })).toThrow(
-          /DATABASE_URL/,
-        );
+        expect(() =>
+          parseEnvironment(developmentEnvironment({ DATABASE_URL: invalidDatabaseUrl })),
+        ).toThrow(/DATABASE_URL/);
       },
     );
 
     it('rejects a production database URL without TLS enforcement (SEC-63)', () => {
       expect(() =>
-        parseEnvironment({ NODE_ENV: 'production', DATABASE_URL: DEVELOPMENT_DATABASE_URL }),
+        parseEnvironment(productionEnvironment({ DATABASE_URL: DEVELOPMENT_DATABASE_URL })),
       ).toThrow(/TLS/);
     });
 
@@ -102,22 +112,44 @@ describe('parseEnvironment', () => {
       (sslMode) => {
         const databaseUrl = `postgresql://yoclick_app:placeholder@db.internal/yoclick?sslmode=${sslMode}`;
 
-        const environment = parseEnvironment({ NODE_ENV: 'production', DATABASE_URL: databaseUrl });
+        const environment = parseEnvironment(productionEnvironment({ DATABASE_URL: databaseUrl }));
 
         expect(environment.DATABASE_URL).toBe(databaseUrl);
       },
     );
 
     it('never echoes the connection string, which contains the password', () => {
-      let errorMessage = '';
-      try {
-        parseEnvironment({ DATABASE_URL: 'mysql://yoclick_app:SuperSecret123@localhost/db' });
-      } catch (error) {
-        errorMessage = String(error);
-      }
+      const errorMessage = captureErrorMessage(
+        developmentEnvironment({ DATABASE_URL: 'mysql://yoclick_app:SuperSecret123@localhost/db' }),
+      );
 
       expect(errorMessage).toContain('DATABASE_URL');
       expect(errorMessage).not.toContain('SuperSecret123');
+    });
+  });
+
+  describe('access token keys', () => {
+    it.each(['JWT_ACCESS_PRIVATE_KEY_BASE64', 'JWT_ACCESS_PUBLIC_KEY_BASE64'])(
+      'requires %s',
+      (variableName) => {
+        const errorMessage = captureErrorMessage(developmentEnvironment({ [variableName]: '' }));
+
+        expect(errorMessage).toContain(variableName);
+      },
+    );
+
+    it('rejects the development key id in production, so a dev key is never reused there', () => {
+      expect(() => parseEnvironment(productionEnvironment({ JWT_KEY_ID: 'dev-1' }))).toThrow(
+        /JWT_KEY_ID/,
+      );
+    });
+
+    it('never echoes the private key', () => {
+      const errorMessage = captureErrorMessage(
+        developmentEnvironment({ PORT: 'abc', JWT_ACCESS_PRIVATE_KEY_BASE64: FAKE_KEY_BASE64 }),
+      );
+
+      expect(errorMessage).not.toContain(FAKE_KEY_BASE64);
     });
   });
 });
