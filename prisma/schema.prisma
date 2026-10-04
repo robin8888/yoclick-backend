@@ -94,23 +94,24 @@ model User {
 
 /// Tenant raíz: un centro (gimnasio, academia...).
 model Center {
-  id         String       @id @db.Uuid
-  slug       String       @unique
-  name       String
-  sectorId   String       @map("sector_id")
-  brandColor String       @map("brand_color") @db.Char(7)
-  timezone   String       @default("Europe/Madrid")
-  joinCode   String       @unique @map("join_code") @db.Char(6)
-  status     CenterStatus @default(trial)
+  id          String       @id @db.Uuid
+  slug        String       @unique
+  name        String
+  sectorId    String       @map("sector_id")
+  brandColor  String       @map("brand_color") @db.Char(7)
+  timezone    String       @default("Europe/Madrid")
+  joinCode    String       @unique @map("join_code") @db.Char(6)
+  status      CenterStatus @default(trial)
   /// Aparece en la búsqueda pública. Por defecto un centro es privado: solo se entra con su código.
-  isListed   Boolean      @default(false) @map("is_listed")
-  city       String?
-  latitude   Float?
-  longitude  Float?
+  isListed    Boolean      @default(false) @map("is_listed")
+  city        String?
+  latitude    Float?
+  longitude   Float?
   /// Tope de clientes activos del plan. Nulo = sin tope.
-  maxClients Int?         @map("max_clients")
-  createdAt  DateTime     @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt  DateTime     @updatedAt @map("updated_at") @db.Timestamptz
+  maxClients  Int?         @map("max_clients")
+  trialEndsAt DateTime?    @map("trial_ends_at") @db.Timestamptz
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime     @updatedAt @map("updated_at") @db.Timestamptz
 
   memberships Membership[]
 

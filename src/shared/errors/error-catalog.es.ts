@@ -44,6 +44,7 @@ export const ERROR_CATALOG = {
   JOIN_CODE_INVALID: { title: 'Ese código no corresponde a ningún centro' },
   CLIENT_LIMIT_REACHED: { title: 'Este centro ha alcanzado su límite de clientes por ahora' },
   MEMBERSHIP_BLOCKED: { title: 'El centro no permite que te unas' },
+  CENTER_LIMIT_REACHED: { title: 'Has alcanzado el máximo de centros que puedes gestionar' },
   INTERNAL_ERROR: { title: 'Algo ha fallado de nuestro lado. Inténtalo de nuevo' },
 } as const;
 

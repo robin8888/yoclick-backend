@@ -666,6 +666,40 @@ paths:
       summary: Te une al centro como cliente. Un centro privado exige su código de unión; uno listado, no. Comprueba el límite de clientes del plan.
       tags:
         - join
+  /v1/onboarding/centers:
+    post:
+      operationId: onboarding_create_center
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          description: UUID por intención del usuario
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCenterRequestDto"
+      responses:
+        "201":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateCenterResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Da de alta un centro en prueba de 14 días; quien lo crea queda como propietario. Repetir la misma Idempotency-Key devuelve el mismo centro.
+      tags:
+        - onboarding
   /v1/centers/{centerId}/branding:
     get:
       operationId: centers_get_branding
@@ -1561,6 +1595,85 @@ components:
         - role
         - status
         - isNewMembership
+      additionalProperties: false
+    CreateCenterRequestDto:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 80
+        sectorId:
+          type: string
+          enum:
+            - gym
+            - estudio
+            - readap
+            - box
+            - yoga
+            - academia
+            - baile
+            - marciales
+            - musica
+            - cocina
+            - otro
+        brandColor:
+          type: string
+          pattern: ^#[0-9A-Fa-f]{6}$
+        city:
+          type: string
+          minLength: 1
+          maxLength: 80
+      required:
+        - name
+        - sectorId
+      additionalProperties: false
+    CreateCenterResponseDto:
+      type: object
+      properties:
+        centerId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        ownerMembershipId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        slug:
+          type: string
+        name:
+          type: string
+        sectorId:
+          type: string
+          enum:
+            - gym
+            - estudio
+            - readap
+            - box
+            - yoga
+            - academia
+            - baile
+            - marciales
+            - musica
+            - cocina
+            - otro
+        brandColor:
+          type: string
+        joinCode:
+          type: string
+        trialEndsAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+      required:
+        - centerId
+        - ownerMembershipId
+        - slug
+        - name
+        - sectorId
+        - brandColor
+        - joinCode
+        - trialEndsAt
       additionalProperties: false
     CenterBrandingResponseDto:
       type: object

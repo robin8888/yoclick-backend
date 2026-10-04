@@ -6,6 +6,7 @@ import { ZodValidationPipe } from 'nestjs-zod';
 import { AuthIdentityModule } from './modules/auth/auth-identity.module';
 import { CentersModule } from './modules/centers/centers.module';
 import { JoinModule } from './modules/join/join.module';
+import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { MeModule } from './modules/me/me.module';
 import { HealthModule } from './modules/health/health.module';
 import { AuthModule } from './shared/auth/auth.module';
@@ -36,6 +37,7 @@ import { buildLoggerOptions } from './shared/logging/build-logger-options';
     AuthIdentityModule,
     MeModule,
     JoinModule,
+    OnboardingModule,
     CentersModule,
     HealthModule,
   ],

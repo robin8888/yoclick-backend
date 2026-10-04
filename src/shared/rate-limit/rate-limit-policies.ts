@@ -25,5 +25,7 @@ export const RATE_LIMITS = {
   submitCode: { limit: 10, ttl: ONE_MINUTE },
   refreshSession: { limit: 30, ttl: ONE_MINUTE },
   /** Cambiar contraseña, exportar datos, eliminar la cuenta: lo que haría quien robara un token. */
+  /** Dar de alta centros: poco frecuente y atractivo para el abuso. */
+  createCenter: { limit: 5, ttl: ONE_MINUTE },
   accountSecurity: { limit: 5, ttl: ONE_MINUTE },
 } as const satisfies Record<string, RateLimitPolicy>;
