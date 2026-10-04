@@ -15,19 +15,24 @@ export class PasswordAcceptabilityChecker {
     private readonly breachedPasswordChecker: BreachedPasswordChecker,
   ) {}
 
-  async assertAcceptable(plainPassword: string, email: string): Promise<void> {
+  /** `fieldPath`: el campo del cuerpo de la petición donde viaja la contraseña, para señalarlo en el error. */
+  async assertAcceptable(
+    plainPassword: string,
+    email: string,
+    fieldPath: 'password' | 'newPassword' = 'password',
+  ): Promise<void> {
     const violations = findPasswordPolicyViolations(plainPassword, email);
     if (violations.length > 0) {
       throw new DomainError(
         'VALIDATION_FAILED',
         HTTP_STATUS.badRequest,
-        violations.map((violation) => ({ path: 'password', code: violation })),
+        violations.map((violation) => ({ path: fieldPath, code: violation })),
       );
     }
 
     if (await this.breachedPasswordChecker.isBreached(plainPassword)) {
       throw new DomainError('PASSWORD_BREACHED', HTTP_STATUS.unprocessableEntity, [
-        { path: 'password', code: 'breached' },
+        { path: fieldPath, code: 'breached' },
       ]);
     }
   }

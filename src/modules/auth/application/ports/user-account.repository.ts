@@ -45,6 +45,11 @@ export interface UserAccountRepository {
   /** Crea la cuenta y sus consentimientos juntos, o nada. `email-taken` si otra petición se adelantó. */
   create(newUser: NewUserAccount): Promise<CreateUserAccountResult>;
   markEmailVerified(userId: string, verifiedAt: Date): Promise<void>;
+  /**
+   * Guarda una contraseña nueva y levanta cualquier bloqueo. Si el correo aún no estaba confirmado lo
+   * confirma: recibir el código de recuperación en ese buzón es la misma prueba que verificarlo.
+   */
+  changePassword(userId: string, newPasswordHash: string, changedAt: Date): Promise<void>;
   /** Cuenta un intento fallido de forma atómica; al llegar al límite bloquea la cuenta y reinicia la cuenta. */
   recordFailedLogin(userId: string, policy: LockoutPolicy): Promise<FailedLoginOutcome>;
   /** Reinicia el contador, anota el acceso y, si se indica, guarda un hash recalculado con parámetros nuevos. */

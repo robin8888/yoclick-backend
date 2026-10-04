@@ -67,6 +67,21 @@ export function buildAccountLockedMessage(details: RecipientDetails): EmailMessa
   };
 }
 
+/** Aviso de que la contraseña cambió. Nunca incluye la contraseña, ni vieja ni nueva. */
+export function buildPasswordChangedMessage(details: RecipientDetails): EmailMessage {
+  return {
+    to: details.to,
+    subject: 'Tu contraseña se ha cambiado',
+    textBody: [
+      `Hola, ${details.fullName}:`,
+      '',
+      'La contraseña de tu cuenta de Yoclick se acaba de cambiar y hemos cerrado tu sesión en todos los dispositivos.',
+      'Si has sido tú, no tienes que hacer nada: vuelve a iniciar sesión con la nueva.',
+      'Si no has sido tú, recupera tu cuenta ahora desde la pantalla de acceso y revisa la seguridad de tu correo.',
+    ].join('\n'),
+  };
+}
+
 export function buildPasswordResetMessage(details: VerificationCodeDetails): EmailMessage {
   return {
     to: details.to,

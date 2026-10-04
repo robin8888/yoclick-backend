@@ -42,6 +42,24 @@ export class PrismaUserAccountRepository implements UserAccountRepository {
     );
   }
 
+  async changePassword(userId: string, newPasswordHash: string, changedAt: Date): Promise<void> {
+    await this.tenantPrismaService.runInUserContext(userId, async (client) => {
+      const { emailVerifiedAt } = await client.user.findUniqueOrThrow({
+        where: { id: userId },
+        select: { emailVerifiedAt: true },
+      });
+      await client.user.update({
+        where: { id: userId },
+        data: {
+          passwordHash: newPasswordHash,
+          failedLoginCount: 0,
+          lockedUntil: null,
+          emailVerifiedAt: emailVerifiedAt ?? changedAt,
+        },
+      });
+    });
+  }
+
   async recordFailedLogin(userId: string, policy: LockoutPolicy): Promise<FailedLoginOutcome> {
     return this.tenantPrismaService.runInUserContext(userId, async (client) => {
       // El incremento es un UPDATE atómico y deja la fila bloqueada hasta el final de la transacción:

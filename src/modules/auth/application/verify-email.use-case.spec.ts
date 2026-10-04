@@ -6,6 +6,7 @@ import {
 } from '../../../../test/support/auth-fakes';
 import { MAX_VERIFICATION_ATTEMPTS } from '../domain/verification-code';
 import { ResendEmailVerificationUseCase } from './resend-email-verification.use-case';
+import { VerificationCodeChecker } from './verification-code-checker';
 import { VerificationCodeIssuer } from './verification-code-issuer';
 import { VerifyEmailUseCase } from './verify-email.use-case';
 
@@ -30,7 +31,7 @@ function buildScenario() {
     codes,
     emails,
     issuer,
-    verifyEmail: new VerifyEmailUseCase(users, codes, hasher),
+    verifyEmail: new VerifyEmailUseCase(users, new VerificationCodeChecker(codes, hasher)),
     resendVerification: new ResendEmailVerificationUseCase(users, issuer),
   };
 }

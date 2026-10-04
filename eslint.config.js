@@ -161,7 +161,7 @@ module.exports = tseslint.config(
   {
     // Un caso de uso recibe por inyección sus puertos (repositorios, hasher, correo...): hasta 5.
     // Si necesita más, está haciendo demasiado y hay que partirlo. Las funciones siguen en 3.
-    files: ['src/**/*.use-case.ts', 'src/**/*.controller.ts'],
+    files: ['src/**/*.use-case.ts', 'src/**/*.controller.ts', 'src/**/application/*.ts'],
     rules: { 'max-params': ['error', 5] },
   },
 

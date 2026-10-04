@@ -53,6 +53,20 @@ export class InMemoryUserAccountRepository implements UserAccountRepository {
     return Promise.resolve('created');
   }
 
+  changePassword(userId: string, newPasswordHash: string, changedAt: Date): Promise<void> {
+    for (const [key, account] of this.accounts) {
+      if (account.id !== userId) continue;
+      this.accounts.set(key, {
+        ...account,
+        passwordHash: newPasswordHash,
+        failedLoginCount: 0,
+        lockedUntil: null,
+        emailVerifiedAt: account.emailVerifiedAt ?? changedAt,
+      });
+    }
+    return Promise.resolve();
+  }
+
   recordFailedLogin(userId: string, policy: LockoutPolicy): Promise<FailedLoginOutcome> {
     for (const [key, account] of this.accounts) {
       if (account.id !== userId) continue;

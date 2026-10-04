@@ -154,6 +154,58 @@ paths:
       summary: Cierra la sesión de este dispositivo, o de todos con `everywhere`.
       tags:
         - auth
+  /v1/auth/password/forgot:
+    post:
+      operationId: auth_forgot_password
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForgotPasswordRequestDto"
+      responses:
+        "202":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PasswordResetRequestedResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      summary: Envía un código de 6 dígitos para cambiar la contraseña. Responde igual exista o no la cuenta.
+      tags:
+        - auth
+  /v1/auth/password/reset:
+    post:
+      operationId: auth_reset_password
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordRequestDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PasswordChangedResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      summary: Cambia la contraseña con el código (30 minutos, 5 intentos) y cierra la sesión en todos los dispositivos.
+      tags:
+        - auth
   /health:
     get:
       operationId: health_check_liveness
@@ -393,6 +445,53 @@ components:
         everywhere:
           default: false
           type: boolean
+      additionalProperties: false
+    ForgotPasswordRequestDto:
+      type: object
+      properties:
+        email:
+          type: string
+          maxLength: 254
+      required:
+        - email
+      additionalProperties: false
+    PasswordResetRequestedResponseDto:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - reset_requested
+      required:
+        - status
+      additionalProperties: false
+    ResetPasswordRequestDto:
+      type: object
+      properties:
+        email:
+          type: string
+          maxLength: 254
+        code:
+          type: string
+          pattern: ^\d{6}$
+        newPassword:
+          type: string
+          minLength: 1
+          maxLength: 256
+      required:
+        - email
+        - code
+        - newPassword
+      additionalProperties: false
+    PasswordChangedResponseDto:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - password_changed
+      required:
+        - status
       additionalProperties: false
     HealthResponseDto:
       type: object

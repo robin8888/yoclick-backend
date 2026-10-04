@@ -6,6 +6,8 @@ import { type Environment } from '../../shared/config/environment.schema';
 import { AccountSecurityNotifier } from './application/account-security-notifier';
 import { LoginUseCase } from './application/login.use-case';
 import { LogoutUseCase } from './application/logout.use-case';
+import { AccountPasswordChanger } from './application/account-password-changer';
+import { ForgotPasswordUseCase } from './application/forgot-password.use-case';
 import { PasswordAcceptabilityChecker } from './application/password-acceptability.checker';
 import {
   BREACHED_PASSWORD_CHECKER,
@@ -15,13 +17,16 @@ import { SESSION_REPOSITORY } from './application/ports/session.repository';
 import { USER_ACCOUNT_REPOSITORY } from './application/ports/user-account.repository';
 import { VERIFICATION_CODE_HASHER } from './application/ports/verification-code.hasher';
 import { VERIFICATION_CODE_REPOSITORY } from './application/ports/verification-code.repository';
+import { ResetPasswordUseCase } from './application/reset-password.use-case';
 import { RefreshSessionUseCase } from './application/refresh-session.use-case';
 import { RegisterUserUseCase } from './application/register-user.use-case';
 import { RegistrationEligibilityChecker } from './application/registration-eligibility.checker';
 import { ResendEmailVerificationUseCase } from './application/resend-email-verification.use-case';
 import { SessionIssuer } from './application/session-issuer';
+import { VerificationCodeChecker } from './application/verification-code-checker';
 import { VerificationCodeIssuer } from './application/verification-code-issuer';
 import { VerifyEmailUseCase } from './application/verify-email.use-case';
+import { PasswordController } from './http/password.controller';
 import { RegistrationController } from './http/registration.controller';
 import { SessionController } from './http/session.controller';
 import { ClientAddressHasher } from './infrastructure/client-address.hasher';
@@ -33,18 +38,22 @@ import { PrismaVerificationCodeRepository } from './infrastructure/prisma-verifi
 import { PwnedPasswordsChecker } from './infrastructure/pwned-passwords.checker';
 
 @Module({
-  controllers: [RegistrationController, SessionController],
+  controllers: [RegistrationController, SessionController, PasswordController],
   providers: [
     PasswordHasher,
     ClientAddressHasher,
     PasswordAcceptabilityChecker,
     RegistrationEligibilityChecker,
+    VerificationCodeChecker,
     VerificationCodeIssuer,
     SessionIssuer,
     AccountSecurityNotifier,
     LoginUseCase,
     RefreshSessionUseCase,
     LogoutUseCase,
+    AccountPasswordChanger,
+    ForgotPasswordUseCase,
+    ResetPasswordUseCase,
     RegisterUserUseCase,
     VerifyEmailUseCase,
     ResendEmailVerificationUseCase,
