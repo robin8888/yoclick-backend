@@ -45,6 +45,9 @@ export const ERROR_CATALOG = {
   CLIENT_LIMIT_REACHED: { title: 'Este centro ha alcanzado su límite de clientes por ahora' },
   MEMBERSHIP_BLOCKED: { title: 'El centro no permite que te unas' },
   CENTER_LIMIT_REACHED: { title: 'Has alcanzado el máximo de centros que puedes gestionar' },
+  ALREADY_MEMBER: { title: 'Esa persona ya forma parte del centro' },
+  INVITATION_INVALID: { title: 'La invitación no es válida o ha caducado' },
+  TEAM_CHANGE_NOT_ALLOWED: { title: 'No puedes hacer ese cambio en el equipo' },
   INTERNAL_ERROR: { title: 'Algo ha fallado de nuestro lado. Inténtalo de nuevo' },
 } as const;
 

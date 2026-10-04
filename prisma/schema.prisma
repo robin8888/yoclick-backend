@@ -121,20 +121,25 @@ model Center {
   updatedAt    DateTime     @updatedAt @map("updated_at") @db.Timestamptz
 
   memberships Membership[]
+  invitations Invitation[]
 
   @@map("centers")
 }
 
 /// Pertenencia de un usuario a un centro con un rol.
 model Membership {
-  id        String           @id @db.Uuid
-  centerId  String           @map("center_id") @db.Uuid
-  userId    String           @map("user_id") @db.Uuid
-  role      MembershipRole
-  status    MembershipStatus @default(active)
-  joinedAt  DateTime         @default(now()) @map("joined_at") @db.Timestamptz
-  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt DateTime         @updatedAt @map("updated_at") @db.Timestamptz
+  id          String           @id @db.Uuid
+  centerId    String           @map("center_id") @db.Uuid
+  userId      String           @map("user_id") @db.Uuid
+  role        MembershipRole
+  status      MembershipStatus @default(active)
+  joinedAt    DateTime         @default(now()) @map("joined_at") @db.Timestamptz
+  /// Cargo que ve la clientela ("Profesora de yoga"). Solo para el equipo.
+  staffTitle  String?          @map("staff_title")
+  /// Permisos extra del equipo, p. ej. ["health:read"]. Un array de cadenas validado por la API.
+  permissions Json             @default("[]")
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime         @updatedAt @map("updated_at") @db.Timestamptz
 
   center Center @relation(fields: [centerId], references: [id])
   user   User   @relation(fields: [userId], references: [id])
@@ -252,4 +257,23 @@ model MfaRecoveryCode {
 
   @@index([userId])
   @@map("mfa_recovery_codes")
+}
+
+/// Invitación a unirse a un centro con un rol. El código viaja por correo; aquí solo su hash.
+model Invitation {
+  id              String         @id @db.Uuid
+  centerId        String         @map("center_id") @db.Uuid
+  email           String
+  role            MembershipRole
+  tokenHash       String         @unique @map("token_hash")
+  invitedByUserId String         @map("invited_by_user_id") @db.Uuid
+  expiresAt       DateTime       @map("expires_at") @db.Timestamptz
+  acceptedAt      DateTime?      @map("accepted_at") @db.Timestamptz
+  revokedAt       DateTime?      @map("revoked_at") @db.Timestamptz
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz
+
+  center Center @relation(fields: [centerId], references: [id])
+
+  @@index([centerId, email])
+  @@map("invitations")
 }

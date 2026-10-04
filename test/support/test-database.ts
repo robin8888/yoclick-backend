@@ -39,13 +39,20 @@ export async function resetTestDatabase(): Promise<void> {
  * (envejecer un código, caducarlo). El dueño también está sujeto a RLS (FORCE), así que se fija la
  * persona en el contexto antes. Solo para tests, y solo contra la base `*_test`.
  */
-export async function runStatementAsOwnerForUser(userId: string, statement: string): Promise<void> {
+export async function runStatementAsOwnerForUser(
+  userId: string,
+  statement: string,
+  centerId = '',
+): Promise<void> {
   const migrationUrl = readRequiredEnvironmentVariable('TEST_MIGRATION_DATABASE_URL');
   assertIsTestDatabase(migrationUrl);
   const client = new Client({ connectionString: migrationUrl });
   await client.connect();
   try {
-    await client.query("select set_config('app.user_id', $1, false)", [userId]);
+    await client.query(
+      "select set_config('app.user_id', $1, false), set_config('app.center_id', $2, false)",
+      [userId, centerId],
+    );
     const result = await client.query(statement);
     // Un UPDATE que no toca ninguna fila hace pasar o fallar un test por la razón equivocada.
     if (result.rowCount === 0) throw new Error(`Statement affected no rows: ${statement}`);

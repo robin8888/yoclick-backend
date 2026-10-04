@@ -20,11 +20,15 @@ interface RequestContextSettings {
   readonly lookupJoinCode?: string;
   readonly lookupCenterId?: string;
   readonly isDirectoryLookup?: boolean;
+  readonly lookupInvitationHash?: string;
 }
 
 /** Qué centro(s) puede ver quien aún no pertenece a ninguno: uno por código, uno por id, o los listados. */
 export type CenterLookup =
-  { readonly joinCode: string } | { readonly centerId: string } | { readonly isDirectory: true };
+  | { readonly joinCode: string }
+  | { readonly centerId: string }
+  | { readonly isDirectory: true }
+  | { readonly invitationTokenHash: string };
 
 const NO_CENTER_SETTINGS: Pick<RequestContextSettings, 'centerId' | 'membershipId' | 'role'> = {
   centerId: '',
@@ -91,6 +95,7 @@ export class TenantPrismaService {
       ...('joinCode' in lookup && { lookupJoinCode: lookup.joinCode }),
       ...('centerId' in lookup && { lookupCenterId: lookup.centerId }),
       ...('isDirectory' in lookup && { isDirectoryLookup: true }),
+      ...('invitationTokenHash' in lookup && { lookupInvitationHash: lookup.invitationTokenHash }),
     };
     return this.runWithSettings(settings, work);
   }
@@ -120,6 +125,7 @@ export class TenantPrismaService {
         set_config('app.role', ${settings.role}, true),
         set_config('app.lookup_join_code', ${settings.lookupJoinCode ?? ''}, true),
         set_config('app.lookup_center_id', ${settings.lookupCenterId ?? ''}, true),
+        set_config('app.lookup_invitation_hash', ${settings.lookupInvitationHash ?? ''}, true),
         set_config('app.lookup_directory', ${settings.isDirectoryLookup ? 'on' : ''}, true),
         set_config('statement_timeout', ${String(STATEMENT_TIMEOUT_MS)}, true)`;
   }
