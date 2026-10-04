@@ -7,6 +7,8 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { type FastifyRequest } from 'fastify';
+import { RATE_LIMITS } from '../../../shared/rate-limit/rate-limit-policies';
+import { Throttle } from '@nestjs/throttler';
 import { Public } from '../../../shared/auth/decorators/public.decorator';
 import { ProblemDetailsDto } from '../../../shared/errors/problem-details.dto';
 import { RegisterUserUseCase } from '../application/register-user.use-case';
@@ -34,6 +36,7 @@ export class RegistrationController {
   ) {}
 
   @Post('register')
+  @Throttle({ default: RATE_LIMITS.register })
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
     operationId: 'auth_register',
@@ -56,6 +59,7 @@ export class RegistrationController {
   }
 
   @Post('email/verify')
+  @Throttle({ default: RATE_LIMITS.submitCode })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     operationId: 'auth_verify_email',
@@ -68,6 +72,7 @@ export class RegistrationController {
   }
 
   @Post('email/resend')
+  @Throttle({ default: RATE_LIMITS.resendVerification })
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
     operationId: 'auth_resend_email_verification',

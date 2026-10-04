@@ -7,6 +7,8 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
+import { RATE_LIMITS } from '../../../shared/rate-limit/rate-limit-policies';
+import { Throttle } from '@nestjs/throttler';
 import { CurrentUserId } from '../../../shared/auth/decorators/current-user-id.decorator';
 import { Public } from '../../../shared/auth/decorators/public.decorator';
 import { UserScoped } from '../../../shared/auth/decorators/user-scoped.decorator';
@@ -45,6 +47,7 @@ export class SessionController {
   ) {}
 
   @Post('login')
+  @Throttle({ default: RATE_LIMITS.login })
   @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -63,6 +66,7 @@ export class SessionController {
   }
 
   @Post('refresh')
+  @Throttle({ default: RATE_LIMITS.refreshSession })
   @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({

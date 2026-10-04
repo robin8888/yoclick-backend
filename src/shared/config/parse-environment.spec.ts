@@ -164,6 +164,7 @@ describe('parseEnvironment', () => {
 
       expect(environment).toMatchObject({
         PASSWORD_BREACH_CHECK: 'enabled',
+        RATE_LIMITING: 'enabled',
         EMAIL_PROVIDER: 'console',
         ALLOW_DISPOSABLE_EMAILS: false,
       });
@@ -222,6 +223,7 @@ describe('parseEnvironment', () => {
     });
 
     it.each([
+      ['RATE_LIMITING', 'disabled'],
       ['PASSWORD_BREACH_CHECK', 'disabled'],
       ['EMAIL_PROVIDER', 'console'],
       ['ALLOW_DISPOSABLE_EMAILS', 'true'],

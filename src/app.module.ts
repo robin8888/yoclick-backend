@@ -9,6 +9,7 @@ import { AuthModule } from './shared/auth/auth.module';
 import { type Environment } from './shared/config/environment.schema';
 import { parseEnvironment } from './shared/config/parse-environment';
 import { DatabaseModule } from './shared/database/database.module';
+import { RateLimitModule } from './shared/rate-limit/rate-limit.module';
 import { EmailModule } from './shared/email/email.module';
 import { ProblemDetailsFilter } from './shared/errors/problem-details.filter';
 import { buildLoggerOptions } from './shared/logging/build-logger-options';
@@ -25,6 +26,8 @@ import { buildLoggerOptions } from './shared/logging/build-logger-options';
         }),
     }),
     DatabaseModule,
+    // Antes que AuthModule: el límite por IP se aplica antes de autenticar.
+    RateLimitModule,
     AuthModule,
     EmailModule,
     AuthIdentityModule,

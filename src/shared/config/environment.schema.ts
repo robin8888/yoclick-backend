@@ -45,6 +45,8 @@ const baseEnvironmentSchema = z.object({
     ),
   // Comprueba contraseñas contra filtraciones conocidas (k-anonymity, SEC-43). Solo se apaga sin red.
   PASSWORD_BREACH_CHECK: z.enum(['enabled', 'disabled']).default('enabled'),
+  // Límite de peticiones por IP (SEC-46, SEC-50). Solo se apaga en tests; en producción es obligatorio.
+  RATE_LIMITING: z.enum(['enabled', 'disabled']).default('enabled'),
   EMAIL_PROVIDER: z.enum(['console', 'brevo']).default('console'),
   // Solo hacen falta con EMAIL_PROVIDER=brevo (se exigen en ese caso, ver más abajo).
   BREVO_API_KEY: z.string().min(1).optional(),
@@ -84,6 +86,11 @@ function listProductionRequirements(environment: ParsedEnvironment): ProductionR
       isMet: TLS_ENFORCING_SSL_MODES.includes(sslMode),
       path: 'DATABASE_URL',
       message: 'must enforce TLS in production (sslmode=require, verify-ca or verify-full)',
+    },
+    {
+      isMet: environment.RATE_LIMITING === 'enabled',
+      path: 'RATE_LIMITING',
+      message: 'must be enabled in production',
     },
     {
       isMet: environment.PASSWORD_BREACH_CHECK === 'enabled',

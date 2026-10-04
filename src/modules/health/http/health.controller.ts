@@ -2,6 +2,7 @@ import { Controller, Get } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
+import { SkipThrottle } from '@nestjs/throttler';
 import { Public } from '../../../shared/auth/decorators/public.decorator';
 
 class HealthResponseDto extends createZodDto(z.strictObject({ status: z.literal('ok') })) {}
@@ -11,6 +12,8 @@ class HealthResponseDto extends createZodDto(z.strictObject({ status: z.literal(
 export class HealthController {
   @Get()
   @Public()
+  // Los monitores y balanceadores lo consultan sin parar: no debe contar contra el límite por IP.
+  @SkipThrottle()
   @ApiOperation({
     operationId: 'health_check_liveness',
     summary: 'Comprueba que la API está viva. No requiere autenticación.',

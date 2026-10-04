@@ -25,3 +25,6 @@ process.env['AUTH_CODE_PEPPER_BASE64'] = randomBytes(TEST_PEPPER_BYTES).toString
 process.env['PASSWORD_BREACH_CHECK'] = 'disabled';
 process.env['EMAIL_PROVIDER'] = 'console';
 process.env['ALLOW_DISPOSABLE_EMAILS'] = 'true';
+// Los tests de integración hacen muchos inicios de sesión seguidos: el límite por IP los frenaría.
+// Solo el test de límites lo activa, sustituyendo el proveedor de ajustes.
+process.env['RATE_LIMITING'] = 'disabled';

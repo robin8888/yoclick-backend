@@ -6,6 +6,8 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
+import { RATE_LIMITS } from '../../../shared/rate-limit/rate-limit-policies';
+import { Throttle } from '@nestjs/throttler';
 import { Public } from '../../../shared/auth/decorators/public.decorator';
 import { ProblemDetailsDto } from '../../../shared/errors/problem-details.dto';
 import { ForgotPasswordUseCase } from '../application/forgot-password.use-case';
@@ -28,6 +30,7 @@ export class PasswordController {
   ) {}
 
   @Post('forgot')
+  @Throttle({ default: RATE_LIMITS.forgotPassword })
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
     operationId: 'auth_forgot_password',
@@ -41,6 +44,7 @@ export class PasswordController {
   }
 
   @Post('reset')
+  @Throttle({ default: RATE_LIMITS.submitCode })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     operationId: 'auth_reset_password',
