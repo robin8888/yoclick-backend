@@ -1,0 +1,81 @@
+{
+  "name": "yoclick-back",
+  "version": "0.1.0",
+  "description": "API de Yoclick: reservas multi-centro en marca blanca",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "build": "nest build",
+    "start": "nest start",
+    "start:dev": "nest start --watch",
+    "start:prod": "node dist/main.js",
+    "lint": "eslint \"src/**/*.ts\" \"test/**/*.ts\" --max-warnings 0",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\"",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage",
+    "test:e2e": "jest --config test/jest-e2e.config.js --runInBand",
+    "audit:prod": "npm audit --omit=dev --audit-level=high",
+    "prepare": "husky"
+  },
+  "license": "UNLICENSED",
+  "type": "commonjs",
+  "dependencies": {
+    "@fastify/helmet": "13.1.1",
+    "@nestjs/common": "11.2.7",
+    "@nestjs/config": "12.0.1",
+    "@nestjs/core": "11.2.7",
+    "@nestjs/platform-fastify": "11.2.7",
+    "@nestjs/swagger": "11.4.7",
+    "@nestjs/terminus": "11.1.1",
+    "@nestjs/throttler": "6.7.1",
+    "nestjs-pino": "4.6.1",
+    "nestjs-zod": "5.5.0",
+    "pino": "10.4.0",
+    "pino-http": "11.0.0",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "21.2.3",
+    "@commitlint/config-conventional": "21.2.3",
+    "@eslint/js": "9.39.5",
+    "@nestjs/cli": "11.0.24",
+    "@nestjs/schematics": "11.1.0",
+    "@nestjs/testing": "11.2.7",
+    "@types/jest": "30.0.0",
+    "@types/node": "22.20.5",
+    "@types/supertest": "6.0.3",
+    "eslint": "9.39.5",
+    "eslint-plugin-boundaries": "7.2.0",
+    "eslint-plugin-sonarjs": "4.2.2",
+    "globals": "17.13.0",
+    "husky": "9.1.7",
+    "jest": "30.5.2",
+    "lint-staged": "17.6.0",
+    "pino-pretty": "13.1.3",
+    "prettier": "3.9.9",
+    "supertest": "7.3.1",
+    "ts-jest": "29.4.14",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.71.0"
+  },
+  "overrides": {
+    "fastify": "5.12.5",
+    "js-yaml": "5.4.2"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "lint-staged": {
+    "*.ts": [
+      "eslint --max-warnings 0 --fix",
+      "prettier --write"
+    ]
+  }
+}
