@@ -4,7 +4,7 @@ Un ticket = una rama (`feat/API-012-bookings-create`) = un PR pequeño (< 400 l�
 
 Orden recomendado: **API-0 → API-1 → APP-0 en paralelo con API-2 → …** La app trabaja con mocks MSW generados del contrato hasta que el endpoint real existe.
 
-## Estado de avance (4 oct 2026)
+## Estado de avance (4 oct 2026, cierre del día)
 
 Leyenda: ✅ hecho · 🟡 parcial · ⬜ pendiente. Basado en el historial de git de cada repo.
 
@@ -22,8 +22,10 @@ Leyenda: ✅ hecho · 🟡 parcial · ⬜ pendiente. Basado en el historial de g
 - 🟡 APP-2 Unirse y autenticación: hechas `jstart` (con logo, fondo y pie como el prototipo; sin la pastilla DEMO), `jqr` (escáner de QR), `jcode`, `jsearch`, `jconfirm`, `welcome`, `jcenters`, login, registro, verificación, recuperar contraseña y MFA. Faltan Apple/Google y el E2E Maestro.
 - ⬜ APP-3 a APP-9.
 
+- ✅ Primera pantalla validada por el usuario en el iPhone: `jstart` coincide con el prototipo actualizado. Mañana: resto de pantallas de APP-2 y APP-1.
+
 ### Pendientes transversales (decisiones o acciones tuyas)
-- Probar en el iPhone un **development build nuevo** (`eas build --profile development --platform ios`): `expo-camera` es un módulo nativo.
+- Reinstalar el **development build** con `expo-camera` (los fallos de `npm ci` en EAS ya están corregidos en main) y probar el escáner QR; (`eas build --profile development --platform ios`): `expo-camera` es un módulo nativo.
 - Id de bundle definitivo (`com.yoclick.app` es provisional), URL de staging de `eas.json` y cuentas de desarrollador de Apple y Google (ver `STORE_CHECKLIST.md` en yoclick-app).
 - Confirmar el contenido real del QR del centro: la app solo acepta `https://yoclick.app/j/{código}`.
 - Página de alta de centro: el pie «Crea la app de tu centro» abre `https://yoclick.app` hasta que existan las pantallas `(onboarding)`.
