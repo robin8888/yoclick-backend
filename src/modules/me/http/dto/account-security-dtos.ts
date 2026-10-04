@@ -1,4 +1,4 @@
-import { createZodDto } from 'nestjs-zod';
+import { createZodDto } from '../../../../shared/http/create-zod-dto';
 import { z } from 'zod';
 
 const MAX_PASSWORD_LENGTH_ACCEPTED = 256;

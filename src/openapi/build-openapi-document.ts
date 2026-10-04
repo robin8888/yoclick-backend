@@ -1,6 +1,7 @@
 import { type INestApplication } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule, type OpenAPIObject } from '@nestjs/swagger';
 import { cleanupOpenApiDoc } from 'nestjs-zod';
+import { normalizeNullableTypes } from './normalize-nullable-types';
 
 /** Versión del CONTRATO (semver). Un cambio incompatible exige `/v2` o un periodo de compatibilidad. */
 export const API_CONTRACT_VERSION = '0.1.0';
@@ -22,5 +23,5 @@ export function buildOpenApiDocument(application: INestApplication): OpenAPIObje
 
   const rawDocument = SwaggerModule.createDocument(application, documentConfiguration);
   // Convierte los esquemas zod de los DTO a JSON Schema válido para OpenAPI.
-  return cleanupOpenApiDoc(rawDocument);
+  return normalizeNullableTypes(cleanupOpenApiDoc(rawDocument));
 }

@@ -1,4 +1,4 @@
-import { createZodDto } from 'nestjs-zod';
+import { createZodDto } from '../http/create-zod-dto';
 import { z } from 'zod';
 
 /** Esquema del error RFC 9457 para el contrato OpenAPI: todas las respuestas de error tienen esta forma. */

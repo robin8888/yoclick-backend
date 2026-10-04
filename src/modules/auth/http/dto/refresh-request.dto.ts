@@ -1,4 +1,4 @@
-import { createZodDto } from 'nestjs-zod';
+import { createZodDto } from '../../../../shared/http/create-zod-dto';
 import { z } from 'zod';
 import { refreshTokenFieldSchema } from './refresh-token-field.schema';
 

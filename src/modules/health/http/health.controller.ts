@@ -1,6 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { createZodDto } from 'nestjs-zod';
+import { createZodDto } from '../../../shared/http/create-zod-dto';
 import { z } from 'zod';
 import { SkipThrottle } from '@nestjs/throttler';
 import { Public } from '../../../shared/auth/decorators/public.decorator';

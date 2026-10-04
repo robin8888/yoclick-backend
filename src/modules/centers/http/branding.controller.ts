@@ -1,6 +1,6 @@
 import { Controller, Get, Header, Param } from '@nestjs/common';
 import { ApiDefaultResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { createZodDto } from 'nestjs-zod';
+import { createZodDto } from '../../../shared/http/create-zod-dto';
 import { z } from 'zod';
 import { Public } from '../../../shared/auth/decorators/public.decorator';
 import { ProblemDetailsDto } from '../../../shared/errors/problem-details.dto';

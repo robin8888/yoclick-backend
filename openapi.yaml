@@ -1480,9 +1480,8 @@ components:
         fullName:
           type: string
         phone:
-          type: array
-          items:
-            type: string
+          type: string
+          nullable: true
         birthDate:
           type: string
           format: date
@@ -1682,9 +1681,8 @@ components:
             fullName:
               type: string
             phone:
-              type:
-                - string
-                - "null"
+              type: string
+              nullable: true
             birthDate:
               type: string
               format: date
@@ -1829,9 +1827,8 @@ components:
         brandColor:
           type: string
         city:
-          type: array
-          items:
-            type: string
+          type: string
+          nullable: true
       required:
         - id
         - name
@@ -1861,13 +1858,11 @@ components:
               brandColor:
                 type: string
               city:
-                type:
-                  - string
-                  - "null"
+                type: string
+                nullable: true
               distanceInKilometers:
-                type:
-                  - number
-                  - "null"
+                type: number
+                nullable: true
             required:
               - id
               - name
@@ -2036,9 +2031,8 @@ components:
                   - blocked
                   - left
               staffTitle:
-                type:
-                  - string
-                  - "null"
+                type: string
+                nullable: true
               permissions:
                 type: array
                 items:
@@ -2130,9 +2124,8 @@ components:
             - blocked
             - left
         staffTitle:
-          type: array
-          items:
-            type: string
+          type: string
+          nullable: true
         permissions:
           type: array
           items:
@@ -2362,21 +2355,17 @@ components:
         isListed:
           type: boolean
         city:
-          type: array
-          items:
-            type: string
+          type: string
+          nullable: true
         address:
-          type: array
-          items:
-            type: string
+          type: string
+          nullable: true
         latitude:
-          type: array
-          items:
-            type: number
+          type: number
+          nullable: true
         longitude:
-          type: array
-          items:
-            type: number
+          type: number
+          nullable: true
         openingHours:
           type: object
           properties:

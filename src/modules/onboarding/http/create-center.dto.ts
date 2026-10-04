@@ -1,4 +1,4 @@
-import { createZodDto } from 'nestjs-zod';
+import { createZodDto } from '../../../shared/http/create-zod-dto';
 import { z } from 'zod';
 
 /** Los tipos de centro del producto; el vocabulario de cada uno vive en la app. */

@@ -1,4 +1,4 @@
-import { createZodDto } from 'nestjs-zod';
+import { createZodDto } from '../../../shared/http/create-zod-dto';
 import { z } from 'zod';
 import { TEAM_PERMISSIONS } from '../domain/team-rules';
 

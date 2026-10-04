@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Module, Post } from '@nestjs/common';
-import { createZodDto } from 'nestjs-zod';
+import { createZodDto } from '../../src/shared/http/create-zod-dto';
 import { z } from 'zod';
 import { Public } from '../../src/shared/auth/decorators/public.decorator';
 import { DomainError } from '../../src/shared/errors/domain-error';
