@@ -29,6 +29,13 @@ enum MembershipRole {
   @@map("membership_role")
 }
 
+enum IdempotencyStatus {
+  in_progress
+  completed
+
+  @@map("idempotency_status")
+}
+
 enum MembershipStatus {
   invited
   active
@@ -49,7 +56,8 @@ model User {
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
-  memberships Membership[]
+  memberships     Membership[]
+  idempotencyKeys IdempotencyKey[]
 
   @@map("users")
 }
@@ -90,4 +98,25 @@ model Membership {
   @@index([centerId, role])
   @@index([userId])
   @@map("memberships")
+}
+
+/// Respuesta guardada de una operación con Idempotency-Key: reintentar no repite el efecto.
+/// Acotada por persona (no por centro): la clave la genera la app por cada intención del usuario.
+model IdempotencyKey {
+  id                 String            @id @db.Uuid
+  userId             String            @map("user_id") @db.Uuid
+  key                String            @db.Uuid
+  operation          String
+  requestFingerprint String            @map("request_fingerprint")
+  status             IdempotencyStatus @default(in_progress)
+  responseStatus     Int?              @map("response_status")
+  responseBody       Json?             @map("response_body")
+  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  expiresAt          DateTime          @map("expires_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, key])
+  @@index([expiresAt])
+  @@map("idempotency_keys")
 }

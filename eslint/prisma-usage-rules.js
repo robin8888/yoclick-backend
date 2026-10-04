@@ -35,6 +35,7 @@ const GLOBAL_CLIENT_ALLOWED_FILE_GLOBS = ['src/shared/database/**/*.ts', ...TEST
 
 const GENERATED_CLIENT_ALLOWED_FILE_GLOBS = [
   'src/modules/*/infrastructure/**/*.ts',
+  'src/shared/*/infrastructure/**/*.ts',
   ...GLOBAL_CLIENT_ALLOWED_FILE_GLOBS,
 ];
 

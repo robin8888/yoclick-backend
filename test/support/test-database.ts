@@ -26,7 +26,9 @@ export async function resetTestDatabase(): Promise<void> {
   const client = new Client({ connectionString: migrationUrl });
   await client.connect();
   try {
-    await client.query('TRUNCATE TABLE "memberships", "centers", "users" RESTART IDENTITY CASCADE');
+    await client.query(
+      'TRUNCATE TABLE "idempotency_keys", "memberships", "centers", "users" RESTART IDENTITY CASCADE',
+    );
   } finally {
     await client.end();
   }
