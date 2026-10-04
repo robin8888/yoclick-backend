@@ -6,8 +6,15 @@ import { type MembershipRoleName } from '../shared/tenancy/actor-context';
  */
 export const DEMO_PASSWORD = 'Nosnibor88';
 
-/** `.test` es un dominio reservado (RFC 2606): ninguna persona real puede tener un correo aquí. */
-export const DEMO_EMAIL_DOMAIN = 'demo.yoclick.test';
+/**
+ * Yopmail es un buzón público y desechable: cualquiera puede abrir cualquier dirección en yopmail.com
+ * sin contraseña. Por eso sirve para ver los correos reales de verificación al probar, y por eso las
+ * cuentas de demo no deben tener nada sensible.
+ */
+export const DEMO_EMAIL_DOMAIN = 'yopmail.com';
+
+/** Prefijo que evita chocar con direcciones de Yopmail que use otra persona (`owner@yopmail.com`). */
+export const DEMO_EMAIL_PREFIX = 'yoclick';
 
 export interface DemoCenterDefinition {
   readonly id: string;
@@ -108,7 +115,7 @@ export function buildDemoUsers(centers: readonly DemoCenterDefinition[]): DemoUs
       userCounter += 1;
       return {
         id: buildDemoId('user', userCounter),
-        email: `${person.localPart}.${center.slug}@${DEMO_EMAIL_DOMAIN}`,
+        email: `${DEMO_EMAIL_PREFIX}.${person.localPart}.${center.slug}@${DEMO_EMAIL_DOMAIN}`,
         fullName: person.fullName,
         memberships: [nextMembership(center.id, person.role)],
       };
@@ -118,7 +125,7 @@ export function buildDemoUsers(centers: readonly DemoCenterDefinition[]): DemoUs
   userCounter += 1;
   const multiCenterUser: DemoUserDefinition = {
     id: buildDemoId('user', userCounter),
-    email: `multi@${DEMO_EMAIL_DOMAIN}`,
+    email: `${DEMO_EMAIL_PREFIX}.multi@${DEMO_EMAIL_DOMAIN}`,
     fullName: 'Carlos Navarro',
     memberships: centers.map((center) => nextMembership(center.id, 'client')),
   };

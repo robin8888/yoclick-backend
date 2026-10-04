@@ -4,6 +4,7 @@ const DEVELOPMENT_DATABASE_URL = 'postgresql://yoclick_app:placeholder@localhost
 const PRODUCTION_DATABASE_URL =
   'postgresql://yoclick_app:placeholder@db.internal:5432/yoclick?sslmode=require';
 const FAKE_KEY_BASE64 = Buffer.from('not-a-real-key').toString('base64');
+const FAKE_PEPPER_BASE64 = Buffer.alloc(32, 7).toString('base64');
 
 /** Entorno de desarrollo válido; cada test cambia solo lo que quiere probar. */
 function developmentEnvironment(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -11,6 +12,7 @@ function developmentEnvironment(overrides: Record<string, unknown> = {}): Record
     DATABASE_URL: DEVELOPMENT_DATABASE_URL,
     JWT_ACCESS_PRIVATE_KEY_BASE64: FAKE_KEY_BASE64,
     JWT_ACCESS_PUBLIC_KEY_BASE64: FAKE_KEY_BASE64,
+    AUTH_CODE_PEPPER_BASE64: FAKE_PEPPER_BASE64,
     ...overrides,
   };
 }
@@ -20,6 +22,7 @@ function productionEnvironment(overrides: Record<string, unknown> = {}): Record<
     NODE_ENV: 'production',
     DATABASE_URL: PRODUCTION_DATABASE_URL,
     JWT_KEY_ID: 'prod-2026-10',
+    EMAIL_PROVIDER: 'brevo',
     ...overrides,
   });
 }
@@ -150,6 +153,53 @@ describe('parseEnvironment', () => {
       );
 
       expect(errorMessage).not.toContain(FAKE_KEY_BASE64);
+    });
+  });
+
+  describe('authentication settings', () => {
+    it('defaults to checking breached passwords, the console mailer and no disposable emails', () => {
+      const environment = parseEnvironment(developmentEnvironment());
+
+      expect(environment).toMatchObject({
+        PASSWORD_BREACH_CHECK: 'enabled',
+        EMAIL_PROVIDER: 'console',
+        ALLOW_DISPOSABLE_EMAILS: false,
+      });
+    });
+
+    it('turns ALLOW_DISPOSABLE_EMAILS=true into a boolean', () => {
+      expect(
+        parseEnvironment(developmentEnvironment({ ALLOW_DISPOSABLE_EMAILS: 'true' }))
+          .ALLOW_DISPOSABLE_EMAILS,
+      ).toBe(true);
+    });
+
+    it('requires a pepper of at least 32 bytes: a short one makes the code hash guessable', () => {
+      const shortPepper = Buffer.alloc(8, 1).toString('base64');
+
+      expect(() =>
+        parseEnvironment(developmentEnvironment({ AUTH_CODE_PEPPER_BASE64: shortPepper })),
+      ).toThrow(/AUTH_CODE_PEPPER_BASE64/);
+    });
+
+    it('never echoes the pepper', () => {
+      const shortPepper = Buffer.alloc(8, 1).toString('base64');
+
+      const errorMessage = captureErrorMessage(
+        developmentEnvironment({ AUTH_CODE_PEPPER_BASE64: shortPepper }),
+      );
+
+      expect(errorMessage).not.toContain(shortPepper);
+    });
+
+    it.each([
+      ['PASSWORD_BREACH_CHECK', 'disabled'],
+      ['EMAIL_PROVIDER', 'console'],
+      ['ALLOW_DISPOSABLE_EMAILS', 'true'],
+    ])('rejects %s=%s in production', (variableName, unsafeValue) => {
+      expect(() =>
+        parseEnvironment(productionEnvironment({ [variableName]: unsafeValue })),
+      ).toThrow(new RegExp(variableName));
     });
   });
 });

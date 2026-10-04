@@ -63,12 +63,16 @@ Cuentas (sustituye `<centro>` por `studio-norte`, `forja-readaptacion`, `kine-la
 
 | Rol | Correo |
 |---|---|
-| Propietario | `owner.<centro>@demo.yoclick.test` |
-| Administración | `admin.<centro>@demo.yoclick.test` |
-| Equipo | `staff.<centro>@demo.yoclick.test` |
-| Clientes | `client1.<centro>@demo.yoclick.test`, `client2.<centro>@demo.yoclick.test` |
-| Cliente en los 4 centros | `multi@demo.yoclick.test` |
+| Propietario | `yoclick.owner.<centro>@yopmail.com` |
+| Administración | `yoclick.admin.<centro>@yopmail.com` |
+| Equipo | `yoclick.staff.<centro>@yopmail.com` |
+| Clientes | `yoclick.client1.<centro>@yopmail.com`, `yoclick.client2.<centro>@yopmail.com` |
+| Cliente en los 4 centros | `yoclick.multi@yopmail.com` |
 
 ## Claves de los tokens
 
 `npm run keys:generate` crea el par de claves Ed25519 de desarrollo y lo añade a `.env` (no toca nada que ya exista).
+
+Los correos son de **Yopmail**: abre https://yopmail.com, escribe la dirección completa y verás los correos reales que
+envíe la API (códigos de verificación, recuperación de contraseña). Es un buzón público: no pongas nada sensible en estas cuentas.
+Para registrarte con una dirección de Yopmail hace falta `ALLOW_DISPOSABLE_EMAILS=true` en tu `.env` (`npm run keys:generate` lo añade).

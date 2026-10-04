@@ -1,6 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
-import { DEMO_EMAIL_DOMAIN, DEMO_PASSWORD } from '../../src/seed/demo-data';
+import { DEMO_EMAIL_DOMAIN, DEMO_EMAIL_PREFIX, DEMO_PASSWORD } from '../../src/seed/demo-data';
 import { DemoSeeder } from '../../src/seed/demo-seeder';
 import { SeedModule } from '../../src/seed/seed.module';
 import { PasswordHasher } from '../../src/shared/auth/password-hasher';
@@ -67,7 +67,7 @@ describe('demo seed', () => {
     await demoSeeder.run();
 
     const multiCenterUser = await prismaService.user.findUniqueOrThrow({
-      where: { email: `multi@${DEMO_EMAIL_DOMAIN}` },
+      where: { email: `${DEMO_EMAIL_PREFIX}.multi@${DEMO_EMAIL_DOMAIN}` },
     });
     const centers = await tenantPrismaService.runInUserContext(multiCenterUser.id, (client) =>
       client.center.findMany({ orderBy: { joinCode: 'asc' } }),
@@ -96,24 +96,41 @@ describe('demo seed', () => {
     }
   });
 
-  it('uses only addresses on the reserved demo domain, so no real person can be on it', async () => {
+  it('uses only recognisable yopmail addresses, whose inbox you can open to read real emails', async () => {
     await demoSeeder.run();
 
     const emails = (await prismaService.user.findMany({ select: { email: true } })).map(
       ({ email }) => email,
     );
 
+    expect(DEMO_EMAIL_DOMAIN).toBe('yopmail.com');
+    expect(emails.every((email) => email.startsWith(`${DEMO_EMAIL_PREFIX}.`))).toBe(true);
     expect(emails.every((email) => email.endsWith(`@${DEMO_EMAIL_DOMAIN}`))).toBe(true);
-    expect(DEMO_EMAIL_DOMAIN.endsWith('.test')).toBe(true);
+  });
+
+  it('moves an existing account to its new address instead of colliding with it', async () => {
+    await demoSeeder.run();
+    const email = `${DEMO_EMAIL_PREFIX}.client1.studio-norte@${DEMO_EMAIL_DOMAIN}`;
+    const original = await prismaService.user.findUniqueOrThrow({ where: { email } });
+    await prismaService.user.update({
+      where: { id: original.id },
+      data: { email: 'old-address@example.test' },
+    });
+
+    await demoSeeder.run();
+
+    const migrated = await prismaService.user.findUniqueOrThrow({ where: { id: original.id } });
+    expect(migrated.email).toBe(email);
+    expect(await prismaService.user.count()).toBe(EXPECTED_USER_COUNT);
   });
 
   it('gives each center an owner, an admin, staff and clients', async () => {
     await demoSeeder.run();
     const norteOwner = await prismaService.user.findUniqueOrThrow({
-      where: { email: `owner.studio-norte@${DEMO_EMAIL_DOMAIN}` },
+      where: { email: `${DEMO_EMAIL_PREFIX}.owner.studio-norte@${DEMO_EMAIL_DOMAIN}` },
     });
     const multiCenterUser = await prismaService.user.findUniqueOrThrow({
-      where: { email: `multi@${DEMO_EMAIL_DOMAIN}` },
+      where: { email: `${DEMO_EMAIL_PREFIX}.multi@${DEMO_EMAIL_DOMAIN}` },
     });
     const centers = await tenantPrismaService.runInUserContext(multiCenterUser.id, (client) =>
       client.center.findMany(),
@@ -139,7 +156,7 @@ describe('demo seed', () => {
   it('puts one client in all four centers, to try "Mis centros"', async () => {
     await demoSeeder.run();
     const multiCenterUser = await prismaService.user.findUniqueOrThrow({
-      where: { email: `multi@${DEMO_EMAIL_DOMAIN}` },
+      where: { email: `${DEMO_EMAIL_PREFIX}.multi@${DEMO_EMAIL_DOMAIN}` },
     });
 
     const memberships = await tenantPrismaService.runInUserContext(multiCenterUser.id, (client) =>
@@ -153,7 +170,7 @@ describe('demo seed', () => {
   it('produces accounts the access guards recognise as members of their center', async () => {
     await demoSeeder.run();
     const owner = await prismaService.user.findUniqueOrThrow({
-      where: { email: `owner.studio-norte@${DEMO_EMAIL_DOMAIN}` },
+      where: { email: `${DEMO_EMAIL_PREFIX}.owner.studio-norte@${DEMO_EMAIL_DOMAIN}` },
     });
     const centers = await tenantPrismaService.runInUserContext(owner.id, (client) =>
       client.center.findMany(),
@@ -177,7 +194,7 @@ describe('demo seed', () => {
 
   it('restores the demo password if someone changed it while testing', async () => {
     await demoSeeder.run();
-    const email = `client1.studio-norte@${DEMO_EMAIL_DOMAIN}`;
+    const email = `${DEMO_EMAIL_PREFIX}.client1.studio-norte@${DEMO_EMAIL_DOMAIN}`;
     await prismaService.user.update({
       where: { email },
       data: { passwordHash: await passwordHasher.hash('SomethingElse123') },

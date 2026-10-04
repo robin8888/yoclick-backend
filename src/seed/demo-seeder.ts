@@ -61,7 +61,8 @@ export class DemoSeeder {
     // `users` es global (sin RLS): el contexto de usuario basta para escribir en ella.
     await this.tenantPrismaService.runInUserContext(demoUser.id, (client) =>
       client.user.upsert({
-        where: { email: demoUser.email },
+        // Por id y no por correo: así un cambio de dirección actualiza la cuenta en lugar de chocar con ella.
+        where: { id: demoUser.id },
         create: {
           id: demoUser.id,
           email: demoUser.email,
@@ -69,7 +70,12 @@ export class DemoSeeder {
           fullName: demoUser.fullName,
           emailVerifiedAt: now,
         },
-        update: { passwordHash, fullName: demoUser.fullName, emailVerifiedAt: now },
+        update: {
+          email: demoUser.email,
+          passwordHash,
+          fullName: demoUser.fullName,
+          emailVerifiedAt: now,
+        },
       }),
     );
   }

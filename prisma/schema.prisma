@@ -36,6 +36,24 @@ enum IdempotencyStatus {
   @@map("idempotency_status")
 }
 
+enum ConsentKind {
+  privacy
+  terms
+  marketing
+  health
+  image
+  parental
+
+  @@map("consent_kind")
+}
+
+enum VerificationPurpose {
+  email_verification
+  password_reset
+
+  @@map("verification_purpose")
+}
+
 enum MembershipStatus {
   invited
   active
@@ -56,8 +74,10 @@ model User {
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
-  memberships     Membership[]
-  idempotencyKeys IdempotencyKey[]
+  memberships       Membership[]
+  idempotencyKeys   IdempotencyKey[]
+  consents          Consent[]
+  verificationCodes VerificationCode[]
 
   @@map("users")
 }
@@ -119,4 +139,39 @@ model IdempotencyKey {
   @@unique([userId, key])
   @@index([expiresAt])
   @@map("idempotency_keys")
+}
+
+/// Consentimiento (RGPD). Inmutable: una fila por cambio, nunca se actualiza ni se borra.
+model Consent {
+  id        String      @id @db.Uuid
+  userId    String      @map("user_id") @db.Uuid
+  kind      ConsentKind
+  /// Versión del texto legal que la persona aceptó.
+  version   String
+  isGranted Boolean     @map("is_granted")
+  grantedAt DateTime    @default(now()) @map("granted_at") @db.Timestamptz
+  /// Hash del IP, no el IP: sirve de evidencia sin guardar un dato personal directo.
+  ipHash    String?     @map("ip_hash")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, kind, grantedAt])
+  @@map("consents")
+}
+
+/// Código de 6 dígitos de un solo uso (verificar email, recuperar contraseña). Solo se guarda su HMAC.
+model VerificationCode {
+  id           String              @id @db.Uuid
+  userId       String              @map("user_id") @db.Uuid
+  purpose      VerificationPurpose
+  codeHash     String              @map("code_hash")
+  attemptCount Int                 @default(0) @map("attempt_count")
+  expiresAt    DateTime            @map("expires_at") @db.Timestamptz
+  consumedAt   DateTime?           @map("consumed_at") @db.Timestamptz
+  createdAt    DateTime            @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, purpose, createdAt])
+  @@map("verification_codes")
 }
