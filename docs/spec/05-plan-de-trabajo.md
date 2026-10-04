@@ -4,6 +4,33 @@ Un ticket = una rama (`feat/API-012-bookings-create`) = un PR pequeño (< 400 l�
 
 Orden recomendado: **API-0 → API-1 → APP-0 en paralelo con API-2 → …** La app trabaja con mocks MSW generados del contrato hasta que el endpoint real existe.
 
+## Estado de avance (4 oct 2026)
+
+Leyenda: ✅ hecho · 🟡 parcial · ⬜ pendiente. Basado en el historial de git de cada repo.
+
+### yoclick-api
+- ✅ API-0 Cimientos.
+- ✅ API-1 Identidad: registro con código por correo, login, refresh rotatorio, recuperar contraseña, 2FA (TOTP) obligatorio para owner/admin, límite de peticiones por IP, cuenta propia (perfil, consentimientos, exportar y borrar).
+- 🟡 API-2 Centros y unirse: unirse por código, búsqueda en el directorio y branding hechos; alta de centro con prueba, ajustes (horarios, festivos, cancelación) y equipo con invitaciones por código hechos. Falta el enlace de invitación `/i/{token}`, el QR del centro y la ubicación en la búsqueda.
+- ⬜ API-3 Agenda y reservas · API-4 Cobros · API-5 Personas, contenido y avisos · API-6 Endurecimiento y salida.
+
+### yoclick-app
+- ✅ APP-001 a APP-004: proyecto, `app.config.ts` + EAS, tema y brand engine, fuentes y `Text`.
+- ✅ APP-005 cliente API, APP-006 i18n y formateadores, APP-008 estados compartidos.
+- ⬜ APP-007 Storybook (no instalado).
+- 🟡 APP-1 Sistema de diseño: hechos los átomos principales, `FormField`, `ListItem`, `ScreenTemplate`, `ScreenSkeleton`, `EmptyState`, `ErrorState`, `OfflineBanner`, `ForceUpdateGate`, `Logo`. Faltan el resto de moléculas (SearchBar, SlotButton, DayPill, ProgressRing, KPI, Toast, SegmentedControl, StepIndicator), los organismos y las plantillas FormTemplate, ListTemplate, WizardTemplate y TabsTemplate.
+- 🟡 APP-2 Unirse y autenticación: hechas `jstart` (con logo, fondo y pie como el prototipo; sin la pastilla DEMO), `jqr` (escáner de QR), `jcode`, `jsearch`, `jconfirm`, `welcome`, `jcenters`, login, registro, verificación, recuperar contraseña y MFA. Faltan Apple/Google y el E2E Maestro.
+- ⬜ APP-3 a APP-9.
+
+### Pendientes transversales (decisiones o acciones tuyas)
+- Probar en el iPhone un **development build nuevo** (`eas build --profile development --platform ios`): `expo-camera` es un módulo nativo.
+- Id de bundle definitivo (`com.yoclick.app` es provisional), URL de staging de `eas.json` y cuentas de desarrollador de Apple y Google (ver `STORE_CHECKLIST.md` en yoclick-app).
+- Confirmar el contenido real del QR del centro: la app solo acepta `https://yoclick.app/j/{código}`.
+- Página de alta de centro: el pie «Crea la app de tu centro» abre `https://yoclick.app` hasta que existan las pantallas `(onboarding)`.
+- Code signing de las actualizaciones OTA (EAS Update) y gitleaks en el equipo.
+- Comprobar en dispositivo el texto al 200 % y el renderizado del logo (símbolo sin la sombra del original).
+- Subir cambios con `git push` en los dos repos (los commits son locales hasta entonces).
+
 ---
 
 ## yoclick-api
