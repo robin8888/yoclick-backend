@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
+import { exposeApiDocs } from './openapi/expose-api-docs';
 import { type Environment } from './shared/config/environment.schema';
 import { configureApplication } from './shared/configure-application';
 import { createFastifyAdapter } from './shared/create-fastify-adapter';
@@ -17,6 +18,7 @@ async function bootstrap(): Promise<void> {
   await configureApplication(application);
 
   const configService = application.get<ConfigService<Environment, true>>(ConfigService);
+  exposeApiDocs(application, configService.get('NODE_ENV', { infer: true }));
   await application.listen(
     configService.get('PORT', { infer: true }),
     configService.get('HOST', { infer: true }),

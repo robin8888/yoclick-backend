@@ -23,12 +23,14 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "openapi:gen": "nest build && node dist/openapi/generate-openapi.js"
   },
   "license": "UNLICENSED",
   "type": "commonjs",
   "dependencies": {
     "@fastify/helmet": "13.1.1",
+    "@fastify/static": "10.1.5",
     "@nestjs/common": "11.2.7",
     "@nestjs/config": "4.0.4",
     "@nestjs/core": "11.2.7",
@@ -47,6 +49,7 @@
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2",
     "uuid": "14.0.2",
+    "yaml": "2.9.1",
     "zod": "4.6.5"
   },
   "devDependencies": {

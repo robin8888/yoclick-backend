@@ -1,0 +1,41 @@
+openapi: 3.0.0
+paths:
+  /health:
+    get:
+      operationId: health_check_liveness
+      parameters: []
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponseDto"
+      summary: Comprueba que la API está viva. No requiere autenticación.
+      tags:
+        - health
+info:
+  title: Yoclick API
+  description: API multi-centro de reservas en marca blanca. Contrato canónico para la app.
+  version: 0.1.0
+  contact: {}
+tags: []
+servers:
+  - url: https://api.yoclick.app
+components:
+  securitySchemes:
+    bearer:
+      scheme: bearer
+      bearerFormat: JWT
+      type: http
+  schemas:
+    HealthResponseDto:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - ok
+      required:
+        - status
+      additionalProperties: false
