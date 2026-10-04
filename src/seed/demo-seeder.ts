@@ -88,19 +88,13 @@ export class DemoSeeder {
       role: 'owner',
       permissions: [],
     };
-    const centerFields = {
-      slug: demoCenter.slug,
-      name: demoCenter.name,
-      sectorId: demoCenter.sectorId,
-      brandColor: demoCenter.brandColor,
-      joinCode: demoCenter.joinCode,
-      status: 'active',
-    } as const;
+    const { id: centerId, ...demoCenterFields } = demoCenter;
+    const centerFields = { ...demoCenterFields, status: 'active' } as const;
 
     await this.tenantPrismaService.runInTenantContext(seedActor, async (client) => {
       await client.center.upsert({
-        where: { id: demoCenter.id },
-        create: { id: demoCenter.id, ...centerFields },
+        where: { id: centerId },
+        create: { id: centerId, ...centerFields },
         update: centerFields,
       });
 

@@ -25,7 +25,18 @@ export class DatabaseFixtures {
     return userId;
   }
 
-  async createCenter(slug: string, joinCode: string): Promise<string> {
+  async createCenter(
+    slug: string,
+    joinCode: string,
+    options: {
+      isListed?: boolean;
+      city?: string;
+      latitude?: number;
+      longitude?: number;
+      maxClients?: number;
+      status?: 'trial' | 'active' | 'past_due' | 'suspended';
+    } = {},
+  ): Promise<string> {
     const centerId = generateUuidV7();
     const ownerContext = this.buildActor(centerId, generateUuidV7(), 'owner');
     await this.tenantPrismaService.runInTenantContext(ownerContext, (client) =>
@@ -37,6 +48,7 @@ export class DatabaseFixtures {
           sectorId: 'gym',
           brandColor: '#E4572E',
           joinCode,
+          ...options,
         },
       }),
     );

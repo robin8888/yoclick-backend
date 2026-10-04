@@ -23,6 +23,10 @@ export interface DemoCenterDefinition {
   readonly sectorId: string;
   readonly brandColor: string;
   readonly joinCode: string;
+  readonly isListed: boolean;
+  readonly city: string;
+  readonly latitude: number;
+  readonly longitude: number;
 }
 
 export interface DemoMembershipDefinition {
@@ -63,6 +67,10 @@ const CENTER_FIELDS = [
     sectorId: 'estudio',
     brandColor: '#E4572E',
     joinCode: 'NORTE7',
+    isListed: true,
+    city: 'Madrid',
+    latitude: 40.4168,
+    longitude: -3.7038,
   },
   {
     slug: 'forja-readaptacion',
@@ -70,6 +78,10 @@ const CENTER_FIELDS = [
     sectorId: 'readap',
     brandColor: '#2446C7',
     joinCode: 'FORJA2',
+    isListed: true,
+    city: 'Barcelona',
+    latitude: 41.3874,
+    longitude: 2.1686,
   },
   {
     slug: 'kine-lab',
@@ -77,6 +89,10 @@ const CENTER_FIELDS = [
     sectorId: 'box',
     brandColor: '#C8F031',
     joinCode: 'KINE24',
+    isListed: false,
+    city: 'Sevilla',
+    latitude: 37.3891,
+    longitude: -5.9845,
   },
   {
     slug: 'compas-escuela-de-baile',
@@ -84,6 +100,10 @@ const CENTER_FIELDS = [
     sectorId: 'baile',
     brandColor: '#7A3FE0',
     joinCode: 'COMPAS',
+    isListed: true,
+    city: 'Valencia',
+    latitude: 39.4699,
+    longitude: -0.3763,
   },
 ] as const;
 

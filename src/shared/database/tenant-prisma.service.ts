@@ -16,7 +16,15 @@ interface RequestContextSettings {
   readonly userId: string;
   readonly membershipId: string;
   readonly role: string;
+  /** Ver un centro sin pertenecer a él (unirse). Cada uno habilita una política estrecha. */
+  readonly lookupJoinCode?: string;
+  readonly lookupCenterId?: string;
+  readonly isDirectoryLookup?: boolean;
 }
+
+/** Qué centro(s) puede ver quien aún no pertenece a ninguno: uno por código, uno por id, o los listados. */
+export type CenterLookup =
+  { readonly joinCode: string } | { readonly centerId: string } | { readonly isDirectory: true };
 
 const NO_CENTER_SETTINGS: Pick<RequestContextSettings, 'centerId' | 'membershipId' | 'role'> = {
   centerId: '',
@@ -72,6 +80,21 @@ export class TenantPrismaService {
     return this.runWithSettings({ ...NO_CENTER_SETTINGS, userId: '' }, work);
   }
 
+  /** Para unirse: lee centros concretos (por código o id) o los listados, sin sesión ni centro. */
+  async runInCenterLookupContext<TResult>(
+    lookup: CenterLookup,
+    work: (transactionClient: TenantTransactionClient) => Promise<TResult>,
+  ): Promise<TResult> {
+    const settings: RequestContextSettings = {
+      ...NO_CENTER_SETTINGS,
+      userId: '',
+      ...('joinCode' in lookup && { lookupJoinCode: lookup.joinCode }),
+      ...('centerId' in lookup && { lookupCenterId: lookup.centerId }),
+      ...('isDirectory' in lookup && { isDirectoryLookup: true }),
+    };
+    return this.runWithSettings(settings, work);
+  }
+
   private async runWithSettings<TResult>(
     settings: RequestContextSettings,
     work: (transactionClient: TenantTransactionClient) => Promise<TResult>,
@@ -95,6 +118,9 @@ export class TenantPrismaService {
         set_config('app.user_id', ${settings.userId}, true),
         set_config('app.membership_id', ${settings.membershipId}, true),
         set_config('app.role', ${settings.role}, true),
+        set_config('app.lookup_join_code', ${settings.lookupJoinCode ?? ''}, true),
+        set_config('app.lookup_center_id', ${settings.lookupCenterId ?? ''}, true),
+        set_config('app.lookup_directory', ${settings.isDirectoryLookup ? 'on' : ''}, true),
         set_config('statement_timeout', ${String(STATEMENT_TIMEOUT_MS)}, true)`;
   }
 }

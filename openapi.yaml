@@ -563,6 +563,136 @@ paths:
       summary: Descarga todos mis datos en JSON (RGPD arts. 15 y 20). Pide la contraseña.
       tags:
         - me
+  /v1/join/code/{code}:
+    get:
+      operationId: join_find_center_by_code
+      parameters:
+        - name: code
+          required: true
+          in: path
+          schema:
+            minLength: 1
+            maxLength: 16
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicCenterResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      summary: El centro que corresponde a un código de unión. Un código desconocido responde 404 JOIN_CODE_INVALID.
+      tags:
+        - join
+  /v1/join/search:
+    get:
+      operationId: join_search_centers
+      parameters:
+        - name: q
+          required: false
+          in: query
+          schema:
+            minLength: 2
+            maxLength: 80
+            type: string
+        - name: lat
+          required: false
+          in: query
+          schema:
+            minimum: -90
+            maximum: 90
+            type: number
+        - name: lng
+          required: false
+          in: query
+          schema:
+            minimum: -180
+            maximum: 180
+            type: number
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CenterSearchResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      summary: Busca entre los centros que salen en el directorio, por texto y, si se envía ubicación, por cercanía.
+      tags:
+        - join
+  /v1/join/{centerId}:
+    post:
+      operationId: join_center
+      parameters:
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JoinCenterRequestDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JoinCenterResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Te une al centro como cliente. Un centro privado exige su código de unión; uno listado, no. Comprueba el límite de clientes del plan.
+      tags:
+        - join
+  /v1/centers/{centerId}/branding:
+    get:
+      operationId: centers_get_branding
+      parameters:
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CenterBrandingResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      summary: Nombre, sector y color de un centro. Público y cacheable cinco minutos.
+      tags:
+        - centers
   /health:
     get:
       operationId: health_check_liveness
@@ -1322,6 +1452,134 @@ components:
       required:
         - password
         - confirmation
+      additionalProperties: false
+    PublicCenterResponseDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        name:
+          type: string
+        slug:
+          type: string
+        sectorId:
+          type: string
+        brandColor:
+          type: string
+        city:
+          type: array
+          items:
+            type: string
+      required:
+        - id
+        - name
+        - slug
+        - sectorId
+        - brandColor
+        - city
+      additionalProperties: false
+    CenterSearchResponseDto:
+      type: object
+      properties:
+        centers:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              name:
+                type: string
+              slug:
+                type: string
+              sectorId:
+                type: string
+              brandColor:
+                type: string
+              city:
+                type:
+                  - string
+                  - "null"
+              distanceInKilometers:
+                type:
+                  - number
+                  - "null"
+            required:
+              - id
+              - name
+              - slug
+              - sectorId
+              - brandColor
+              - city
+              - distanceInKilometers
+            additionalProperties: false
+      required:
+        - centers
+      additionalProperties: false
+    JoinCenterRequestDto:
+      type: object
+      properties:
+        joinCode:
+          type: string
+          minLength: 1
+          maxLength: 16
+      additionalProperties: false
+    JoinCenterResponseDto:
+      type: object
+      properties:
+        membershipId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        centerId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        role:
+          type: string
+          enum:
+            - owner
+            - admin
+            - staff
+            - client
+        status:
+          type: string
+          enum:
+            - invited
+            - active
+            - blocked
+            - left
+        isNewMembership:
+          type: boolean
+      required:
+        - membershipId
+        - centerId
+        - role
+        - status
+        - isNewMembership
+      additionalProperties: false
+    CenterBrandingResponseDto:
+      type: object
+      properties:
+        centerId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        name:
+          type: string
+        sectorId:
+          type: string
+        brandColor:
+          type: string
+      required:
+        - centerId
+        - name
+        - sectorId
+        - brandColor
       additionalProperties: false
     HealthResponseDto:
       type: object

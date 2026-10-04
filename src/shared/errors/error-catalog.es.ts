@@ -41,6 +41,9 @@ export const ERROR_CATALOG = {
   EMAIL_NOT_VERIFIED: { title: 'Confirma tu correo para poder entrar' },
   ACCOUNT_LOCKED: { title: 'Demasiados intentos. Espera unos minutos y vuelve a probar' },
   SESSION_INVALID: { title: 'Tu sesión ha caducado. Inicia sesión de nuevo' },
+  JOIN_CODE_INVALID: { title: 'Ese código no corresponde a ningún centro' },
+  CLIENT_LIMIT_REACHED: { title: 'Este centro ha alcanzado su límite de clientes por ahora' },
+  MEMBERSHIP_BLOCKED: { title: 'El centro no permite que te unas' },
   INTERNAL_ERROR: { title: 'Algo ha fallado de nuestro lado. Inténtalo de nuevo' },
 } as const;
 

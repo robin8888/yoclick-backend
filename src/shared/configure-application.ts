@@ -22,7 +22,8 @@ export async function configureApplication(application: NestFastifyApplication):
     .getHttpAdapter()
     .getInstance()
     .addHook('onSend', async (_request, reply, payload) => {
-      void reply.header('cache-control', 'no-store');
+      // Por defecto nada se cachea; una ruta pública (la marca de un centro) puede fijar su propia política.
+      if (!reply.hasHeader('cache-control')) void reply.header('cache-control', 'no-store');
       return payload;
     });
 }

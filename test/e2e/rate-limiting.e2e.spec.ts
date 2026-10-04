@@ -54,6 +54,15 @@ describe('rate limiting per IP', () => {
     expect(blocked.statusCode).toBe(429);
   });
 
+  it('limits join-code guessing per IP, so codes cannot be enumerated', async () => {
+    const guess = async () => application.inject({ method: 'GET', url: '/v1/join/code/ZZZZZZ' });
+    for (let attempt = 0; attempt < RATE_LIMITS.submitCode.limit; attempt += 1) {
+      expect((await guess()).statusCode).toBe(404);
+    }
+
+    expect((await guess()).statusCode).toBe(429);
+  });
+
   it('answers 429 as problem+json with a stable code and a Retry-After header', async () => {
     for (let attempt = 0; attempt < RATE_LIMITS.login.limit; attempt += 1) await loginAttempt();
 
