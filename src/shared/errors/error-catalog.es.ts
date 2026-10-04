@@ -24,6 +24,10 @@ export const ERROR_CATALOG = {
   },
   PASSWORD_BREACHED: { title: 'Esa contraseña aparece en filtraciones. Elige otra' },
   VERIFICATION_CODE_INVALID: { title: 'El código no es válido o ha caducado' },
+  REAUTHENTICATION_FAILED: { title: 'La contraseña no es correcta' },
+  ACCOUNT_OWNS_CENTER: {
+    title: 'Antes de eliminar tu cuenta, cierra o traspasa el centro del que eres propietario',
+  },
   INVALID_CREDENTIALS: { title: 'Correo o contraseña incorrectos' },
   EMAIL_NOT_VERIFIED: { title: 'Confirma tu correo para poder entrar' },
   ACCOUNT_LOCKED: { title: 'Demasiados intentos. Espera unos minutos y vuelve a probar' },

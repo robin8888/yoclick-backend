@@ -4,6 +4,7 @@ import { APP_FILTER, APP_PIPE } from '@nestjs/core';
 import { LoggerModule } from 'nestjs-pino';
 import { ZodValidationPipe } from 'nestjs-zod';
 import { AuthIdentityModule } from './modules/auth/auth-identity.module';
+import { MeModule } from './modules/me/me.module';
 import { HealthModule } from './modules/health/health.module';
 import { AuthModule } from './shared/auth/auth.module';
 import { type Environment } from './shared/config/environment.schema';
@@ -31,6 +32,7 @@ import { buildLoggerOptions } from './shared/logging/build-logger-options';
     AuthModule,
     EmailModule,
     AuthIdentityModule,
+    MeModule,
     HealthModule,
   ],
   providers: [

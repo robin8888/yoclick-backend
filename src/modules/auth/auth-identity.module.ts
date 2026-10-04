@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { PinoLogger } from 'nestjs-pino';
 import { PasswordHasher } from '../../shared/auth/password-hasher';
 import { type Environment } from '../../shared/config/environment.schema';
+import { ChangePasswordUseCase } from './application/change-password.use-case';
+import { ReauthenticationChecker } from './application/reauthentication.checker';
 import { AccountSecurityNotifier } from './application/account-security-notifier';
 import { LoginUseCase } from './application/login.use-case';
 import { LogoutUseCase } from './application/logout.use-case';
@@ -52,6 +54,8 @@ import { PwnedPasswordsChecker } from './infrastructure/pwned-passwords.checker'
     RefreshSessionUseCase,
     LogoutUseCase,
     AccountPasswordChanger,
+    ReauthenticationChecker,
+    ChangePasswordUseCase,
     ForgotPasswordUseCase,
     ResetPasswordUseCase,
     RegisterUserUseCase,
@@ -73,5 +77,7 @@ import { PwnedPasswordsChecker } from './infrastructure/pwned-passwords.checker'
           : new DisabledBreachedPasswordChecker(),
     },
   ],
+  // Lo que el módulo `me` necesita de identidad: reautenticar, cambiar la contraseña y cerrar sesiones.
+  exports: [ReauthenticationChecker, ChangePasswordUseCase, SESSION_REPOSITORY],
 })
 export class AuthIdentityModule {}

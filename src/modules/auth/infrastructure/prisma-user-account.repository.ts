@@ -42,6 +42,23 @@ export class PrismaUserAccountRepository implements UserAccountRepository {
     );
   }
 
+  async findById(userId: string): Promise<UserAccount | null> {
+    return this.tenantPrismaService.runInUserContext(userId, (client) =>
+      client.user.findFirst({
+        where: { id: userId, deletedAt: null },
+        select: {
+          id: true,
+          email: true,
+          fullName: true,
+          passwordHash: true,
+          emailVerifiedAt: true,
+          failedLoginCount: true,
+          lockedUntil: true,
+        },
+      }),
+    );
+  }
+
   async changePassword(userId: string, newPasswordHash: string, changedAt: Date): Promise<void> {
     await this.tenantPrismaService.runInUserContext(userId, async (client) => {
       const { emailVerifiedAt } = await client.user.findUniqueOrThrow({

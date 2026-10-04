@@ -9,4 +9,5 @@ export const LEGAL_DOCUMENT_VERSIONS = {
   privacy: '2026-10-01',
   terms: '2026-10-01',
   marketing: '2026-10-01',
+  image: '2026-10-01',
 } as const;

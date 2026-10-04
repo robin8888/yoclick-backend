@@ -42,6 +42,8 @@ export type CreateUserAccountResult = 'created' | 'email-taken';
 
 export interface UserAccountRepository {
   findByEmail(email: string): Promise<UserAccount | null>;
+  /** Para quien ya está autenticada (reautenticación). Una cuenta eliminada no se devuelve. */
+  findById(userId: string): Promise<UserAccount | null>;
   /** Crea la cuenta y sus consentimientos juntos, o nada. `email-taken` si otra petición se adelantó. */
   create(newUser: NewUserAccount): Promise<CreateUserAccountResult>;
   markEmailVerified(userId: string, verifiedAt: Date): Promise<void>;

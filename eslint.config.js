@@ -150,6 +150,8 @@ module.exports = tseslint.config(
     rules: {
       'no-magic-numbers': 'off',
       'max-lines-per-function': 'off',
+      // Los ayudantes de petición de los tests (método, ruta, token, cuerpo) tienen más de 3 parámetros.
+      'max-params': 'off',
       '@typescript-eslint/no-non-null-assertion': 'off',
       // Los fixtures usan contraseñas falsas a propósito.
       'sonarjs/no-hardcoded-passwords': 'off',

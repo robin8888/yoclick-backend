@@ -67,6 +67,11 @@ export class InMemoryUserAccountRepository implements UserAccountRepository {
     return Promise.resolve();
   }
 
+  findById(userId: string): Promise<UserAccount | null> {
+    const found = [...this.accounts.values()].find((account) => account.id === userId);
+    return Promise.resolve(found ?? null);
+  }
+
   recordFailedLogin(userId: string, policy: LockoutPolicy): Promise<FailedLoginOutcome> {
     for (const [key, account] of this.accounts) {
       if (account.id !== userId) continue;
