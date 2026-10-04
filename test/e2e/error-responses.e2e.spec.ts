@@ -9,7 +9,7 @@ describe('error responses (RFC 9457)', () => {
   let application: NestFastifyApplication;
 
   beforeAll(async () => {
-    application = await createTestApplication([ErrorProbeModule]);
+    application = await createTestApplication({ extraModules: [ErrorProbeModule] });
   });
 
   afterAll(async () => {
@@ -17,7 +17,7 @@ describe('error responses (RFC 9457)', () => {
   });
 
   it('answers a domain error as problem+json with its stable code', async () => {
-    const response = await application.inject({ method: 'GET', url: '/probe/domain-error' });
+    const response = await application.inject({ method: 'GET', url: '/v1/probe/domain-error' });
 
     expect(response.statusCode).toBe(409);
     expect(response.headers['content-type']).toContain(PROBLEM_CONTENT_TYPE);
@@ -29,7 +29,7 @@ describe('error responses (RFC 9457)', () => {
   });
 
   it('never leaks the internals of an unexpected failure (SEC-61)', async () => {
-    const response = await application.inject({ method: 'GET', url: '/probe/crash' });
+    const response = await application.inject({ method: 'GET', url: '/v1/probe/crash' });
 
     expect(response.statusCode).toBe(500);
     expect(response.json()).toMatchObject({ status: 500, code: 'INTERNAL_ERROR' });
@@ -41,7 +41,7 @@ describe('error responses (RFC 9457)', () => {
   it('gives each response a server-generated traceId, ignoring any sent by the client', async () => {
     const response = await application.inject({
       method: 'GET',
-      url: '/probe/crash',
+      url: '/v1/probe/crash',
       headers: { 'x-request-id': 'forged-by-client' },
     });
 
@@ -53,7 +53,7 @@ describe('error responses (RFC 9457)', () => {
   it('rejects an invalid body with the failing fields and no rejected values', async () => {
     const response = await application.inject({
       method: 'POST',
-      url: '/probe/echo',
+      url: '/v1/probe/echo',
       payload: { fullName: 'A', age: 3 },
     });
 
@@ -70,7 +70,7 @@ describe('error responses (RFC 9457)', () => {
   it('rejects fields the DTO does not declare, such as a forged role (BOPLA, SEC-48)', async () => {
     const response = await application.inject({
       method: 'POST',
-      url: '/probe/echo',
+      url: '/v1/probe/echo',
       payload: { fullName: 'Ana Pérez', age: 30, role: 'owner', centerId: 'someone-elses' },
     });
 
@@ -83,7 +83,7 @@ describe('error responses (RFC 9457)', () => {
   it('accepts a valid body', async () => {
     const response = await application.inject({
       method: 'POST',
-      url: '/probe/echo',
+      url: '/v1/probe/echo',
       payload: { fullName: 'Ana Pérez', age: 30 },
     });
 
@@ -94,7 +94,7 @@ describe('error responses (RFC 9457)', () => {
   it('rejects a body over 1 MB with 413 problem+json (SEC-50)', async () => {
     const response = await application.inject({
       method: 'POST',
-      url: '/probe/echo',
+      url: '/v1/probe/echo',
       payload: { fullName: OVER_ONE_MEGABYTE, age: 30 },
     });
 
@@ -105,7 +105,7 @@ describe('error responses (RFC 9457)', () => {
   it('answers malformed JSON with a 400 problem, not a stack trace', async () => {
     const response = await application.inject({
       method: 'POST',
-      url: '/probe/echo',
+      url: '/v1/probe/echo',
       headers: { 'content-type': 'application/json' },
       payload: '{"fullName": ',
     });

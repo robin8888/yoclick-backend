@@ -93,7 +93,7 @@ module.exports = tseslint.config(
           selector: 'variable',
           types: ['boolean'],
           format: ['PascalCase'],
-          prefix: ['is', 'has', 'can', 'should', 'was', 'will'],
+          prefix: ['is', 'are', 'has', 'have', 'can', 'should', 'was', 'were', 'will'],
         },
         { selector: 'function', format: ['camelCase'], custom: NOT_A_VAGUE_NAME },
         // Los decoradores de Nest (`@Public()`, `@Roles()`) son funciones con nombre en PascalCase.
@@ -153,7 +153,16 @@ module.exports = tseslint.config(
       '@typescript-eslint/no-non-null-assertion': 'off',
       // Los fixtures usan contraseñas falsas a propósito.
       'sonarjs/no-hardcoded-passwords': 'off',
+      // Los matchers asimétricos de Jest (`expect.stringMatching`) devuelven `any`.
+      '@typescript-eslint/no-unsafe-assignment': 'off',
     },
+  },
+
+  {
+    // Un caso de uso recibe por inyección sus puertos (repositorios, hasher, correo...): hasta 5.
+    // Si necesita más, está haciendo demasiado y hay que partirlo. Las funciones siguen en 3.
+    files: ['src/**/*.use-case.ts', 'src/**/*.controller.ts'],
+    rules: { 'max-params': ['error', 5] },
   },
 
   {

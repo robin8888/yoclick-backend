@@ -18,6 +18,16 @@ export const ERROR_CATALOG = {
   IDEMPOTENCY_KEY_REUSED: { title: 'Esa clave ya se usó con otra petición distinta' },
   IDEMPOTENCY_IN_PROGRESS: { title: 'Esta operación ya se está procesando' },
   RATE_LIMITED: { title: 'Demasiados intentos. Espera un momento y vuelve a probar' },
+  CONSENT_REQUIRED: { title: 'Tienes que aceptar la política de privacidad y los términos' },
+  EMAIL_DOMAIN_NOT_ALLOWED: {
+    title: 'Ese tipo de correo no está permitido. Usa tu correo personal',
+  },
+  PASSWORD_BREACHED: { title: 'Esa contraseña aparece en filtraciones. Elige otra' },
+  VERIFICATION_CODE_INVALID: { title: 'El código no es válido o ha caducado' },
+  INVALID_CREDENTIALS: { title: 'Correo o contraseña incorrectos' },
+  EMAIL_NOT_VERIFIED: { title: 'Confirma tu correo para poder entrar' },
+  ACCOUNT_LOCKED: { title: 'Demasiados intentos. Espera unos minutos y vuelve a probar' },
+  SESSION_INVALID: { title: 'Tu sesión ha caducado. Inicia sesión de nuevo' },
   INTERNAL_ERROR: { title: 'Algo ha fallado de nuestro lado. Inténtalo de nuevo' },
 } as const;
 

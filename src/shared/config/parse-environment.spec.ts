@@ -23,6 +23,8 @@ function productionEnvironment(overrides: Record<string, unknown> = {}): Record<
     DATABASE_URL: PRODUCTION_DATABASE_URL,
     JWT_KEY_ID: 'prod-2026-10',
     EMAIL_PROVIDER: 'brevo',
+    BREVO_API_KEY: 'fake-api-key',
+    EMAIL_FROM_ADDRESS: 'no-reply@yoclick.app',
     ...overrides,
   });
 }
@@ -190,6 +192,33 @@ describe('parseEnvironment', () => {
       );
 
       expect(errorMessage).not.toContain(shortPepper);
+    });
+
+    it.each(['BREVO_API_KEY', 'EMAIL_FROM_ADDRESS'])(
+      'requires %s when the real email provider is selected',
+      (variableName) => {
+        expect(() =>
+          parseEnvironment(
+            developmentEnvironment({ EMAIL_PROVIDER: 'brevo', [variableName]: undefined }),
+          ),
+        ).toThrow(new RegExp(variableName));
+      },
+    );
+
+    it('does not require provider credentials for the console mailer', () => {
+      expect(() => parseEnvironment(developmentEnvironment())).not.toThrow();
+    });
+
+    it('never echoes the provider API key', () => {
+      const errorMessage = captureErrorMessage(
+        developmentEnvironment({
+          EMAIL_PROVIDER: 'brevo',
+          BREVO_API_KEY: 'xkeysib-super-secret',
+          EMAIL_FROM_ADDRESS: 'not-an-email',
+        }),
+      );
+
+      expect(errorMessage).not.toContain('xkeysib-super-secret');
     });
 
     it.each([

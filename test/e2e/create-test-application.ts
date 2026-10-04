@@ -5,13 +5,29 @@ import { AppModule } from '../../src/app.module';
 import { configureApplication } from '../../src/shared/configure-application';
 import { createFastifyAdapter } from '../../src/shared/create-fastify-adapter';
 
-/** `extraModules`: módulos de sondeo que solo existen en tests, para provocar errores a propósito. */
+interface ProviderOverride {
+  readonly token: symbol | (new (...parameters: never[]) => object);
+  readonly value: unknown;
+}
+
+interface TestApplicationOptions {
+  /** Módulos de sondeo que solo existen en tests, para provocar errores a propósito. */
+  readonly extraModules?: ModuleMetadata['imports'];
+  /** Sustituye proveedores reales (correo, comprobador de contraseñas filtradas) por dobles. */
+  readonly overrides?: readonly ProviderOverride[];
+}
+
 export async function createTestApplication(
-  extraModules: ModuleMetadata['imports'] = [],
+  options: TestApplicationOptions = {},
 ): Promise<NestFastifyApplication> {
-  const testingModule = await Test.createTestingModule({
-    imports: [AppModule, ...extraModules],
-  }).compile();
+  const testingModuleBuilder = Test.createTestingModule({
+    imports: [AppModule, ...(options.extraModules ?? [])],
+  });
+  for (const override of options.overrides ?? []) {
+    testingModuleBuilder.overrideProvider(override.token).useValue(override.value);
+  }
+
+  const testingModule = await testingModuleBuilder.compile();
   const application =
     testingModule.createNestApplication<NestFastifyApplication>(createFastifyAdapter());
   await configureApplication(application);

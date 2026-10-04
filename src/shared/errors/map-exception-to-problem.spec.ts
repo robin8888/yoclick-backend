@@ -26,6 +26,16 @@ describe('mapExceptionToProblem', () => {
     });
   });
 
+  it('carries the failing field of a domain error, without the rejected value', () => {
+    const error = new DomainError('VALIDATION_FAILED', 400, [
+      { path: 'password', code: 'too_short' },
+    ]);
+
+    const problem = mapExceptionToProblem(error, TRACE_ID);
+
+    expect(problem.errors).toEqual([{ path: 'password', code: 'too_short' }]);
+  });
+
   it('turns zod validation failures into field errors without echoing the rejected values', () => {
     const problem = mapExceptionToProblem(captureZodException(), TRACE_ID);
 

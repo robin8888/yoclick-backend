@@ -3,11 +3,13 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_FILTER, APP_PIPE } from '@nestjs/core';
 import { LoggerModule } from 'nestjs-pino';
 import { ZodValidationPipe } from 'nestjs-zod';
+import { AuthIdentityModule } from './modules/auth/auth-identity.module';
 import { HealthModule } from './modules/health/health.module';
 import { AuthModule } from './shared/auth/auth.module';
 import { type Environment } from './shared/config/environment.schema';
 import { parseEnvironment } from './shared/config/parse-environment';
 import { DatabaseModule } from './shared/database/database.module';
+import { EmailModule } from './shared/email/email.module';
 import { ProblemDetailsFilter } from './shared/errors/problem-details.filter';
 import { buildLoggerOptions } from './shared/logging/build-logger-options';
 
@@ -24,6 +26,8 @@ import { buildLoggerOptions } from './shared/logging/build-logger-options';
     }),
     DatabaseModule,
     AuthModule,
+    EmailModule,
+    AuthIdentityModule,
     HealthModule,
   ],
   providers: [

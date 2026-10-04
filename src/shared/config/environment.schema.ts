@@ -46,6 +46,10 @@ const baseEnvironmentSchema = z.object({
   // Comprueba contraseñas contra filtraciones conocidas (k-anonymity, SEC-43). Solo se apaga sin red.
   PASSWORD_BREACH_CHECK: z.enum(['enabled', 'disabled']).default('enabled'),
   EMAIL_PROVIDER: z.enum(['console', 'brevo']).default('console'),
+  // Solo hacen falta con EMAIL_PROVIDER=brevo (se exigen en ese caso, ver más abajo).
+  BREVO_API_KEY: z.string().min(1).optional(),
+  EMAIL_FROM_ADDRESS: z.email().optional(),
+  EMAIL_FROM_NAME: z.string().min(1).default('Yoclick'),
   // Los buzones de usar y tirar (yopmail...) sirven para probar, pero en producción dejan sin
   // comprobar que haya una persona detrás de la cuenta.
   ALLOW_DISPOSABLE_EMAILS: z
@@ -99,10 +103,31 @@ function listProductionRequirements(environment: ParsedEnvironment): ProductionR
   ];
 }
 
-export const environmentSchema = baseEnvironmentSchema.superRefine((environment, context) => {
-  if (environment.NODE_ENV !== 'production') return;
+/** Con proveedor real hacen falta sus credenciales; con `console` no. */
+function listEmailProviderRequirements(environment: ParsedEnvironment): ProductionRequirement[] {
+  if (environment.EMAIL_PROVIDER !== 'brevo') return [];
+  return [
+    {
+      isMet: environment.BREVO_API_KEY !== undefined,
+      path: 'BREVO_API_KEY',
+      message: 'is required when EMAIL_PROVIDER=brevo',
+    },
+    {
+      isMet: environment.EMAIL_FROM_ADDRESS !== undefined,
+      path: 'EMAIL_FROM_ADDRESS',
+      message: 'is required when EMAIL_PROVIDER=brevo',
+    },
+  ];
+}
 
-  for (const requirement of listProductionRequirements(environment)) {
+export const environmentSchema = baseEnvironmentSchema.superRefine((environment, context) => {
+  const isProduction = environment.NODE_ENV === 'production';
+  const requirements = [
+    ...listEmailProviderRequirements(environment),
+    ...(isProduction ? listProductionRequirements(environment) : []),
+  ];
+
+  for (const requirement of requirements) {
     if (!requirement.isMet) {
       context.addIssue({ code: 'custom', path: [requirement.path], message: requirement.message });
     }

@@ -40,7 +40,7 @@ describe('access control: authentication, tenancy and roles', () => {
   }
 
   beforeAll(async () => {
-    application = await createTestApplication([GuardProbeModule]);
+    application = await createTestApplication({ extraModules: [GuardProbeModule] });
     accessTokenService = application.get(AccessTokenService);
     fixtures = new DatabaseFixtures(
       application.get(PrismaService),
@@ -79,13 +79,13 @@ describe('access control: authentication, tenancy and roles', () => {
 
   describe('authentication', () => {
     it('lets anyone reach a route declared public', async () => {
-      const response = await get('/probe-guards/public', undefined);
+      const response = await get('/v1/probe-guards/public', undefined);
 
       expect(response.statusCode).toBe(200);
     });
 
     it('requires a token on every route that is not public', async () => {
-      const response = await get('/probe-guards/user', undefined);
+      const response = await get('/v1/probe-guards/user', undefined);
 
       expect(response.statusCode).toBe(401);
       expect(response.headers['content-type']).toContain(PROBLEM_CONTENT_TYPE);
@@ -100,7 +100,7 @@ describe('access control: authentication, tenancy and roles', () => {
     ])('rejects %s with 401', async (_description, authorization) => {
       const response = await application.inject({
         method: 'GET',
-        url: '/probe-guards/user',
+        url: '/v1/probe-guards/user',
         headers: { authorization },
       });
 
@@ -108,7 +108,7 @@ describe('access control: authentication, tenancy and roles', () => {
     });
 
     it('identifies the person from a valid token', async () => {
-      const response = await get('/probe-guards/user', staffOfCenterA);
+      const response = await get('/v1/probe-guards/user', staffOfCenterA);
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toEqual({ userId: staffOfCenterA });
@@ -117,41 +117,45 @@ describe('access control: authentication, tenancy and roles', () => {
 
   describe('tenancy (X-Center-Id is verified against the memberships, never trusted)', () => {
     it('lets a member reach a route of their own center with the role the route allows', async () => {
-      const response = await get('/probe-guards/staff-area', staffOfCenterA, centerAId);
+      const response = await get('/v1/probe-guards/staff-area', staffOfCenterA, centerAId);
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toEqual({ centerId: centerAId, role: 'staff' });
     });
 
     it('answers 400 when a center route comes without X-Center-Id', async () => {
-      const response = await get('/probe-guards/staff-area', staffOfCenterA);
+      const response = await get('/v1/probe-guards/staff-area', staffOfCenterA);
 
       expect(response.statusCode).toBe(400);
     });
 
     it('answers 400 when X-Center-Id is not a UUID', async () => {
-      const response = await get('/probe-guards/staff-area', staffOfCenterA, 'not-a-uuid');
+      const response = await get('/v1/probe-guards/staff-area', staffOfCenterA, 'not-a-uuid');
 
       expect(response.statusCode).toBe(400);
     });
 
     it('answers 404 for a center the person does not belong to, without confirming it exists', async () => {
-      const response = await get('/probe-guards/staff-area', adminOfCenterB, centerAId);
+      const response = await get('/v1/probe-guards/staff-area', adminOfCenterB, centerAId);
 
       expect(response.statusCode).toBe(404);
       expect(response.json()).toMatchObject({ code: 'NOT_FOUND' });
     });
 
     it('answers exactly the same for a center that does not exist at all', async () => {
-      const unknownCenter = await get('/probe-guards/staff-area', staffOfCenterA, generateUuidV7());
-      const foreignCenter = await get('/probe-guards/staff-area', adminOfCenterB, centerAId);
+      const unknownCenter = await get(
+        '/v1/probe-guards/staff-area',
+        staffOfCenterA,
+        generateUuidV7(),
+      );
+      const foreignCenter = await get('/v1/probe-guards/staff-area', adminOfCenterB, centerAId);
 
       expect(unknownCenter.statusCode).toBe(foreignCenter.statusCode);
       expect(unknownCenter.json()).toMatchObject({ code: 'NOT_FOUND', status: 404 });
     });
 
     it('answers 404 when the membership is blocked', async () => {
-      const response = await get('/probe-guards/staff-area', blockedStaffOfCenterA, centerAId);
+      const response = await get('/v1/probe-guards/staff-area', blockedStaffOfCenterA, centerAId);
 
       expect(response.statusCode).toBe(404);
     });
@@ -159,22 +163,22 @@ describe('access control: authentication, tenancy and roles', () => {
 
   describe('roles', () => {
     it('answers 403 when the member of the center has a role the route does not allow', async () => {
-      const response = await get('/probe-guards/staff-area', clientOfCenterA, centerAId);
+      const response = await get('/v1/probe-guards/staff-area', clientOfCenterA, centerAId);
 
       expect(response.statusCode).toBe(403);
       expect(response.json()).toMatchObject({ code: 'FORBIDDEN' });
     });
 
     it('lets staff in but not into the admin area', async () => {
-      const staffArea = await get('/probe-guards/staff-area', staffOfCenterA, centerAId);
-      const adminArea = await get('/probe-guards/admin-area', staffOfCenterA, centerAId);
+      const staffArea = await get('/v1/probe-guards/staff-area', staffOfCenterA, centerAId);
+      const adminArea = await get('/v1/probe-guards/admin-area', staffOfCenterA, centerAId);
 
       expect(staffArea.statusCode).toBe(200);
       expect(adminArea.statusCode).toBe(403);
     });
 
     it('lets the owner into the admin area', async () => {
-      const response = await get('/probe-guards/admin-area', ownerOfCenterA, centerAId);
+      const response = await get('/v1/probe-guards/admin-area', ownerOfCenterA, centerAId);
 
       expect(response.statusCode).toBe(200);
     });
@@ -182,7 +186,7 @@ describe('access control: authentication, tenancy and roles', () => {
     it('takes the role from the database, not from anything the client sends', async () => {
       const response = await application.inject({
         method: 'GET',
-        url: '/probe-guards/admin-area',
+        url: '/v1/probe-guards/admin-area',
         headers: {
           ...(await bearerFor(clientOfCenterA)),
           'x-center-id': centerAId,
@@ -196,14 +200,14 @@ describe('access control: authentication, tenancy and roles', () => {
 
   describe('deny by default (SEC-53)', () => {
     it('denies a route that forgot to declare any access policy, even to an authenticated owner', async () => {
-      const response = await get('/probe-guards/forgotten-policy', ownerOfCenterA, centerAId);
+      const response = await get('/v1/probe-guards/forgotten-policy', ownerOfCenterA, centerAId);
 
       expect(response.statusCode).toBe(403);
       expect(response.body).not.toContain('reached');
     });
 
     it('asks a stranger to authenticate before saying anything about the route', async () => {
-      const response = await get('/probe-guards/forgotten-policy', undefined);
+      const response = await get('/v1/probe-guards/forgotten-policy', undefined);
 
       expect(response.statusCode).toBe(401);
     });

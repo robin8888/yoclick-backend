@@ -61,6 +61,17 @@ export class TenantPrismaService {
     return this.runWithSettings({ ...NO_CENTER_SETTINGS, userId }, work);
   }
 
+  /**
+   * Para lo que ocurre ANTES de saber quién es la persona (buscar una cuenta por correo al registrarse
+   * o iniciar sesión). Sin identidad ni centro: solo alcanza tablas sin RLS (`users`); las demás
+   * no devuelven ninguna fila.
+   */
+  async runInPublicContext<TResult>(
+    work: (transactionClient: TenantTransactionClient) => Promise<TResult>,
+  ): Promise<TResult> {
+    return this.runWithSettings({ ...NO_CENTER_SETTINGS, userId: '' }, work);
+  }
+
   private async runWithSettings<TResult>(
     settings: RequestContextSettings,
     work: (transactionClient: TenantTransactionClient) => Promise<TResult>,

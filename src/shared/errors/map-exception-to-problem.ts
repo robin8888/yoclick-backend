@@ -71,7 +71,12 @@ function mapZodValidationToProblem(
  */
 export function mapExceptionToProblem(exception: unknown, traceId: string): ProblemDetails {
   if (exception instanceof DomainError) {
-    return buildProblemDetails({ code: exception.code, status: exception.httpStatus, traceId });
+    return buildProblemDetails({
+      code: exception.code,
+      status: exception.httpStatus,
+      traceId,
+      ...(exception.fieldErrors && { errors: exception.fieldErrors }),
+    });
   }
   if (exception instanceof ZodValidationException) {
     return mapZodValidationToProblem(exception, traceId);

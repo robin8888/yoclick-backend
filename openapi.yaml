@@ -1,5 +1,83 @@
 openapi: 3.0.0
 paths:
+  /v1/auth/register:
+    post:
+      operationId: auth_register
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequestDto"
+      responses:
+        "202":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerificationSentResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      summary: Crea una cuenta y envía un código de 6 dígitos al correo. Responde igual exista o no la cuenta.
+      tags:
+        - auth
+  /v1/auth/email/verify:
+    post:
+      operationId: auth_verify_email
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyEmailRequestDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailVerifiedResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      summary: Confirma el correo con el código de 6 dígitos (5 intentos, 15 minutos).
+      tags:
+        - auth
+  /v1/auth/email/resend:
+    post:
+      operationId: auth_resend_email_verification
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResendEmailVerificationRequestDto"
+      responses:
+        "202":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerificationSentResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      summary: Reenvía el código. Responde igual exista o no la cuenta.
+      tags:
+        - auth
   /health:
     get:
       operationId: health_check_liveness
@@ -29,6 +107,115 @@ components:
       bearerFormat: JWT
       type: http
   schemas:
+    ProblemDetailsDto:
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        code:
+          type: string
+        traceId:
+          type: string
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              path:
+                type: string
+              code:
+                type: string
+            required:
+              - path
+              - code
+      required:
+        - type
+        - title
+        - status
+        - code
+        - traceId
+    RegisterRequestDto:
+      type: object
+      properties:
+        email:
+          type: string
+          maxLength: 254
+        password:
+          type: string
+          minLength: 1
+          maxLength: 256
+        fullName:
+          type: string
+          minLength: 2
+          maxLength: 100
+        consents:
+          type: object
+          properties:
+            privacy:
+              type: boolean
+            terms:
+              type: boolean
+            marketing:
+              default: false
+              type: boolean
+          required:
+            - privacy
+            - terms
+          additionalProperties: false
+      required:
+        - email
+        - password
+        - fullName
+        - consents
+      additionalProperties: false
+    VerificationSentResponseDto:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - verification_sent
+      required:
+        - status
+      additionalProperties: false
+    VerifyEmailRequestDto:
+      type: object
+      properties:
+        email:
+          type: string
+          maxLength: 254
+        code:
+          type: string
+          pattern: ^\d{6}$
+      required:
+        - email
+        - code
+      additionalProperties: false
+    EmailVerifiedResponseDto:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - verified
+      required:
+        - status
+      additionalProperties: false
+    ResendEmailVerificationRequestDto:
+      type: object
+      properties:
+        email:
+          type: string
+          maxLength: 254
+      required:
+        - email
+      additionalProperties: false
     HealthResponseDto:
       type: object
       properties:
