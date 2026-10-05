@@ -33,5 +33,9 @@ export const RATE_LIMITS = {
   createBooking: { limit: 20, ttl: ONE_MINUTE },
   /** Consultar huecos: la app lo pide al cambiar de día o de servicio. */
   queryAvailability: { limit: 60, ttl: ONE_MINUTE },
+  /** Pedir el QR de asistencia: la app lo renueva cada pocos minutos mientras se enseña. */
+  issueCheckinToken: { limit: 30, ttl: ONE_MINUTE },
+  /** Escanear QR: quien atiende pasa a varias personas seguidas, nunca cientos por minuto. */
+  checkInClient: { limit: 60, ttl: ONE_MINUTE },
   accountSecurity: { limit: 5, ttl: ONE_MINUTE },
 } as const satisfies Record<string, RateLimitPolicy>;

@@ -4,33 +4,38 @@ Un ticket = una rama (`feat/API-012-bookings-create`) = un PR pequeño (< 400 l�
 
 Orden recomendado: **API-0 → API-1 → APP-0 en paralelo con API-2 → …** La app trabaja con mocks MSW generados del contrato hasta que el endpoint real existe.
 
-## Estado de avance (4 oct 2026, cierre del día)
+## Estado de avance (5 oct 2026, cierre del día)
 
 Leyenda: ✅ hecho · 🟡 parcial · ⬜ pendiente. Basado en el historial de git de cada repo.
 
 ### yoclick-api
-- ✅ API-0 Cimientos.
-- ✅ API-1 Identidad: registro con código por correo, login, refresh rotatorio, recuperar contraseña, 2FA (TOTP) obligatorio para owner/admin, límite de peticiones por IP, cuenta propia (perfil, consentimientos, exportar y borrar).
-- 🟡 API-2 Centros y unirse: unirse por código, búsqueda en el directorio y branding hechos; alta de centro con prueba, ajustes (horarios, festivos, cancelación) y equipo con invitaciones por código hechos. Falta el enlace de invitación `/i/{token}`, el QR del centro y la ubicación en la búsqueda.
-- ⬜ API-3 Agenda y reservas · API-4 Cobros · API-5 Personas, contenido y avisos · API-6 Endurecimiento y salida.
+- ✅ API-0 Cimientos · ✅ API-1 Identidad (registro, login, refresh rotatorio, recuperar contraseña, 2FA obligatorio para owner/admin, cuenta propia).
+- 🟡 API-2 Centros y unirse: unirse por código, búsqueda, branding, alta de centro con prueba y logo, ajustes y equipo con invitaciones (código y enlace) hechos. Falta ubicación en la búsqueda.
+- 🟡 API-3 Agenda y reservas: servicios individuales (CRUD y archivado), disponibilidad, reservas con concurrencia (EXCLUDE + cerrojos), cancelación con política, agenda del día, **registro de clase** (iniciar y terminar con temporizador, informe para el propietario) y **asistencia por QR** (`POST /me/checkin-code` con JWT firmado de 5 min y `POST /attendance/check-in`, columnas `checked_in_*`). Falta: clases en grupo y lista de espera, cierre administrativo de una clase sin cerrar, mostrar `checkedInAt` en la reserva.
+- ⬜ API-4 Cobros · API-5 Personas, contenido y avisos · API-6 Endurecimiento y salida.
 
 ### yoclick-app
-- ✅ APP-001 a APP-004: proyecto, `app.config.ts` + EAS, tema y brand engine, fuentes y `Text`.
-- ✅ APP-005 cliente API, APP-006 i18n y formateadores, APP-008 estados compartidos.
-- ⬜ APP-007 Storybook (no instalado).
-- 🟡 APP-1 Sistema de diseño: hechos los átomos principales, `FormField`, `ListItem`, `ScreenTemplate`, `ScreenSkeleton`, `EmptyState`, `ErrorState`, `OfflineBanner`, `ForceUpdateGate`, `Logo`. Faltan el resto de moléculas (SearchBar, SlotButton, DayPill, ProgressRing, KPI, Toast, SegmentedControl, StepIndicator), los organismos y las plantillas FormTemplate, ListTemplate, WizardTemplate y TabsTemplate.
-- 🟡 APP-2 Unirse y autenticación: hechas `jstart` (con logo, fondo y pie como el prototipo; sin la pastilla DEMO), `jqr` (escáner de QR), `jcode`, `jsearch`, `jconfirm`, `welcome`, `jcenters`, login, registro, verificación, recuperar contraseña y MFA. Faltan Apple/Google y el E2E Maestro.
-- ⬜ APP-3 a APP-9.
+- ✅ APP-001 a APP-006 y APP-008. ⬜ APP-007 Storybook.
+- 🟡 APP-1 Sistema de diseño: añadidos `SegmentedControl`, `SlotButton`, `DayPill`, `ProgressRing`, `TabBar` (píldora activa, etiqueta en una línea), `AppointmentCard`, `ConfirmSheet`, `QrCard`, `SessionTimerDisplay`, `LogoLoader`, `ChoiceCard`. Faltan SearchBar, KPI, Toast, StepIndicator y plantillas Form/List/Wizard.
+- ✅ APP-2 Unirse y autenticación (sin Apple/Google ni E2E Maestro) y APP-9 alta de centro (datos, logo, código para compartir, 2FA del propietario).
+- 🟡 APP-3 Cliente: inicio **alineado con el prototipo** (cabecera, «Próxima cita», «Esta semana», «Mi QR de acceso», bono, accesos rápidos), barra Inicio/Reservar/Mis citas/Practicar/Perfil, **Mi QR de acceso** real. Reservar (pasos 1 a 4), «reservada» y «Mis citas» están hechos pero **sin revisar contra el prototipo renderizado**: el usuario indicó que no coinciden.
+- 🟡 APP-5 Instructor: agenda, clase con temporizador, **escáner de asistencia**; la agenda sigue sin el estilo del prototipo (`iagenda`, `iclass`).
+- 🟡 APP-6 Administración: pestañas Agenda, Registro de clases y **Más** con Servicios y horario (lista, editor, archivar, horario en lectura), Invita a tu equipo e Invita a tus clientes. Falta: Datos del centro (sin campos fiscales en la API), editar horario, Clientes, Marca, equipo con lista de miembros.
+- ⬜ APP-4, APP-7, APP-8 y fases 2+ (Practicar y bonos solo como pantallas «muy pronto» o estado vacío).
 
-- ✅ Primera pantalla validada por el usuario en el iPhone: `jstart` coincide con el prototipo actualizado. Mañana: resto de pantallas de APP-2 y APP-1.
+### Pendientes para mañana, en orden
+1. **Revisar con el prototipo renderizado** (`docs/design/prototipo-yoclick.html`, truco: copiar el HTML, cambiar `render();` final por `jump("ID");` y capturar con Edge headless) las pantallas ya construidas: `book1..book4`, `booked`, `appts`, `iagenda`, `iclass`, `aagenda` y la barra del instructor (Agenda, Clientes, Avisos, Perfil). Seguir el prototipo tal cual salvo que el usuario diga otra cosa; fondo blanco.
+2. Perfil del alumno real (hoy es un marcador con cerrar sesión) y pestaña «Mis clientes» del instructor.
+3. Clases en grupo y lista de espera (el usuario eligió antes las pantallas de administración).
+4. Vista de privacidad en el app switcher para el QR (SEC-M6; requiere una dependencia nueva: pedir permiso).
+5. Mostrar la llegada (`checkedInAt`) en la agenda del instructor y administración.
 
 ### Pendientes transversales (decisiones o acciones tuyas)
-- Reinstalar el **development build** con `expo-camera` (los fallos de `npm ci` en EAS ya están corregidos en main) y probar el escáner QR; (`eas build --profile development --platform ios`): `expo-camera` es un módulo nativo.
-- Id de bundle definitivo (`com.yoclick.app` es provisional), URL de staging de `eas.json` y cuentas de desarrollador de Apple y Google (ver `STORE_CHECKLIST.md` en yoclick-app).
-- Confirmar el contenido real del QR del centro: la app solo acepta `https://yoclick.app/j/{código}`.
-- Página de alta de centro: el pie «Crea la app de tu centro» abre `https://yoclick.app` hasta que existan las pantallas `(onboarding)`.
-- Code signing de las actualizaciones OTA (EAS Update) y gitleaks en el equipo.
-- Comprobar en dispositivo el texto al 200 % y el renderizado del logo (símbolo sin la sombra del original).
+- Reiniciar la API en el puerto 3000 tras cada cambio del backend; la migración `20261007090000_add_booking_check_in` ya está aplicada en la base local. `npm run db:seed` restablece las contraseñas demo.
+- Si Metro da errores de tipos de rutas, arrancar con `npx expo start --clear` (la caché de rutas tipadas se queda vieja).
+- Reinstalar el development build si cambian módulos nativos; id de bundle definitivo, URL de staging y cuentas de Apple y Google (`STORE_CHECKLIST.md`).
+- Code signing de EAS Update y gitleaks en el equipo.
+- Comprobar en dispositivo el texto al 200 % y los nuevos QR (generar y escanear con dos cuentas).
 - Subir cambios con `git push` en los dos repos (los commits son locales hasta entonces).
 
 ---

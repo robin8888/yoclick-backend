@@ -19,11 +19,15 @@ const TOKEN_ISSUER = 'https://api.yoclick.app';
 const ACCESS_TOKEN_AUDIENCE = 'yoclick-app';
 /** Otra audiencia: un token de desafío jamás es válido como token de acceso, ni al revés. */
 const MFA_CHALLENGE_AUDIENCE = 'yoclick-mfa-challenge';
+/** Un token de asistencia solo vale para registrar asistencia: ni como acceso ni como desafío. */
+const CHECKIN_AUDIENCE = 'yoclick-checkin';
 const SIGNING_ALGORITHM = 'EdDSA';
 /** SEC-44: token de acceso de vida corta; la sesión larga la sostiene el refresh token rotativo. */
 const ACCESS_TOKEN_LIFETIME_SECONDS = 600;
 /** Tiempo para teclear el código del segundo factor tras haber acertado la contraseña. */
 const MFA_CHALLENGE_LIFETIME_SECONDS = 300;
+/** El QR de asistencia se enseña en pantalla y se escanea al momento: vida corta, la app lo renueva. */
+export const CHECKIN_TOKEN_LIFETIME_SECONDS = 300;
 const CLOCK_TOLERANCE_SECONDS = 5;
 /** Métodos de autenticación (claim `amr`, RFC 8176): contraseña, y contraseña más código de un solo uso. */
 const PASSWORD_METHOD = 'pwd';
@@ -43,6 +47,11 @@ interface KeyPair {
 export interface IssuedAccessToken {
   readonly token: string;
   readonly expiresAt: Date;
+}
+
+export interface CheckinTokenClaims {
+  readonly membershipId: string;
+  readonly centerId: string;
 }
 
 export interface AccessTokenClaims {
@@ -129,6 +138,28 @@ export class AccessTokenService implements OnModuleInit {
       return { userId: subjectSchema.parse(payload.sub) };
     } catch {
       throw new DomainError('SESSION_INVALID', HTTP_STATUS.unauthorized);
+    }
+  }
+
+  /** El QR de asistencia de una persona clienta: lo firma el servidor, la app solo lo enseña. */
+  async issueCheckinToken(claims: CheckinTokenClaims): Promise<IssuedAccessToken> {
+    return this.sign({
+      userId: claims.membershipId,
+      audience: CHECKIN_AUDIENCE,
+      lifetimeSeconds: CHECKIN_TOKEN_LIFETIME_SECONDS,
+      claims: { cid: claims.centerId },
+    });
+  }
+
+  async verifyCheckinToken(token: string): Promise<CheckinTokenClaims> {
+    try {
+      const payload = await this.verifyOrThrow(token, CHECKIN_AUDIENCE);
+      return {
+        membershipId: subjectSchema.parse(payload.sub),
+        centerId: subjectSchema.parse(payload['cid']),
+      };
+    } catch {
+      throw new DomainError('CHECKIN_CODE_INVALID', HTTP_STATUS.unprocessableEntity);
     }
   }
 

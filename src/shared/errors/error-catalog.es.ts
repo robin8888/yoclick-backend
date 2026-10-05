@@ -61,6 +61,12 @@ export const ERROR_CATALOG = {
     title: 'Ya tienes otra clase en marcha. Termínala antes de iniciar esta',
   },
   SESSION_NOT_STARTED: { title: 'Esta clase todavía no se ha iniciado' },
+  CHECKIN_CODE_INVALID: {
+    title: 'Este código QR no es válido o ha caducado. Pide que lo actualicen',
+  },
+  CHECKIN_NO_BOOKING: {
+    title: 'Esta persona no tiene una cita confirmada para registrar ahora',
+  },
   INTERNAL_ERROR: { title: 'Algo ha fallado de nuestro lado. Inténtalo de nuevo' },
 } as const;
 

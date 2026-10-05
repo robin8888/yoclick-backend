@@ -270,3 +270,52 @@ describe('AccessTokenService', () => {
     });
   });
 });
+
+describe('AccessTokenService check-in tokens', () => {
+  const MEMBERSHIP_ID = '01a10685-b683-70b8-bc14-b2fed580d44d';
+  const CENTER_ID = '01a10685-b683-70b8-bc14-b2fed580d44e';
+
+  it('round-trips the membership and center of the client', async () => {
+    const service = buildService();
+    const { token } = await service.issueCheckinToken({
+      membershipId: MEMBERSHIP_ID,
+      centerId: CENTER_ID,
+    });
+
+    await expect(service.verifyCheckinToken(token)).resolves.toEqual({
+      membershipId: MEMBERSHIP_ID,
+      centerId: CENTER_ID,
+    });
+  });
+
+  it('is not accepted as an access token, and an access token is not accepted as a check-in code', async () => {
+    const service = buildService();
+    const checkin = await service.issueCheckinToken({
+      membershipId: MEMBERSHIP_ID,
+      centerId: CENTER_ID,
+    });
+    const access = await service.issue(USER_ID);
+
+    await expect(service.verify(checkin.token)).rejects.toBeInstanceOf(DomainError);
+    await expect(service.verifyCheckinToken(access.token)).rejects.toMatchObject({
+      code: 'CHECKIN_CODE_INVALID',
+    });
+  });
+
+  it('expires after a few minutes', async () => {
+    const service = buildService();
+    const { expiresAt } = await service.issueCheckinToken({
+      membershipId: MEMBERSHIP_ID,
+      centerId: CENTER_ID,
+    });
+
+    expect(expiresAt.getTime() - Date.now()).toBeLessThanOrEqual(300_000);
+    expect(expiresAt.getTime() - Date.now()).toBeGreaterThan(290_000);
+  });
+
+  it('rejects text that is not a token', async () => {
+    await expect(buildService().verifyCheckinToken('no-es-un-token')).rejects.toMatchObject({
+      code: 'CHECKIN_CODE_INVALID',
+    });
+  });
+});
