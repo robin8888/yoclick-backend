@@ -54,6 +54,36 @@ enum VerificationPurpose {
   @@map("verification_purpose")
 }
 
+/// Por ahora solo `individual` (una persona del equipo atiende a un cliente); los grupos llegan después.
+enum ServiceKind {
+  individual
+
+  @@map("service_kind")
+}
+
+enum ClassSessionStatus {
+  scheduled
+  cancelled
+
+  @@map("class_session_status")
+}
+
+enum BookingStatus {
+  confirmed
+  cancelled
+  attended
+  no_show
+
+  @@map("booking_status")
+}
+
+enum BookingCancelledBy {
+  client
+  staff
+
+  @@map("booking_cancelled_by")
+}
+
 enum MembershipStatus {
   invited
   active
@@ -122,9 +152,12 @@ model Center {
   createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz
   updatedAt     DateTime     @updatedAt @map("updated_at") @db.Timestamptz
 
-  memberships Membership[]
-  invitations Invitation[]
-  logo        CenterLogo?
+  memberships   Membership[]
+  invitations   Invitation[]
+  logo          CenterLogo?
+  services      Service[]
+  classSessions ClassSession[]
+  bookings      Booking[]
 
   @@map("centers")
 }
@@ -161,6 +194,10 @@ model Membership {
 
   center Center @relation(fields: [centerId], references: [id])
   user   User   @relation(fields: [userId], references: [id])
+
+  serviceAssignments  ServiceStaff[]
+  taughtClassSessions ClassSession[] @relation("StaffClassSessions")
+  bookings            Booking[]      @relation("ClientBookings")
 
   @@unique([centerId, userId])
   @@index([centerId, role])
@@ -294,4 +331,97 @@ model Invitation {
 
   @@index([centerId, email])
   @@map("invitations")
+}
+
+/// Lo que el centro ofrece y se puede reservar. Se archiva, no se borra: las reservas existentes se conservan.
+model Service {
+  id                  String      @id @db.Uuid
+  centerId            String      @map("center_id") @db.Uuid
+  name                String
+  description         String?
+  kind                ServiceKind @default(individual)
+  durationMinutes     Int         @map("duration_minutes")
+  capacity            Int         @default(1)
+  /// En céntimos; nulo = "a consultar".
+  priceCents          Int?        @map("price_cents")
+  color               String?     @db.Char(7)
+  /// Cuántos días hacia delante se puede reservar.
+  bookingWindowDays   Int         @default(30) @map("booking_window_days")
+  /// Antelación mínima para reservar.
+  minNoticeMinutes    Int         @default(120) @map("min_notice_minutes")
+  /// Nulo = se usa la política de cancelación del centro.
+  cancelNoticeMinutes Int?        @map("cancel_notice_minutes")
+  isVisible           Boolean     @default(true) @map("is_visible")
+  sortOrder           Int         @default(0) @map("sort_order")
+  archivedAt          DateTime?   @map("archived_at") @db.Timestamptz
+  createdAt           DateTime    @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime    @updatedAt @map("updated_at") @db.Timestamptz
+
+  center        Center         @relation(fields: [centerId], references: [id])
+  staff         ServiceStaff[]
+  classSessions ClassSession[]
+
+  @@index([centerId, sortOrder])
+  @@map("services")
+}
+
+/// Quién del equipo puede atender un servicio.
+model ServiceStaff {
+  serviceId    String @map("service_id") @db.Uuid
+  membershipId String @map("membership_id") @db.Uuid
+
+  service    Service    @relation(fields: [serviceId], references: [id])
+  membership Membership @relation(fields: [membershipId], references: [id])
+
+  @@id([serviceId, membershipId])
+  @@index([membershipId])
+  @@map("service_staff")
+}
+
+/// Una ocurrencia de un servicio. En esta fase, una fila por reserva individual (se crea al reservar).
+/// Una restricción EXCLUDE (en el SQL de la migración) impide que una misma persona del equipo
+/// tenga dos sesiones programadas solapadas.
+model ClassSession {
+  id                String             @id @db.Uuid
+  centerId          String             @map("center_id") @db.Uuid
+  serviceId         String             @map("service_id") @db.Uuid
+  staffMembershipId String             @map("staff_membership_id") @db.Uuid
+  startsAt          DateTime           @map("starts_at") @db.Timestamptz
+  endsAt            DateTime           @map("ends_at") @db.Timestamptz
+  capacity          Int                @default(1)
+  status            ClassSessionStatus @default(scheduled)
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz
+
+  center          Center     @relation(fields: [centerId], references: [id])
+  service         Service    @relation(fields: [serviceId], references: [id])
+  staffMembership Membership @relation("StaffClassSessions", fields: [staffMembershipId], references: [id])
+  bookings        Booking[]
+
+  @@index([centerId, startsAt])
+  @@index([centerId, staffMembershipId, startsAt])
+  @@map("class_sessions")
+}
+
+model Booking {
+  id                 String              @id @db.Uuid
+  centerId           String              @map("center_id") @db.Uuid
+  classSessionId     String              @map("class_session_id") @db.Uuid
+  clientMembershipId String              @map("client_membership_id") @db.Uuid
+  status             BookingStatus       @default(confirmed)
+  cancelledAt        DateTime?           @map("cancelled_at") @db.Timestamptz
+  cancelledBy        BookingCancelledBy? @map("cancelled_by")
+  /// Si se canceló con la antelación que marca la política; nulo mientras no se cancele.
+  cancelWithinPolicy Boolean?            @map("cancel_within_policy")
+  idempotencyKey     String?             @map("idempotency_key") @db.Uuid
+  createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime            @updatedAt @map("updated_at") @db.Timestamptz
+
+  center           Center       @relation(fields: [centerId], references: [id])
+  classSession     ClassSession @relation(fields: [classSessionId], references: [id])
+  clientMembership Membership   @relation("ClientBookings", fields: [clientMembershipId], references: [id])
+
+  @@unique([clientMembershipId, idempotencyKey])
+  @@index([centerId, classSessionId])
+  @@index([centerId, clientMembershipId, status])
+  @@map("bookings")
 }

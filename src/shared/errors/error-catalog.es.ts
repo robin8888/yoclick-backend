@@ -50,6 +50,10 @@ export const ERROR_CATALOG = {
   TEAM_CHANGE_NOT_ALLOWED: { title: 'No puedes hacer ese cambio en el equipo' },
   LOGO_INVALID: { title: 'El logo no es válido. Sube una imagen PNG, JPG o WebP' },
   LOGO_TOO_LARGE: { title: 'El logo es demasiado grande. Máximo 700 KB' },
+  SLOT_UNAVAILABLE: { title: 'Ese hueco ya no está disponible. Elige otro' },
+  OUTSIDE_BOOKING_WINDOW: { title: 'Ese día u hora todavía no se puede reservar' },
+  ALREADY_BOOKED: { title: 'Ya tienes otra cita a esa hora' },
+  BOOKING_NOT_CANCELLABLE: { title: 'Esta reserva ya no se puede cancelar' },
   INTERNAL_ERROR: { title: 'Algo ha fallado de nuestro lado. Inténtalo de nuevo' },
 } as const;
 

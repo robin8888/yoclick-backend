@@ -29,5 +29,9 @@ export const RATE_LIMITS = {
   createCenter: { limit: 5, ttl: ONE_MINUTE },
   /** Subir el logo: se hace una vez al dar de alta el centro y rara vez después. */
   uploadCenterLogo: { limit: 10, ttl: MILLISECONDS_PER_HOUR },
+  /** Reservar: una persona normal reserva pocas citas por minuto; un bucle de reservas no. */
+  createBooking: { limit: 20, ttl: ONE_MINUTE },
+  /** Consultar huecos: la app lo pide al cambiar de día o de servicio. */
+  queryAvailability: { limit: 60, ttl: ONE_MINUTE },
   accountSecurity: { limit: 5, ttl: ONE_MINUTE },
 } as const satisfies Record<string, RateLimitPolicy>;

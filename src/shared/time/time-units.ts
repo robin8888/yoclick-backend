@@ -1,6 +1,6 @@
 /** Unidades de tiempo con nombre, para que `60 * 1000` no aparezca suelto en el código. */
 const SECONDS_PER_MINUTE = 60;
-const MINUTES_PER_HOUR = 60;
+export const MINUTES_PER_HOUR = 60;
 
 export const MILLISECONDS_PER_SECOND = 1_000;
 export const MILLISECONDS_PER_MINUTE = SECONDS_PER_MINUTE * MILLISECONDS_PER_SECOND;

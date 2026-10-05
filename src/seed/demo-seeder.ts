@@ -2,8 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PasswordHasher } from '../shared/auth/password-hasher';
 import { type Environment } from '../shared/config/environment.schema';
-import { TenantPrismaService } from '../shared/database/tenant-prisma.service';
+import {
+  TenantPrismaService,
+  type TenantTransactionClient,
+} from '../shared/database/tenant-prisma.service';
 import { type ActorContext } from '../shared/tenancy/actor-context';
+import { provisionCenterDefaults } from '../modules/onboarding/infrastructure/center-defaults.provisioner';
 import {
   DEMO_CENTERS,
   DEMO_PASSWORD,
@@ -20,6 +24,56 @@ export interface DemoSeedSummary {
 
 /** Quien "ejecuta" el seed. No es una persona: solo da contexto de centro a las políticas RLS. */
 const SEED_ACTOR_ID = '01930000-0000-7000-8000-000000000000';
+
+/** Quienes atienden en la demo: la propiedad y el personal de cada centro. */
+function listProfessionalMembershipIds(centerId: string): string[] {
+  return DEMO_USERS.flatMap((demoUser) => demoUser.memberships)
+    .filter(
+      (membership) =>
+        membership.centerId === centerId && ['owner', 'staff'].includes(membership.role),
+    )
+    .map((membership) => membership.id);
+}
+
+async function upsertMemberships(client: TenantTransactionClient, centerId: string): Promise<void> {
+  for (const demoUser of DEMO_USERS) {
+    for (const membership of demoUser.memberships) {
+      if (membership.centerId !== centerId) continue;
+      await client.membership.upsert({
+        where: { centerId_userId: { centerId, userId: demoUser.id } },
+        create: {
+          id: membership.id,
+          centerId,
+          userId: demoUser.id,
+          role: membership.role,
+          status: 'active',
+        },
+        update: { role: membership.role, status: 'active' },
+      });
+    }
+  }
+}
+
+/**
+ * Un centro sembrado antes de que el personal atendiera servicios (o creado solo con su propietario)
+ * también debe quedar con todo el equipo de demo asignado. `skipDuplicates` lo hace idempotente.
+ */
+async function assignProfessionalsToServices(
+  client: TenantTransactionClient,
+  centerId: string,
+  membershipIds: readonly string[],
+): Promise<void> {
+  const services = await client.service.findMany({
+    where: { centerId, archivedAt: null },
+    select: { id: true },
+  });
+  await client.serviceStaff.createMany({
+    data: services.flatMap(({ id: serviceId }) =>
+      membershipIds.map((membershipId) => ({ serviceId, membershipId })),
+    ),
+    skipDuplicates: true,
+  });
+}
 
 /**
  * Siembra los centros y las cuentas de demo. Idempotente: se puede ejecutar cuantas veces haga falta;
@@ -98,22 +152,15 @@ export class DemoSeeder {
         update: centerFields,
       });
 
-      for (const demoUser of DEMO_USERS) {
-        for (const membership of demoUser.memberships) {
-          if (membership.centerId !== demoCenter.id) continue;
-          await client.membership.upsert({
-            where: { centerId_userId: { centerId: demoCenter.id, userId: demoUser.id } },
-            create: {
-              id: membership.id,
-              centerId: demoCenter.id,
-              userId: demoUser.id,
-              role: membership.role,
-              status: 'active',
-            },
-            update: { role: membership.role, status: 'active' },
-          });
-        }
-      }
+      await upsertMemberships(client, demoCenter.id);
+      // Horario y servicios para poder reservar en la demo; no pisa lo que el centro ya tenga.
+      const professionalMembershipIds = listProfessionalMembershipIds(demoCenter.id);
+      await provisionCenterDefaults(client, {
+        centerId,
+        sectorId: demoCenter.sectorId,
+        professionalMembershipIds,
+      });
+      await assignProfessionalsToServices(client, centerId, professionalMembershipIds);
     });
   }
 }

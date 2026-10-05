@@ -26,7 +26,8 @@
     "postinstall": "prisma generate",
     "openapi:gen": "nest build && node dist/openapi/generate-openapi.js",
     "keys:generate": "node scripts/generate-development-jwt-keys.cjs",
-    "db:seed": "nest build && node dist/seed/run-seed.js"
+    "db:seed": "nest build && node dist/seed/run-seed.js",
+    "db:backfill-center-defaults": "nest build && node dist/seed/run-backfill-center-defaults.js"
   },
   "license": "UNLICENSED",
   "type": "commonjs",
