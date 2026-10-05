@@ -54,6 +54,13 @@ export const ERROR_CATALOG = {
   OUTSIDE_BOOKING_WINDOW: { title: 'Ese día u hora todavía no se puede reservar' },
   ALREADY_BOOKED: { title: 'Ya tienes otra cita a esa hora' },
   BOOKING_NOT_CANCELLABLE: { title: 'Esta reserva ya no se puede cancelar' },
+  BOOKING_NOT_STARTABLE: {
+    title: 'Esta clase no se puede iniciar ahora: solo desde 15 minutos antes hasta que termina',
+  },
+  SESSION_ALREADY_OPEN: {
+    title: 'Ya tienes otra clase en marcha. Termínala antes de iniciar esta',
+  },
+  SESSION_NOT_STARTED: { title: 'Esta clase todavía no se ha iniciado' },
   INTERNAL_ERROR: { title: 'Algo ha fallado de nuestro lado. Inténtalo de nuevo' },
 } as const;
 

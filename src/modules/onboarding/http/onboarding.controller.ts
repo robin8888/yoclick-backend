@@ -69,6 +69,7 @@ export class OnboardingController {
           sectorId: body.sectorId,
           brandColor: body.brandColor,
           city: body.city ?? null,
+          isListed: body.isListed,
         });
         return { status: HttpStatus.CREATED, body: { ...center } };
       },

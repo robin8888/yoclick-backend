@@ -19,6 +19,7 @@ export interface CreateCenterRequest {
   readonly sectorId: string;
   readonly brandColor: string;
   readonly city: string | null;
+  readonly isListed: boolean;
 }
 
 export interface CreatedCenter {
@@ -28,6 +29,7 @@ export interface CreatedCenter {
   readonly name: string;
   readonly sectorId: string;
   readonly brandColor: string;
+  readonly isListed: boolean;
   readonly joinCode: string;
   readonly trialEndsAt: string;
   readonly logoUrl: string | null;
@@ -74,6 +76,7 @@ function pickCenterFields(request: CreateCenterRequest) {
     sectorId: request.sectorId,
     brandColor: request.brandColor,
     city: request.city,
+    isListed: request.isListed,
   };
 }
 
@@ -92,6 +95,7 @@ function toCreatedCenter(created: {
     name: created.request.name,
     sectorId: created.request.sectorId,
     brandColor: created.request.brandColor,
+    isListed: created.request.isListed,
     joinCode: created.joinCode,
     trialEndsAt: created.trialEndsAt.toISOString(),
     logoUrl: null,

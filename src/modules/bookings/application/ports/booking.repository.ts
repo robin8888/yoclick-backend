@@ -15,6 +15,8 @@ export interface BookingView {
   readonly staff: { readonly membershipId: string; readonly fullName: string };
   readonly cancelledAt: Date | null;
   readonly cancelWithinPolicy: boolean | null;
+  readonly startedAt: Date | null;
+  readonly endedAt: Date | null;
   readonly createdAt: Date;
 }
 

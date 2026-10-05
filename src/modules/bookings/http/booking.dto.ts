@@ -36,7 +36,7 @@ export class AgendaQueryDto extends createZodDto(
   z.strictObject({ date: z.iso.date(), staffMembershipId: z.uuid().optional() }),
 ) {}
 
-const bookingShape = {
+export const bookingShape = {
   id: z.uuid(),
   status: z.enum(['confirmed', 'cancelled', 'attended', 'no_show']),
   startsAt: z.iso.datetime(),
@@ -51,6 +51,11 @@ const bookingShape = {
   cancelledAt: z.iso.datetime().nullable(),
   /** Si se canceló con la antelación de la política; `null` mientras no se cancele. */
   cancelWithinPolicy: z.boolean().nullable(),
+  /** Cuándo empezó la clase en el servidor; la app calcula el temporizador a partir de aquí. */
+  startedAt: z.iso.datetime().nullable(),
+  endedAt: z.iso.datetime().nullable(),
+  /** Fin menos inicio en segundos enteros; `null` mientras no haya terminado. */
+  actualDurationSeconds: z.number().int().nullable(),
   createdAt: z.iso.datetime(),
 };
 

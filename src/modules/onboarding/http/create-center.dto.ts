@@ -33,6 +33,8 @@ export class CreateCenterRequestDto extends createZodDto(
       .transform((color) => color.toUpperCase())
       .default(DEFAULT_BRAND_COLOR),
     city: z.string().trim().min(1).max(MAX_CITY_LENGTH).optional(),
+    /** Si el centro aparece en el buscador público. Por defecto no: se decide a propósito. */
+    isListed: z.boolean().default(false),
   }),
 ) {}
 
@@ -44,6 +46,7 @@ export class CreateCenterResponseDto extends createZodDto(
     name: z.string(),
     sectorId: z.enum(SECTOR_IDS),
     brandColor: z.string(),
+    isListed: z.boolean(),
     /** El código con el que la clientela se une. Solo lo ve quien administra el centro. */
     joinCode: z.string(),
     trialEndsAt: z.iso.datetime(),

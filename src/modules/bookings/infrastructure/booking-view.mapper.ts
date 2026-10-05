@@ -42,6 +42,8 @@ export function toBookingView(booking: BookingWithSessionDetails): BookingView {
     },
     cancelledAt: booking.cancelledAt,
     cancelWithinPolicy: booking.cancelWithinPolicy,
+    startedAt: booking.startedAt,
+    endedAt: booking.endedAt,
     createdAt: booking.createdAt,
   };
 }

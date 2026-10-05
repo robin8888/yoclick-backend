@@ -198,6 +198,8 @@ model Membership {
   serviceAssignments  ServiceStaff[]
   taughtClassSessions ClassSession[] @relation("StaffClassSessions")
   bookings            Booking[]      @relation("ClientBookings")
+  startedBookings     Booking[]      @relation("BookingStartedBy")
+  endedBookings       Booking[]      @relation("BookingEndedBy")
 
   @@unique([centerId, userId])
   @@index([centerId, role])
@@ -403,25 +405,34 @@ model ClassSession {
 }
 
 model Booking {
-  id                 String              @id @db.Uuid
-  centerId           String              @map("center_id") @db.Uuid
-  classSessionId     String              @map("class_session_id") @db.Uuid
-  clientMembershipId String              @map("client_membership_id") @db.Uuid
-  status             BookingStatus       @default(confirmed)
-  cancelledAt        DateTime?           @map("cancelled_at") @db.Timestamptz
-  cancelledBy        BookingCancelledBy? @map("cancelled_by")
+  id                    String              @id @db.Uuid
+  centerId              String              @map("center_id") @db.Uuid
+  classSessionId        String              @map("class_session_id") @db.Uuid
+  clientMembershipId    String              @map("client_membership_id") @db.Uuid
+  status                BookingStatus       @default(confirmed)
+  cancelledAt           DateTime?           @map("cancelled_at") @db.Timestamptz
+  cancelledBy           BookingCancelledBy? @map("cancelled_by")
   /// Si se canceló con la antelación que marca la política; nulo mientras no se cancele.
-  cancelWithinPolicy Boolean?            @map("cancel_within_policy")
-  idempotencyKey     String?             @map("idempotency_key") @db.Uuid
-  createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt          DateTime            @updatedAt @map("updated_at") @db.Timestamptz
+  cancelWithinPolicy    Boolean?            @map("cancel_within_policy")
+  idempotencyKey        String?             @map("idempotency_key") @db.Uuid
+  /// Registro de la clase: lo escribe el servidor al iniciarla y terminarla, nunca la app.
+  startedAt             DateTime?           @map("started_at") @db.Timestamptz
+  endedAt               DateTime?           @map("ended_at") @db.Timestamptz
+  startedByMembershipId String?             @map("started_by_membership_id") @db.Uuid
+  endedByMembershipId   String?             @map("ended_by_membership_id") @db.Uuid
+  sessionNotes          String?             @map("session_notes")
+  createdAt             DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime            @updatedAt @map("updated_at") @db.Timestamptz
 
   center           Center       @relation(fields: [centerId], references: [id])
   classSession     ClassSession @relation(fields: [classSessionId], references: [id])
   clientMembership Membership   @relation("ClientBookings", fields: [clientMembershipId], references: [id])
+  startedBy        Membership?  @relation("BookingStartedBy", fields: [startedByMembershipId], references: [id])
+  endedBy          Membership?  @relation("BookingEndedBy", fields: [endedByMembershipId], references: [id])
 
   @@unique([clientMembershipId, idempotencyKey])
   @@index([centerId, classSessionId])
   @@index([centerId, clientMembershipId, status])
+  @@index([centerId, startedAt])
   @@map("bookings")
 }

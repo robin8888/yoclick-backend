@@ -5,6 +5,7 @@ export interface NewCenter {
   readonly sectorId: string;
   readonly brandColor: string;
   readonly city: string | null;
+  readonly isListed: boolean;
   readonly joinCode: string;
   readonly trialEndsAt: Date;
 }

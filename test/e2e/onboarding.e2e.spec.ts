@@ -19,6 +19,7 @@ interface CreatedCenterBody {
   joinCode: string;
   trialEndsAt: string;
   brandColor: string;
+  isListed: boolean;
 }
 
 describe('center onboarding', () => {
@@ -89,6 +90,34 @@ describe('center onboarding', () => {
     });
 
     expect(lookup.json()).toMatchObject({ id: body.centerId, city: 'Madrid' });
+  });
+
+  it('keeps the center out of the public directory unless the founder asks to be listed', async () => {
+    const unlisted = (await createCenter(person, VALID_BODY)).json<CreatedCenterBody>();
+    const other = await fixtures.createUser('listed-founder');
+    const listed = (
+      await createCenter(other, { ...VALID_BODY, name: 'Studio Sur', isListed: true })
+    ).json<CreatedCenterBody>();
+
+    expect(unlisted.isListed).toBe(false);
+    expect(listed.isListed).toBe(true);
+    const stored = await tenantPrismaService.runInTenantContext(
+      {
+        userId: other,
+        centerId: listed.centerId,
+        membershipId: listed.ownerMembershipId,
+        role: 'owner',
+        permissions: [],
+      },
+      (client) => client.center.findUniqueOrThrow({ where: { id: listed.centerId } }),
+    );
+    expect(stored.isListed).toBe(true);
+  });
+
+  it('rejects a non-boolean isListed with 400', async () => {
+    const response = await createCenter(person, { ...VALID_BODY, isListed: 'yes' });
+
+    expect(response.statusCode).toBe(400);
   });
 
   it('normalizes the brand color to upper case', async () => {

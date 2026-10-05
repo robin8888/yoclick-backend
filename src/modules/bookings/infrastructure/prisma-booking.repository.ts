@@ -93,6 +93,8 @@ export class PrismaBookingRepository implements BookingRepository {
           id: cancellation.bookingId,
           clientMembershipId: actor.membershipId,
           status: 'confirmed',
+          // Una clase ya iniciada (se puede abrir 15 min antes) deja de poder cancelarse.
+          startedAt: null,
         },
         data: {
           status: 'cancelled',

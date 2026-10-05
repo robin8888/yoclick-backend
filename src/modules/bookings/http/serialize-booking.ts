@@ -1,4 +1,5 @@
 import { type BookingView } from '../application/ports/booking.repository';
+import { calculateActualDurationSeconds } from '../domain/session-record';
 
 export function serializeBooking(booking: BookingView): Record<string, unknown> {
   return {
@@ -10,6 +11,9 @@ export function serializeBooking(booking: BookingView): Record<string, unknown> 
     staff: booking.staff,
     cancelledAt: booking.cancelledAt?.toISOString() ?? null,
     cancelWithinPolicy: booking.cancelWithinPolicy,
+    startedAt: booking.startedAt?.toISOString() ?? null,
+    endedAt: booking.endedAt?.toISOString() ?? null,
+    actualDurationSeconds: calculateActualDurationSeconds(booking),
     createdAt: booking.createdAt.toISOString(),
   };
 }

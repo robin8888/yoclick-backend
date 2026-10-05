@@ -32,6 +32,8 @@ function buildBooking(overrides: Partial<BookingView> = {}): BookingView {
     staff: { membershipId: 'membership-staff', fullName: 'Ana' },
     cancelledAt: null,
     cancelWithinPolicy: null,
+    startedAt: null,
+    endedAt: null,
     createdAt: NOW,
     ...overrides,
   };

@@ -1,6 +1,11 @@
 import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
-import { DEMO_EMAIL_DOMAIN, DEMO_EMAIL_PREFIX, DEMO_PASSWORD } from '../../src/seed/demo-data';
+import {
+  DEMO_CENTERS,
+  DEMO_EMAIL_DOMAIN,
+  DEMO_EMAIL_PREFIX,
+  DEMO_PASSWORD,
+} from '../../src/seed/demo-data';
 import { DemoSeeder } from '../../src/seed/demo-seeder';
 import { SeedModule } from '../../src/seed/seed.module';
 import { PasswordHasher } from '../../src/shared/auth/password-hasher';
@@ -204,6 +209,42 @@ describe('demo seed', () => {
 
     const restored = await prismaService.user.findUniqueOrThrow({ where: { email } });
     expect(await passwordHasher.verify(restored.passwordHash, DEMO_PASSWORD)).toBe(true);
+  });
+
+  it('corrects the listing, city, color and name of demo centers that already existed', async () => {
+    await demoSeeder.run();
+    const [studioNorte] = DEMO_CENTERS;
+    if (!studioNorte) throw new Error('The demo data has no centers');
+    const seedActor = {
+      userId: studioNorte.id,
+      centerId: studioNorte.id,
+      membershipId: studioNorte.id,
+      role: 'owner',
+      permissions: [],
+    } as const;
+    const readCenter = () =>
+      tenantPrismaService.runInTenantContext(seedActor, (client) =>
+        client.center.findUniqueOrThrow({
+          where: { id: studioNorte.id },
+          select: { name: true, isListed: true, city: true, brandColor: true },
+        }),
+      );
+    await tenantPrismaService.runInTenantContext(seedActor, (client) =>
+      client.center.update({
+        where: { id: studioNorte.id },
+        data: { name: 'Old name', isListed: false, city: null, brandColor: '#000000' },
+      }),
+    );
+    expect(await readCenter()).toMatchObject({ isListed: false, city: null });
+
+    await demoSeeder.run();
+
+    expect(await readCenter()).toEqual({
+      name: studioNorte.name,
+      isListed: studioNorte.isListed,
+      city: studioNorte.city,
+      brandColor: studioNorte.brandColor,
+    });
   });
 
   it('refuses to run in production: the demo password is public', async () => {

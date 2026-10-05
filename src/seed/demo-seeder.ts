@@ -77,7 +77,9 @@ async function assignProfessionalsToServices(
 
 /**
  * Siembra los centros y las cuentas de demo. Idempotente: se puede ejecutar cuantas veces haga falta;
- * actualiza lo que ya existe (y devuelve la contraseña de demo a quien la hubiera cambiado probando).
+ * actualiza lo que ya existe: en los centros, nombre, color, ciudad, ubicación y si salen en el buscador
+ * (así un centro sembrado con una versión anterior de los datos queda corregido), y a las cuentas
+ * les devuelve la contraseña de demo si la hubieran cambiado probando.
  */
 @Injectable()
 export class DemoSeeder {

@@ -24,6 +24,9 @@ interface BookingBody {
   staff: { membershipId: string; fullName: string };
   cancelledAt: string | null;
   cancelWithinPolicy: boolean | null;
+  startedAt: string | null;
+  endedAt: string | null;
+  actualDurationSeconds: number | null;
   createdAt: string;
 }
 
@@ -258,6 +261,9 @@ describe('availability and bookings', () => {
         staff: { membershipId: center.ownerMembershipId, fullName: 'owner' },
         cancelledAt: null,
         cancelWithinPolicy: null,
+        startedAt: null,
+        endedAt: null,
+        actualDurationSeconds: null,
         createdAt: expect.stringMatching(/Z$/) as string,
       });
     });
