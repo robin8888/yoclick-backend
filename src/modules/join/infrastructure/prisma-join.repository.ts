@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { v7 as generateUuidV7 } from 'uuid';
+import { buildCenterLogoUrl } from '../../../shared/media/center-logo-url';
 import {
   TenantPrismaService,
   type TenantTransactionClient,
@@ -20,39 +21,67 @@ const PUBLIC_CENTER_FIELDS = {
   sectorId: true,
   brandColor: true,
   city: true,
+  logoUpdatedAt: true,
 } as const;
+
+interface PublicCenterRow {
+  readonly id: string;
+  readonly name: string;
+  readonly slug: string;
+  readonly sectorId: string;
+  readonly brandColor: string;
+  readonly city: string | null;
+  readonly logoUpdatedAt: Date | null;
+}
+
+function toPublicCenterSummary(row: PublicCenterRow): PublicCenterSummary {
+  return {
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    sectorId: row.sectorId,
+    brandColor: row.brandColor,
+    city: row.city,
+    logoUrl: buildCenterLogoUrl(row.id, row.logoUpdatedAt),
+  };
+}
 
 @Injectable()
 export class PrismaJoinRepository implements JoinRepository {
   constructor(private readonly tenantPrismaService: TenantPrismaService) {}
 
   async findCenterByJoinCode(joinCode: string): Promise<PublicCenterSummary | null> {
-    return this.tenantPrismaService.runInCenterLookupContext({ joinCode }, (client) =>
-      client.center.findUnique({
-        where: { joinCode },
-        select: PUBLIC_CENTER_FIELDS,
-      }),
+    const center = await this.tenantPrismaService.runInCenterLookupContext({ joinCode }, (client) =>
+      client.center.findUnique({ where: { joinCode }, select: PUBLIC_CENTER_FIELDS }),
     );
+    return center ? toPublicCenterSummary(center) : null;
   }
 
   async listListedCenters(textQuery: string | null, limit: number): Promise<ListedCenter[]> {
-    return this.tenantPrismaService.runInCenterLookupContext({ isDirectory: true }, (client) =>
-      client.center.findMany({
-        where: {
-          isListed: true,
-          status: { not: 'suspended' },
-          ...(textQuery && {
-            OR: [
-              { name: { contains: textQuery, mode: 'insensitive' } },
-              { city: { contains: textQuery, mode: 'insensitive' } },
-            ],
-          }),
-        },
-        select: { ...PUBLIC_CENTER_FIELDS, latitude: true, longitude: true },
-        orderBy: { name: 'asc' },
-        take: limit,
-      }),
+    const centers = await this.tenantPrismaService.runInCenterLookupContext(
+      { isDirectory: true },
+      (client) =>
+        client.center.findMany({
+          where: {
+            isListed: true,
+            status: { not: 'suspended' },
+            ...(textQuery && {
+              OR: [
+                { name: { contains: textQuery, mode: 'insensitive' } },
+                { city: { contains: textQuery, mode: 'insensitive' } },
+              ],
+            }),
+          },
+          select: { ...PUBLIC_CENTER_FIELDS, latitude: true, longitude: true },
+          orderBy: { name: 'asc' },
+          take: limit,
+        }),
     );
+    return centers.map(({ latitude, longitude, ...row }) => ({
+      ...toPublicCenterSummary(row),
+      latitude,
+      longitude,
+    }));
   }
 
   async joinAsClient(command: JoinCommand): Promise<JoinOutcome> {

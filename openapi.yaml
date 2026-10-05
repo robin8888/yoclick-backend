@@ -700,6 +700,41 @@ paths:
       summary: Da de alta un centro en prueba de 14 días; quien lo crea queda como propietario. Repetir la misma Idempotency-Key devuelve el mismo centro.
       tags:
         - onboarding
+  /v1/onboarding/centers/{centerId}/logo:
+    put:
+      operationId: onboarding_upload_center_logo
+      parameters:
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadCenterLogoRequestDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadCenterLogoResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: "Sube (o sustituye) el logo del centro: PNG, JPEG o WebP de hasta 700 KB en base64. Solo su propietario; para el resto, 404."
+      tags:
+        - onboarding
   /v1/centers/{centerId}/team:
     get:
       operationId: team_list
@@ -1051,6 +1086,42 @@ paths:
       security:
         - bearer: []
       summary: "Modifica datos del centro. Exige If-Match: 428 si falta, 412 si otra persona lo cambió antes."
+      tags:
+        - centers
+  /v1/centers/{centerId}/logo:
+    get:
+      operationId: centers_get_logo
+      parameters:
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: Los bytes de la imagen, con su Content-Type
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      summary: Logo del centro (imagen). Público, con ETag y caché de un día; admite If-None-Match (304).
       tags:
         - centers
   /health:
@@ -1572,11 +1643,15 @@ components:
                     type: string
                   brandColor:
                     type: string
+                  logoUrl:
+                    type: string
+                    nullable: true
                 required:
                   - name
                   - slug
                   - sectorId
                   - brandColor
+                  - logoUrl
                 additionalProperties: false
             required:
               - membershipId
@@ -1748,11 +1823,15 @@ components:
                     type: string
                   brandColor:
                     type: string
+                  logoUrl:
+                    type: string
+                    nullable: true
                 required:
                   - name
                   - slug
                   - sectorId
                   - brandColor
+                  - logoUrl
                 additionalProperties: false
             required:
               - membershipId
@@ -1829,6 +1908,9 @@ components:
         city:
           type: string
           nullable: true
+        logoUrl:
+          type: string
+          nullable: true
       required:
         - id
         - name
@@ -1836,6 +1918,7 @@ components:
         - sectorId
         - brandColor
         - city
+        - logoUrl
       additionalProperties: false
     CenterSearchResponseDto:
       type: object
@@ -1860,6 +1943,9 @@ components:
               city:
                 type: string
                 nullable: true
+              logoUrl:
+                type: string
+                nullable: true
               distanceInKilometers:
                 type: number
                 nullable: true
@@ -1870,6 +1956,7 @@ components:
               - sectorId
               - brandColor
               - city
+              - logoUrl
               - distanceInKilometers
             additionalProperties: false
       required:
@@ -1986,6 +2073,9 @@ components:
           type: string
           format: date-time
           pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+        logoUrl:
+          type: string
+          nullable: true
       required:
         - centerId
         - ownerMembershipId
@@ -1995,6 +2085,31 @@ components:
         - brandColor
         - joinCode
         - trialEndsAt
+        - logoUrl
+      additionalProperties: false
+    UploadCenterLogoRequestDto:
+      type: object
+      properties:
+        contentType:
+          type: string
+          enum:
+            - image/png
+            - image/jpeg
+            - image/webp
+        dataBase64:
+          type: string
+          minLength: 1
+      required:
+        - contentType
+        - dataBase64
+      additionalProperties: false
+    UploadCenterLogoResponseDto:
+      type: object
+      properties:
+        logoUrl:
+          type: string
+      required:
+        - logoUrl
       additionalProperties: false
     TeamResponseDto:
       type: object
@@ -2264,11 +2379,15 @@ components:
               type: string
             brandColor:
               type: string
+            logoUrl:
+              type: string
+              nullable: true
           required:
             - id
             - name
             - sectorId
             - brandColor
+            - logoUrl
           additionalProperties: false
       required:
         - role
@@ -2320,11 +2439,15 @@ components:
           type: string
         brandColor:
           type: string
+        logoUrl:
+          type: string
+          nullable: true
       required:
         - centerId
         - name
         - sectorId
         - brandColor
+        - logoUrl
       additionalProperties: false
     CenterSettingsResponseDto:
       type: object

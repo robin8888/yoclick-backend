@@ -1,4 +1,4 @@
-import { MILLISECONDS_PER_MINUTE } from '../time/time-units';
+import { MILLISECONDS_PER_HOUR, MILLISECONDS_PER_MINUTE } from '../time/time-units';
 
 export interface RateLimitPolicy {
   /** Peticiones permitidas por IP en la ventana. */
@@ -27,5 +27,7 @@ export const RATE_LIMITS = {
   /** Cambiar contraseña, exportar datos, eliminar la cuenta: lo que haría quien robara un token. */
   /** Dar de alta centros: poco frecuente y atractivo para el abuso. */
   createCenter: { limit: 5, ttl: ONE_MINUTE },
+  /** Subir el logo: se hace una vez al dar de alta el centro y rara vez después. */
+  uploadCenterLogo: { limit: 10, ttl: MILLISECONDS_PER_HOUR },
   accountSecurity: { limit: 5, ttl: ONE_MINUTE },
 } as const satisfies Record<string, RateLimitPolicy>;

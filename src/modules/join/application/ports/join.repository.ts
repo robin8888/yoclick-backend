@@ -12,6 +12,7 @@ export interface PublicCenterSummary {
   readonly sectorId: string;
   readonly brandColor: string;
   readonly city: string | null;
+  readonly logoUrl: string | null;
 }
 
 export interface ListedCenter extends PublicCenterSummary {

@@ -86,6 +86,7 @@ export class InvitationPreviewResponseDto extends createZodDto(
       name: z.string(),
       sectorId: z.string(),
       brandColor: z.string(),
+      logoUrl: z.string().nullable(),
     }),
   }),
 ) {}

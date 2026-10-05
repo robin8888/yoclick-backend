@@ -30,6 +30,7 @@ export interface MyMembership {
     readonly slug: string;
     readonly sectorId: string;
     readonly brandColor: string;
+    readonly logoUrl: string | null;
   };
 }
 

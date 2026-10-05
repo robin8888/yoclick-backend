@@ -6,6 +6,7 @@ export const HTTP_STATUS = {
   notFound: 404,
   conflict: 409,
   preconditionFailed: 412,
+  payloadTooLarge: 413,
   unprocessableEntity: 422,
   preconditionRequired: 428,
   tooManyRequests: 429,

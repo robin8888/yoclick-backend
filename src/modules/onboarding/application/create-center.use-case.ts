@@ -30,6 +30,7 @@ export interface CreatedCenter {
   readonly brandColor: string;
   readonly joinCode: string;
   readonly trialEndsAt: string;
+  readonly logoUrl: string | null;
 }
 
 /**
@@ -93,5 +94,6 @@ function toCreatedCenter(created: {
     brandColor: created.request.brandColor,
     joinCode: created.joinCode,
     trialEndsAt: created.trialEndsAt.toISOString(),
+    logoUrl: null,
   };
 }

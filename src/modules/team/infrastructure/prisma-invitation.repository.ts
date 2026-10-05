@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { v7 as generateUuidV7 } from 'uuid';
+import { buildCenterLogoUrl } from '../../../shared/media/center-logo-url';
 import {
   TenantPrismaService,
   type TenantTransactionClient,
@@ -94,7 +95,14 @@ export class PrismaInvitationRepository implements InvitationRepository {
       (client) =>
         client.center.findUnique({
           where: { id: invitation.centerId },
-          select: { id: true, name: true, sectorId: true, brandColor: true, status: true },
+          select: {
+            id: true,
+            name: true,
+            sectorId: true,
+            brandColor: true,
+            logoUpdatedAt: true,
+            status: true,
+          },
         }),
     );
     if (!center || center.status === 'suspended') return null;
@@ -107,6 +115,7 @@ export class PrismaInvitationRepository implements InvitationRepository {
         name: center.name,
         sectorId: center.sectorId,
         brandColor: center.brandColor,
+        logoUrl: buildCenterLogoUrl(center.id, center.logoUpdatedAt),
       },
     };
   }

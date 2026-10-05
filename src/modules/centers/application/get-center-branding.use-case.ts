@@ -7,6 +7,7 @@ export interface CenterBranding {
   readonly name: string;
   readonly sectorId: string;
   readonly brandColor: string;
+  readonly logoUrl: string | null;
 }
 
 export interface CenterBrandingRepository {

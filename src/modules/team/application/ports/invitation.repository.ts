@@ -28,6 +28,7 @@ export interface InvitationPreview {
     readonly name: string;
     readonly sectorId: string;
     readonly brandColor: string;
+    readonly logoUrl: string | null;
   };
 }
 

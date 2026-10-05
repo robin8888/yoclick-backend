@@ -14,6 +14,7 @@ const publicCenterShape = {
   sectorId: z.string(),
   brandColor: z.string(),
   city: z.string().nullable(),
+  logoUrl: z.string().nullable(),
 };
 
 export class PublicCenterResponseDto extends createZodDto(z.strictObject(publicCenterShape)) {}

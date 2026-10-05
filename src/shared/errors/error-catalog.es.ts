@@ -48,6 +48,8 @@ export const ERROR_CATALOG = {
   ALREADY_MEMBER: { title: 'Esa persona ya forma parte del centro' },
   INVITATION_INVALID: { title: 'La invitación no es válida o ha caducado' },
   TEAM_CHANGE_NOT_ALLOWED: { title: 'No puedes hacer ese cambio en el equipo' },
+  LOGO_INVALID: { title: 'El logo no es válido. Sube una imagen PNG, JPG o WebP' },
+  LOGO_TOO_LARGE: { title: 'El logo es demasiado grande. Máximo 700 KB' },
   INTERNAL_ERROR: { title: 'Algo ha fallado de nuestro lado. Inténtalo de nuevo' },
 } as const;
 

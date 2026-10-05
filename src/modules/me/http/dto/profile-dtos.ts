@@ -52,6 +52,7 @@ const membershipResponseSchema = z.strictObject({
     slug: z.string(),
     sectorId: z.string(),
     brandColor: z.string(),
+    logoUrl: z.string().nullable(),
   }),
 });
 

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { buildCenterLogoUrl } from '../../../shared/media/center-logo-url';
 import { v7 as generateUuidV7 } from 'uuid';
 import { TenantPrismaService } from '../../../shared/database/tenant-prisma.service';
 import {
@@ -94,7 +95,15 @@ export class PrismaProfileRepository implements ProfileRepository {
         where: { userId, status: { not: 'left' } },
         orderBy: { joinedAt: 'asc' },
         include: {
-          center: { select: { name: true, slug: true, sectorId: true, brandColor: true } },
+          center: {
+            select: {
+              name: true,
+              slug: true,
+              sectorId: true,
+              brandColor: true,
+              logoUpdatedAt: true,
+            },
+          },
         },
       }),
     );
@@ -104,7 +113,13 @@ export class PrismaProfileRepository implements ProfileRepository {
       role: row.role,
       status: row.status,
       joinedAt: row.joinedAt,
-      center: row.center,
+      center: {
+        name: row.center.name,
+        slug: row.center.slug,
+        sectorId: row.center.sectorId,
+        brandColor: row.center.brandColor,
+        logoUrl: buildCenterLogoUrl(row.centerId, row.center.logoUpdatedAt),
+      },
     }));
   }
 

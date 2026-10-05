@@ -65,6 +65,7 @@ describe('joining a center: lookup, search, branding and joining', () => {
         sectorId: 'gym',
         brandColor: '#E4572E',
         city: 'Madrid',
+        logoUrl: null,
       });
     });
 
@@ -74,7 +75,7 @@ describe('joining a center: lookup, search, branding and joining', () => {
       const body = (await request('GET', '/v1/join/code/NORTE7')).json<Record<string, unknown>>();
 
       expect(Object.keys(body).sort((first, second) => first.localeCompare(second))).toEqual(
-        ['brandColor', 'city', 'id', 'name', 'sectorId', 'slug'].sort((first, second) =>
+        ['brandColor', 'city', 'id', 'logoUrl', 'name', 'sectorId', 'slug'].sort((first, second) =>
           first.localeCompare(second),
         ),
       );
@@ -170,6 +171,7 @@ describe('joining a center: lookup, search, branding and joining', () => {
         name: 'studio-norte',
         sectorId: 'gym',
         brandColor: '#E4572E',
+        logoUrl: null,
       });
     });
 

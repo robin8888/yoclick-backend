@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { buildCenterLogoUrl } from '../../../shared/media/center-logo-url';
 import { TenantPrismaService } from '../../../shared/database/tenant-prisma.service';
 import {
   type CenterBranding,
@@ -13,7 +14,14 @@ export class PrismaCenterBrandingRepository implements CenterBrandingRepository 
     const center = await this.tenantPrismaService.runInCenterLookupContext({ centerId }, (client) =>
       client.center.findUnique({
         where: { id: centerId },
-        select: { id: true, name: true, sectorId: true, brandColor: true, status: true },
+        select: {
+          id: true,
+          name: true,
+          sectorId: true,
+          brandColor: true,
+          logoUpdatedAt: true,
+          status: true,
+        },
       }),
     );
     if (!center || center.status === 'suspended') return null;
@@ -22,6 +30,7 @@ export class PrismaCenterBrandingRepository implements CenterBrandingRepository 
       name: center.name,
       sectorId: center.sectorId,
       brandColor: center.brandColor,
+      logoUrl: buildCenterLogoUrl(center.id, center.logoUpdatedAt),
     };
   }
 }
