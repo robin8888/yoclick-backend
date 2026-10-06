@@ -23,12 +23,13 @@ import {
   UpdateCenterSettingsRequestDto,
 } from './center-settings.dto';
 
-function serializeSettings({ settings }: VersionedCenterSettings): Record<string, unknown> {
-  // `updatedAt` es la versión: viaja en el ETag, no en el cuerpo.
+function serializeSettings({ settings, etag }: VersionedCenterSettings): Record<string, unknown> {
+  // `updatedAt` es la versión: viaja en el ETag y, para quien no lee cabeceras (la app), en `version`.
   const bodyFields = Object.entries(settings).filter(([field]) => field !== 'updatedAt');
   return {
     ...Object.fromEntries(bodyFields),
     trialEndsAt: settings.trialEndsAt?.toISOString() ?? null,
+    version: etag,
   };
 }
 

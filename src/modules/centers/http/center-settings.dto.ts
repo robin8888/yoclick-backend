@@ -69,6 +69,8 @@ const centerSettingsShape = {
   holidays: holidaysSchema.nullable(),
   cancelPolicy: cancelPolicySchema.nullable(),
   trialEndsAt: z.iso.datetime().nullable(),
+  /** El mismo valor que el encabezado `ETag`: se envía en `If-Match` al editar. */
+  version: z.string(),
 };
 
 export class CenterSettingsResponseDto extends createZodDto(z.strictObject(centerSettingsShape)) {}

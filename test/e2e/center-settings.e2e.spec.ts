@@ -100,6 +100,19 @@ describe('center settings (ETag / If-Match)', () => {
       expect((await call('GET', admin)).statusCode).toBe(200);
     });
 
+    it('repeats the ETag in the body as `version`, so the app can send it in If-Match', async () => {
+      const read = await call('GET', owner);
+      const version = read.json<{ version: string }>().version;
+
+      expect(version).toBe(read.headers['etag']);
+      const edited = await call('PATCH', owner, {
+        ifMatch: version,
+        body: { name: 'Nuevo nombre' },
+      });
+      expect(edited.statusCode).toBe(200);
+      expect(edited.json<{ version: string }>().version).toBe(edited.headers['etag']);
+    });
+
     it.each([
       ['staff', () => staff],
       ['a client', () => client],
