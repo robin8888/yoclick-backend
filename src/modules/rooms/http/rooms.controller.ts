@@ -26,6 +26,7 @@ import {
   RoomResponseDto,
   RoomRouteParamsDto,
 } from './room.dto';
+import { ActivityRecorder } from '../../activity/application/activity-recorder';
 
 @ApiTags('rooms')
 @ApiBearerAuth('bearer')
@@ -37,6 +38,7 @@ export class RoomsController {
     private readonly listRooms: ListRoomsUseCase,
     private readonly createRoom: CreateRoomUseCase,
     private readonly archiveRoom: ArchiveRoomUseCase,
+    private readonly activity: ActivityRecorder,
   ) {}
 
   @Get()
@@ -68,7 +70,9 @@ export class RoomsController {
     @Body() body: CreateRoomRequestDto,
   ): Promise<Record<string, unknown>> {
     assertRouteTargetsActorCenter(actor, params.centerId);
-    return { ...(await this.createRoom.execute(actor, body)) };
+    const room = await this.createRoom.execute(actor, body);
+    await this.activity.record(actor, { kind: 'room_created', subject: room.name });
+    return { ...room };
   }
 
   @Delete(':roomId')
@@ -85,5 +89,6 @@ export class RoomsController {
   ): Promise<void> {
     assertRouteTargetsActorCenter(actor, params.centerId);
     await this.archiveRoom.execute(actor, params.roomId);
+    await this.activity.record(actor, { kind: 'room_archived' });
   }
 }

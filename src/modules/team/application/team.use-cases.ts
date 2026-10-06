@@ -9,6 +9,7 @@ import {
   type TeamMemberUpdate,
   type TeamRepository,
 } from './ports/team.repository';
+import { ActivityRecorder } from '../../activity/application/activity-recorder';
 
 @Injectable()
 export class ListTeamUseCase {
@@ -28,7 +29,10 @@ export interface UpdateTeamMemberRequest {
 /** Cambia rol, permisos, cargo o estado de alguien del equipo, según las reglas de quién puede tocar a quién. */
 @Injectable()
 export class UpdateTeamMemberUseCase {
-  constructor(@Inject(TEAM_REPOSITORY) private readonly team: TeamRepository) {}
+  constructor(
+    @Inject(TEAM_REPOSITORY) private readonly team: TeamRepository,
+    private readonly activity: ActivityRecorder,
+  ) {}
 
   async execute(request: UpdateTeamMemberRequest): Promise<TeamMember> {
     const { actor, membershipId, update } = request;
@@ -46,6 +50,8 @@ export class UpdateTeamMemberUseCase {
     if (decision === 'forbidden') {
       throw new DomainError('TEAM_CHANGE_NOT_ALLOWED', HTTP_STATUS.forbidden);
     }
-    return this.team.updateMember(actor, membershipId, update);
+    const updated = await this.team.updateMember(actor, membershipId, update);
+    await this.activity.record(actor, { kind: 'team_member_updated', subject: updated.fullName });
+    return updated;
   }
 }

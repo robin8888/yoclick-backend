@@ -182,6 +182,59 @@ paths:
       summary: Cierra la sesión de este dispositivo, o de todos con `everywhere`.
       tags:
         - auth
+  /v1/me/sessions/list:
+    post:
+      operationId: me_list_sessions
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ListOpenSessionsRequestDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpenSessionsResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Dispositivos con sesión abierta. Se envía el refresh token de este dispositivo (nunca en la URL) para marcar cuál es esta sesión.
+      tags:
+        - me
+  /v1/me/sessions/{sessionId}/revoke:
+    post:
+      operationId: me_revoke_session
+      parameters:
+        - name: sessionId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "204":
+          description: ""
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Cierra la sesión de un dispositivo propio. Una sesión ajena o desconocida responde 404.
+      tags:
+        - me
   /v1/auth/password/forgot:
     post:
       operationId: auth_forgot_password
@@ -1088,6 +1141,74 @@ paths:
       summary: "Modifica datos del centro. Exige If-Match: 428 si falta, 412 si otra persona lo cambió antes."
       tags:
         - centers
+  /v1/centers/{centerId}/join-stats:
+    get:
+      operationId: centers_get_join_stats
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JoinStatsResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Cuántos clientes se han unido este mes (en la zona horaria del centro), por QR, enlace, código o buscador.
+      tags:
+        - centers
+  /v1/centers/{centerId}/join-code/regenerate:
+    post:
+      operationId: centers_regenerate_join_code
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JoinCodeResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Cambia el código de unión del centro. El QR y el enlace anteriores dejan de funcionar; quien ya se unió no se ve afectado.
+      tags:
+        - centers
   /v1/centers/{centerId}/logo:
     get:
       operationId: centers_get_logo
@@ -1324,6 +1445,13 @@ paths:
             format: uuid
             pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
             type: string
+        - name: stepMinutes
+          required: false
+          in: query
+          schema:
+            minimum: -9007199254740991
+            maximum: 9007199254740991
+            type: integer
       responses:
         "200":
           description: ""
@@ -1975,6 +2103,15 @@ paths:
             format: uuid
             pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
             type: string
+        - name: scope
+          required: false
+          in: query
+          schema:
+            default: mine
+            type: string
+            enum:
+              - mine
+              - center
         - name: limit
           required: false
           in: query
@@ -2315,6 +2452,82 @@ paths:
       summary: Marca como leído un aviso propio. 404 si no existe o es de otra persona.
       tags:
         - notifications
+  /v1/centers/{centerId}/activity:
+    get:
+      operationId: activity_list
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: limit
+          required: false
+          in: query
+          schema:
+            minimum: 1
+            maximum: 100
+            default: 20
+            type: integer
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActivityResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Lo último que ha pasado en el centro (quién cambió qué), lo más reciente primero.
+      tags:
+        - activity
+  /v1/centers/{centerId}/privacy/consents:
+    get:
+      operationId: privacy_get_consent_summary
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentSummaryResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Cuántos clientes activos tienen concedido cada consentimiento (privacidad, salud, promociones, imagen y parental). Solo cifras, nunca quién.
+      tags:
+        - privacy
   /health:
     get:
       operationId: health_check_liveness
@@ -2598,6 +2811,51 @@ components:
         everywhere:
           default: false
           type: boolean
+      additionalProperties: false
+    ListOpenSessionsRequestDto:
+      type: object
+      properties:
+        refreshToken:
+          type: string
+          minLength: 1
+          maxLength: 512
+      required:
+        - refreshToken
+      additionalProperties: false
+    OpenSessionsResponseDto:
+      type: object
+      properties:
+        sessions:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              deviceName:
+                type: string
+                nullable: true
+              startedAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+              lastActiveAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+              isCurrent:
+                type: boolean
+            required:
+              - id
+              - deviceName
+              - startedAt
+              - lastActiveAt
+              - isCurrent
+            additionalProperties: false
+      required:
+        - sessions
       additionalProperties: false
     ForgotPasswordRequestDto:
       type: object
@@ -3160,6 +3418,13 @@ components:
           type: string
           minLength: 1
           maxLength: 16
+        source:
+          type: string
+          enum:
+            - qr
+            - link
+            - code
+            - search
       additionalProperties: false
     JoinCenterResponseDto:
       type: object
@@ -3680,6 +3945,21 @@ components:
         address:
           type: string
           nullable: true
+        phone:
+          type: string
+          nullable: true
+        contactEmail:
+          type: string
+          nullable: true
+        legalName:
+          type: string
+          nullable: true
+        taxId:
+          type: string
+          nullable: true
+        taxAddress:
+          type: string
+          nullable: true
         latitude:
           type: number
           nullable: true
@@ -3841,6 +4121,11 @@ components:
         - isListed
         - city
         - address
+        - phone
+        - contactEmail
+        - legalName
+        - taxId
+        - taxAddress
         - latitude
         - longitude
         - openingHours
@@ -3856,6 +4141,20 @@ components:
           type: string
           minLength: 2
           maxLength: 80
+        sectorId:
+          type: string
+          enum:
+            - gym
+            - estudio
+            - readap
+            - box
+            - yoga
+            - academia
+            - baile
+            - marciales
+            - musica
+            - cocina
+            - otro
         brandColor:
           type: string
           pattern: ^#[0-9A-Fa-f]{6}$
@@ -3870,6 +4169,30 @@ components:
           maxLength: 200
           nullable: true
         address:
+          type: string
+          minLength: 1
+          maxLength: 200
+          nullable: true
+        phone:
+          type: string
+          pattern: ^\+?\d[\d -]{5,19}$
+          nullable: true
+        contactEmail:
+          type: string
+          maxLength: 200
+          format: email
+          pattern: ^(?:[A-Za-z0-9_'+\-]+\.)*[A-Za-z0-9_'+\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$
+          nullable: true
+        legalName:
+          type: string
+          minLength: 1
+          maxLength: 200
+          nullable: true
+        taxId:
+          type: string
+          pattern: ^[A-Za-z0-9]{9}$
+          nullable: true
+        taxAddress:
           type: string
           minLength: 1
           maxLength: 200
@@ -4017,6 +4340,47 @@ components:
             - freeCancellationHours
             - lateCancellationConsumesCredit
           additionalProperties: false
+      additionalProperties: false
+    JoinStatsResponseDto:
+      type: object
+      properties:
+        month:
+          type: string
+        qr:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        link:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        code:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        search:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        total:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+      required:
+        - month
+        - qr
+        - link
+        - code
+        - search
+        - total
+      additionalProperties: false
+    JoinCodeResponseDto:
+      type: object
+      properties:
+        joinCode:
+          type: string
+      required:
+        - joinCode
       additionalProperties: false
     ServiceListResponseDto:
       type: object
@@ -5616,6 +5980,75 @@ components:
       required:
         - unreadCount
         - notifications
+      additionalProperties: false
+    ActivityResponseDto:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              kind:
+                type: string
+              subject:
+                type: string
+                nullable: true
+              actorName:
+                type: string
+                nullable: true
+              createdAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+            required:
+              - id
+              - kind
+              - subject
+              - actorName
+              - createdAt
+            additionalProperties: false
+      required:
+        - entries
+      additionalProperties: false
+    ConsentSummaryResponseDto:
+      type: object
+      properties:
+        clientCount:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        privacy:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        health:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        marketing:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        image:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        parental:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+      required:
+        - clientCount
+        - privacy
+        - health
+        - marketing
+        - image
+        - parental
       additionalProperties: false
     HealthResponseDto:
       type: object

@@ -101,6 +101,16 @@ enum NotificationKind {
   @@map("notification_kind")
 }
 
+/// Por dónde se unió una persona al centro; sirve para contar «este mes se han unido».
+enum JoinSource {
+  qr
+  link
+  code
+  search
+
+  @@map("join_source")
+}
+
 enum MembershipStatus {
   invited
   active
@@ -158,6 +168,12 @@ model Center {
   maxClients    Int?         @map("max_clients")
   trialEndsAt   DateTime?    @map("trial_ends_at") @db.Timestamptz
   address       String?
+  /// Contacto que ve la clientela y datos fiscales para facturar (solo los ve la administración).
+  phone         String?
+  contactEmail  String?      @map("contact_email")
+  legalName     String?      @map("legal_name")
+  taxId         String?      @map("tax_id")
+  taxAddress    String?      @map("tax_address")
   /// Horario semanal por día: { mon: [{ opensAt: "09:00", closesAt: "14:00" }], ... }
   openingHours  Json?        @map("opening_hours")
   /// Días de cierre: [{ date: "2026-12-25", label: "Navidad" }]
@@ -178,6 +194,7 @@ model Center {
   rooms         Room[]
   clientGroups  ClientGroup[]
   notifications Notification[]
+  activityLogs  ActivityLog[]
 
   @@map("centers")
 }
@@ -210,6 +227,8 @@ model Membership {
   /// Solo clientes: su nivel y el grupo al que pertenece (uno como máximo).
   level       ClientLevel?
   groupId     String?          @map("group_id") @db.Uuid
+  /// Solo clientes: cómo se unió. Nulo si entró antes de que se registrara o por invitación.
+  joinSource  JoinSource?      @map("join_source")
   /// Permisos extra del equipo, p. ej. ["health:read"]. Un array de cadenas validado por la API.
   permissions Json             @default("[]")
   createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz
@@ -414,6 +433,24 @@ model Notification {
 
   @@index([centerId, recipientMembershipId, createdAt])
   @@map("notifications")
+}
+
+/// Registro de actividad del centro: quién cambió qué. Solo se añade; no se edita ni se borra.
+model ActivityLog {
+  id                String   @id @db.Uuid
+  centerId          String   @map("center_id") @db.Uuid
+  /// Quién lo hizo; nulo si fue el sistema.
+  actorMembershipId String?  @map("actor_membership_id") @db.Uuid
+  /// Qué pasó (`service_updated`, `client_updated`…): la frase se compone en la app.
+  kind              String
+  /// Sobre qué o quién (el nombre del servicio, de la persona…).
+  subject           String?
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  center Center @relation(fields: [centerId], references: [id])
+
+  @@index([centerId, createdAt])
+  @@map("activity_logs")
 }
 
 /// Grupo de clientes del centro (p. ej. «Grupo mañanas»), con su nivel y quien lo da. Se archiva, no se borra.

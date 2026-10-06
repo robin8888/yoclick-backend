@@ -24,6 +24,10 @@ import {
   CreateAgendaBookingRequestDto,
 } from './booking.dto';
 import { serializeBooking } from './serialize-booking';
+import { ActivityRecorder } from '../../activity/application/activity-recorder';
+
+/** Quien pone la cita desde la agenda puede elegir cualquier cuarto de hora (10:00, 10:15, 10:30…). */
+const AGENDA_SLOT_STEP_MINUTES = 15;
 
 @ApiTags('bookings')
 @ApiBearerAuth('bearer')
@@ -34,6 +38,7 @@ export class AgendaController {
   constructor(
     private readonly getDayAgenda: GetDayAgendaUseCase,
     private readonly createBooking: CreateBookingUseCase,
+    private readonly activity: ActivityRecorder,
   ) {}
 
   @Get()
@@ -96,6 +101,11 @@ export class AgendaController {
       idempotencyKey: null,
       now: new Date(),
       clientMembershipId: body.clientMembershipId,
+      slotStepMinutes: AGENDA_SLOT_STEP_MINUTES,
+    });
+    await this.activity.record(actor, {
+      kind: 'booking_created_by_team',
+      subject: booking.service.name,
     });
     return serializeBooking(booking);
   }

@@ -22,6 +22,7 @@ import {
 import { CurrentActor } from '../../../shared/auth/decorators/current-actor.decorator';
 import { Roles } from '../../../shared/auth/decorators/roles.decorator';
 import { ProblemDetailsDto } from '../../../shared/errors/problem-details.dto';
+import { ActivityRecorder } from '../../activity/application/activity-recorder';
 import { assertRouteTargetsActorCenter } from '../../../shared/tenancy/assert-route-targets-actor-center';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
 import { type ServiceView } from '../application/ports/service.repository';
@@ -55,6 +56,7 @@ export class ServicesController {
     private readonly createService: CreateServiceUseCase,
     private readonly updateService: UpdateServiceUseCase,
     private readonly archiveService: ArchiveServiceUseCase,
+    private readonly activity: ActivityRecorder,
   ) {}
 
   @Get()
@@ -102,6 +104,7 @@ export class ServicesController {
         staffMembershipIds: body.staffMembershipIds,
       },
     });
+    await this.activity.record(actor, { kind: 'service_created', subject: service.name });
     return serializeService(service);
   }
 
@@ -119,7 +122,9 @@ export class ServicesController {
     @Body() body: UpdateServiceRequestDto,
   ): Promise<Record<string, unknown>> {
     assertRouteTargetsActorCenter(actor, params.centerId);
-    return serializeService(await this.updateService.execute(actor, params.serviceId, body));
+    const service = await this.updateService.execute(actor, params.serviceId, body);
+    await this.activity.record(actor, { kind: 'service_updated', subject: service.name });
+    return serializeService(service);
   }
 
   @Delete(':serviceId')
@@ -136,5 +141,6 @@ export class ServicesController {
   ): Promise<void> {
     assertRouteTargetsActorCenter(actor, params.centerId);
     await this.archiveService.execute(actor, params.serviceId);
+    await this.activity.record(actor, { kind: 'service_archived' });
   }
 }

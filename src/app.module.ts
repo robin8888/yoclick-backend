@@ -11,6 +11,8 @@ import { ServicesModule } from './modules/services/services.module';
 import { SchedulingModule } from './modules/scheduling/scheduling.module';
 import { BookingsModule } from './modules/bookings/bookings.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { ActivityModule } from './modules/activity/activity.module';
+import { PrivacyModule } from './modules/privacy/privacy.module';
 import { ClientsModule } from './modules/clients/clients.module';
 import { RoomsModule } from './modules/rooms/rooms.module';
 import { ReportsModule } from './modules/reports/reports.module';
@@ -55,6 +57,8 @@ import { buildLoggerOptions } from './shared/logging/build-logger-options';
     RoomsModule,
     ClientsModule,
     NotificationsModule,
+    ActivityModule,
+    PrivacyModule,
     HealthModule,
   ],
   providers: [
