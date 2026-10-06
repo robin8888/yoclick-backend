@@ -10,6 +10,8 @@ import { TeamModule } from './modules/team/team.module';
 import { ServicesModule } from './modules/services/services.module';
 import { SchedulingModule } from './modules/scheduling/scheduling.module';
 import { BookingsModule } from './modules/bookings/bookings.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { ClientsModule } from './modules/clients/clients.module';
 import { RoomsModule } from './modules/rooms/rooms.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
@@ -51,6 +53,8 @@ import { buildLoggerOptions } from './shared/logging/build-logger-options';
     BookingsModule,
     ReportsModule,
     RoomsModule,
+    ClientsModule,
+    NotificationsModule,
     HealthModule,
   ],
   providers: [

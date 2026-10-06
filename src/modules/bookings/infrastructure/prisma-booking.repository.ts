@@ -1,8 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { type Prisma } from '../../../generated/prisma/client';
-import { TenantPrismaService } from '../../../shared/database/tenant-prisma.service';
+import {
+  TenantPrismaService,
+  type TenantTransactionClient,
+} from '../../../shared/database/tenant-prisma.service';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
 import { getUtcRangeOfLocalDates } from '../../../shared/time/zoned-time';
+import {
+  listOpeningRangesOfDate,
+  type OpeningHours,
+  type OpeningInterval,
+} from '../../centers/domain/opening-hours';
 import {
   type AgendaEntryView,
   type BookingListScope,
@@ -13,8 +21,13 @@ import {
   type CreateBookingOutcome,
   type DayAgenda,
 } from '../application/ports/booking.repository';
+import { recordBookingNotification } from '../../notifications/infrastructure/booking-notification.recorder';
 import { createBookingInTransaction } from './booking-creation';
-import { toBookingView, WITH_SESSION_DETAILS } from './booking-view.mapper';
+import {
+  toBookingView,
+  WITH_SESSION_DETAILS,
+  type BookingWithSessionDetails,
+} from './booking-view.mapper';
 
 interface StoredCancelPolicy {
   readonly freeCancellationHours: number;
@@ -26,6 +39,37 @@ function buildScopeFilter(scope: BookingListScope, now: Date): Prisma.BookingWhe
     return { status: { not: 'cancelled' }, classSession: { endsAt: { gt: now } } };
   }
   return { OR: [{ status: 'cancelled' }, { classSession: { endsAt: { lte: now } } }] };
+}
+
+interface CenterSchedule {
+  readonly openingHours: unknown;
+  readonly holidays: unknown;
+}
+
+/** Los tramos de apertura de una fecha local. Ajustes escritos por esta API tras validarlos con zod. */
+function listOpeningRangesOfCenterDate(center: CenterSchedule, date: string): OpeningInterval[] {
+  const holidayDates = ((center.holidays ?? []) as { date: string }[]).map(({ date: day }) => day);
+  return [
+    ...listOpeningRangesOfDate(center.openingHours as OpeningHours | null, holidayDates, date),
+  ];
+}
+
+/** Avisa a quien da la cita y a administración de que el cliente la ha cancelado. */
+async function recordCancellationNotice(
+  client: TenantTransactionClient,
+  actor: ActorContext,
+  booking: BookingWithSessionDetails,
+): Promise<void> {
+  await recordBookingNotification(client, {
+    centerId: actor.centerId,
+    kind: 'booking_cancelled',
+    bookingId: booking.id,
+    clientMembershipId: actor.membershipId,
+    staffMembershipId: booking.classSession.staffMembership.id,
+    serviceName: booking.classSession.service.name,
+    startsAt: booking.classSession.startsAt,
+    actorMembershipId: actor.membershipId,
+  });
 }
 
 @Injectable()
@@ -113,6 +157,7 @@ export class PrismaBookingRepository implements BookingRepository {
         where: { id: booking.classSessionId },
         data: { status: 'cancelled' },
       });
+      await recordCancellationNotice(client, actor, booking);
       return toBookingView(booking);
     });
   }
@@ -122,7 +167,9 @@ export class PrismaBookingRepository implements BookingRepository {
     query: { date: string; staffMembershipId: string | null },
   ): Promise<DayAgenda> {
     return this.tenantPrismaService.runInTenantContext(actor, async (client) => {
-      const center = await client.center.findFirstOrThrow({ select: { timezone: true } });
+      const center = await client.center.findFirstOrThrow({
+        select: { timezone: true, openingHours: true, holidays: true },
+      });
       const range = getUtcRangeOfLocalDates(query.date, query.date, center.timezone);
       const bookings = await client.booking.findMany({
         where: {
@@ -146,7 +193,11 @@ export class PrismaBookingRepository implements BookingRepository {
           fullName: booking.clientMembership.user.fullName,
         },
       }));
-      return { timeZone: center.timezone, entries };
+      return {
+        timeZone: center.timezone,
+        openingRanges: listOpeningRangesOfCenterDate(center, query.date),
+        entries,
+      };
     });
   }
 }

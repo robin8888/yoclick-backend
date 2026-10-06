@@ -24,13 +24,18 @@ export interface CreateBookingCommand {
   readonly serviceId: string;
   readonly startsAt: Date;
   readonly preferredStaffMembershipId: string | null;
-  readonly idempotencyKey: string;
+  /** Clave de idempotencia del cliente; `null` si la reserva la hace la plantilla para un cliente. */
+  readonly idempotencyKey: string | null;
   readonly now: Date;
+  /** Para quién es la reserva cuando la hace el equipo; sin él, para quien la pide. */
+  readonly clientMembershipId?: string | undefined;
 }
 
 export type CreateBookingOutcome =
   | { readonly kind: 'created'; readonly booking: BookingView }
   | { readonly kind: 'service_not_found' }
+  /** El cliente indicado no es un cliente activo de este centro. */
+  | { readonly kind: 'client_not_found' }
   | { readonly kind: 'outside_window' }
   | { readonly kind: 'slot_unavailable' }
   | { readonly kind: 'already_booked' };
@@ -51,6 +56,8 @@ export interface AgendaEntryView {
 
 export interface DayAgenda {
   readonly timeZone: string;
+  /** Cuándo abre el centro ese día (hora local): el profesional ve de un vistazo sus huecos. */
+  readonly openingRanges: readonly { readonly opensAt: string; readonly closesAt: string }[];
   readonly entries: readonly AgendaEntryView[];
 }
 

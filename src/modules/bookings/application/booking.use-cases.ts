@@ -24,6 +24,7 @@ const REFUSALS_BY_OUTCOME: Readonly<
   >
 > = {
   service_not_found: ['NOT_FOUND', HTTP_STATUS.notFound],
+  client_not_found: ['NOT_FOUND', HTTP_STATUS.notFound],
   outside_window: ['OUTSIDE_BOOKING_WINDOW', HTTP_STATUS.conflict],
   slot_unavailable: ['SLOT_UNAVAILABLE', HTTP_STATUS.conflict],
   already_booked: ['ALREADY_BOOKED', HTTP_STATUS.conflict],

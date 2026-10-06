@@ -1,3 +1,4 @@
+import { getWeekdayOfLocalDate } from '../../../shared/time/zoned-time';
 export const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
 export type Weekday = (typeof WEEKDAYS)[number];
 
@@ -45,4 +46,14 @@ export function isValidTimeZone(timeZone: string): boolean {
   } catch {
     return false;
   }
+}
+
+/** Los tramos en los que el centro abre en una fecha local; vacío si es festivo o ese día no abre. */
+export function listOpeningRangesOfDate(
+  openingHours: OpeningHours | null,
+  holidayDates: readonly string[],
+  date: string,
+): readonly OpeningInterval[] {
+  if (holidayDates.includes(date)) return [];
+  return openingHours?.[getWeekdayOfLocalDate(date)] ?? [];
 }

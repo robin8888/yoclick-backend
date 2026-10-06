@@ -755,8 +755,20 @@ describe('availability and bookings', () => {
     interface AgendaBody {
       date: string;
       timezone: string;
+      openingRanges: { opensAt: string; closesAt: string }[];
       entries: { booking: BookingBody; client: { membershipId: string; fullName: string } }[];
     }
+
+    it('tells when the center opens that day, so the staff member sees their free hours', async () => {
+      const response = await world.call('GET', agendaUrl(date), staff.userId, { centerId });
+
+      const { openingRanges } = response.json<AgendaBody>();
+      expect(openingRanges.length).toBeGreaterThan(0);
+      expect(openingRanges[0]).toEqual({
+        opensAt: expect.stringMatching(/^\d\d:\d\d$/) as string,
+        closesAt: expect.stringMatching(/^\d\d:\d\d$/) as string,
+      });
+    });
 
     it('shows the staff member their own day, ordered by time, with who booked and the cancelled ones marked', async () => {
       const response = await world.call('GET', agendaUrl(date), staff.userId, { centerId });

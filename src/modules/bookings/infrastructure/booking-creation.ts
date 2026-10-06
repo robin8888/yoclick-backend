@@ -10,6 +10,7 @@ import {
   type CreateBookingCommand,
   type CreateBookingOutcome,
 } from '../application/ports/booking.repository';
+import { recordBookingNotification } from '../../notifications/infrastructure/booking-notification.recorder';
 import { toBookingView, WITH_SESSION_DETAILS } from './booking-view.mapper';
 
 /**
@@ -23,6 +24,17 @@ async function lockClientBookings(
   clientMembershipId: string,
 ): Promise<void> {
   await client.$executeRaw`select pg_advisory_xact_lock(hashtextextended(${clientMembershipId}, 0))`;
+}
+
+/** La RLS acota a este centro: un cliente de otro centro simplemente no se encuentra. */
+async function isActiveClient(
+  client: TenantTransactionClient,
+  membershipId: string,
+): Promise<boolean> {
+  const count = await client.membership.count({
+    where: { id: membershipId, role: 'client', status: 'active' },
+  });
+  return count === 1;
 }
 
 async function hasOverlappingBooking(
@@ -71,6 +83,48 @@ async function tryInsertSession(
   return inserted.length === 1;
 }
 
+/** La reserva del cliente sobre la sesión recién creada. */
+async function insertBooking(
+  client: TenantTransactionClient,
+  input: { actor: ActorContext; command: CreateBookingCommand; sessionId: string },
+) {
+  return client.booking.create({
+    data: {
+      id: generateUuidV7(),
+      centerId: input.actor.centerId,
+      classSessionId: input.sessionId,
+      clientMembershipId: input.command.clientMembershipId ?? input.actor.membershipId,
+      status: 'confirmed',
+      idempotencyKey: input.command.idempotencyKey,
+    },
+    include: WITH_SESSION_DETAILS,
+  });
+}
+
+interface BookingCreatedNotice {
+  readonly actor: ActorContext;
+  readonly command: CreateBookingCommand;
+  readonly service: SchedulableService;
+  readonly booking: { readonly id: string; readonly staffMembershipId: string };
+}
+
+/** Avisa a quien da la cita y a administración de la nueva reserva. */
+async function notifyBookingCreated(
+  client: TenantTransactionClient,
+  { actor, command, service, booking }: BookingCreatedNotice,
+): Promise<void> {
+  await recordBookingNotification(client, {
+    centerId: actor.centerId,
+    kind: 'booking_created',
+    bookingId: booking.id,
+    clientMembershipId: command.clientMembershipId ?? actor.membershipId,
+    staffMembershipId: booking.staffMembershipId,
+    serviceName: service.name,
+    startsAt: command.startsAt,
+    actorMembershipId: actor.membershipId,
+  });
+}
+
 /**
  * Prueba con cada persona libre a esa hora, la preferida primero. Si otra petición se lleva a la
  * primera entre el cálculo y la inserción, se intenta con la siguiente; si no queda nadie, el hueco
@@ -97,16 +151,12 @@ async function insertSessionAndBooking(
       endsAt: input.endsAt,
     };
     if (!(await tryInsertSession(client, session))) continue;
-    const booking = await client.booking.create({
-      data: {
-        id: generateUuidV7(),
-        centerId: actor.centerId,
-        classSessionId: session.id,
-        clientMembershipId: actor.membershipId,
-        status: 'confirmed',
-        idempotencyKey: command.idempotencyKey,
-      },
-      include: WITH_SESSION_DETAILS,
+    const booking = await insertBooking(client, { actor, command, sessionId: session.id });
+    await notifyBookingCreated(client, {
+      actor,
+      command,
+      service: input.service,
+      booking: { id: booking.id, staffMembershipId: staffMember.membershipId },
     });
     return { kind: 'created', booking: toBookingView(booking) };
   }
@@ -118,7 +168,9 @@ export async function createBookingInTransaction(
   actor: ActorContext,
   command: CreateBookingCommand,
 ): Promise<CreateBookingOutcome> {
-  await lockClientBookings(client, actor.membershipId);
+  const clientMembershipId = command.clientMembershipId ?? actor.membershipId;
+  await lockClientBookings(client, clientMembershipId);
+  if (!(await isActiveClient(client, clientMembershipId))) return { kind: 'client_not_found' };
   const facts = await loadSchedulingFacts(client, {
     serviceId: command.serviceId,
     canSeeHiddenService: false,
@@ -135,7 +187,7 @@ export async function createBookingInTransaction(
 
   const endsAt = addMinutes(command.startsAt, facts.service.durationMinutes);
   const isClientBusy = await hasOverlappingBooking(client, {
-    clientMembershipId: actor.membershipId,
+    clientMembershipId,
     startsAt: command.startsAt,
     endsAt,
   });

@@ -20,6 +20,18 @@ export class CreateBookingRequestDto extends createZodDto(
   }),
 ) {}
 
+/** Una cita que el equipo crea para un cliente desde la agenda. */
+export class CreateAgendaBookingRequestDto extends createZodDto(
+  z.strictObject({
+    clientMembershipId: z.uuid(),
+    serviceId: z.uuid(),
+    /** UTC con `Z`. Debe coincidir exactamente con un hueco de `GET /availability`. */
+    startsAt: z.iso.datetime(),
+    /** La profesional que la da; quien es profesional solo puede ponerla en su propia agenda. */
+    staffMembershipId: z.uuid().optional(),
+  }),
+) {}
+
 export class MyBookingsQueryDto extends createZodDto(
   z.strictObject({
     scope: z.enum(['upcoming', 'past']).default('upcoming'),
@@ -77,6 +89,8 @@ export class AgendaResponseDto extends createZodDto(
   z.strictObject({
     date: z.iso.date(),
     timezone: z.string(),
+    /** Cuándo abre el centro ese día, en hora local; vacío si cierra. */
+    openingRanges: z.array(z.strictObject({ opensAt: z.string(), closesAt: z.string() })),
     entries: z.array(
       z.strictObject({
         booking: z.strictObject(bookingShape),

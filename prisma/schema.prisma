@@ -84,6 +84,23 @@ enum BookingCancelledBy {
   @@map("booking_cancelled_by")
 }
 
+/// Nivel de un cliente; el texto («Inicio», «Base», «Avanzado») lo pone el vocabulario del sector.
+enum ClientLevel {
+  beginner
+  intermediate
+  advanced
+
+  @@map("client_level")
+}
+
+/// Lo que avisa una notificación; el texto lo escribe la app con el vocabulario del sector.
+enum NotificationKind {
+  booking_created
+  booking_cancelled
+
+  @@map("notification_kind")
+}
+
 enum MembershipStatus {
   invited
   active
@@ -159,6 +176,8 @@ model Center {
   classSessions ClassSession[]
   bookings      Booking[]
   rooms         Room[]
+  clientGroups  ClientGroup[]
+  notifications Notification[]
 
   @@map("centers")
 }
@@ -188,14 +207,20 @@ model Membership {
   joinedAt    DateTime         @default(now()) @map("joined_at") @db.Timestamptz
   /// Cargo que ve la clientela ("Profesora de yoga"). Solo para el equipo.
   staffTitle  String?          @map("staff_title")
+  /// Solo clientes: su nivel y el grupo al que pertenece (uno como máximo).
+  level       ClientLevel?
+  groupId     String?          @map("group_id") @db.Uuid
   /// Permisos extra del equipo, p. ej. ["health:read"]. Un array de cadenas validado por la API.
   permissions Json             @default("[]")
   createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz
   updatedAt   DateTime         @updatedAt @map("updated_at") @db.Timestamptz
 
-  center Center @relation(fields: [centerId], references: [id])
-  user   User   @relation(fields: [userId], references: [id])
+  center Center       @relation(fields: [centerId], references: [id])
+  user   User         @relation(fields: [userId], references: [id])
+  group  ClientGroup? @relation("GroupMembers", fields: [groupId], references: [id])
 
+  instructedGroups    ClientGroup[]  @relation("GroupInstructor")
+  notifications       Notification[] @relation("NotificationRecipient")
   serviceAssignments  ServiceStaff[]
   taughtClassSessions ClassSession[] @relation("StaffClassSessions")
   bookings            Booking[]      @relation("ClientBookings")
@@ -370,6 +395,43 @@ model Service {
 
   @@index([centerId, sortOrder])
   @@map("services")
+}
+
+/// Aviso para alguien del centro (nueva reserva, cita cancelada…). Cada persona ve solo los suyos.
+model Notification {
+  id                    String           @id @db.Uuid
+  centerId              String           @map("center_id") @db.Uuid
+  recipientMembershipId String           @map("recipient_membership_id") @db.Uuid
+  kind                  NotificationKind
+  /// Los datos del aviso (cliente, servicio, hora…): el texto se compone en la app.
+  data                  Json
+  bookingId             String?          @map("booking_id") @db.Uuid
+  readAt                DateTime?        @map("read_at") @db.Timestamptz
+  createdAt             DateTime         @default(now()) @map("created_at") @db.Timestamptz
+
+  center    Center     @relation(fields: [centerId], references: [id])
+  recipient Membership @relation("NotificationRecipient", fields: [recipientMembershipId], references: [id])
+
+  @@index([centerId, recipientMembershipId, createdAt])
+  @@map("notifications")
+}
+
+/// Grupo de clientes del centro (p. ej. «Grupo mañanas»), con su nivel y quien lo da. Se archiva, no se borra.
+model ClientGroup {
+  id                     String       @id @db.Uuid
+  centerId               String       @map("center_id") @db.Uuid
+  name                   String
+  level                  ClientLevel?
+  instructorMembershipId String?      @map("instructor_membership_id") @db.Uuid
+  archivedAt             DateTime?    @map("archived_at") @db.Timestamptz
+  createdAt              DateTime     @default(now()) @map("created_at") @db.Timestamptz
+
+  center     Center       @relation(fields: [centerId], references: [id])
+  instructor Membership?  @relation("GroupInstructor", fields: [instructorMembershipId], references: [id])
+  members    Membership[] @relation("GroupMembers")
+
+  @@index([centerId])
+  @@map("client_groups")
 }
 
 /// Sala o recurso del centro (Sala 1, Tatami, Zona de peso libre). Se archiva, no se borra.
