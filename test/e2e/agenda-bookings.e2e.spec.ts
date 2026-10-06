@@ -78,6 +78,25 @@ describe('POST /agenda/bookings (an appointment made by the team)', () => {
     );
   });
 
+  it('lets the team book at a quarter of an hour, which the client grid never offers', async () => {
+    const fineSlots = await world.call(
+      'GET',
+      `/v1/centers/${center.centerId}/availability?serviceId=${serviceId}&from=${slot.startsAt.slice(0, 10)}&to=${slot.startsAt.slice(0, 10)}&stepMinutes=15&staffMembershipId=${staff.membershipId}`,
+      staff.userId,
+      { centerId: center.centerId },
+    );
+    const quarterPast = new Date(Date.parse(slot.startsAt) + 15 * 60_000).toISOString();
+
+    const days = fineSlots.json<{ days: { slots: { startsAt: string }[] }[] }>().days;
+    expect(days.flatMap((day) => day.slots.map(({ startsAt }) => startsAt))).toContain(quarterPast);
+    const response = await createFor(staff.userId, {
+      clientMembershipId: ana.membershipId,
+      serviceId,
+      startsAt: quarterPast,
+    });
+    expect(response.statusCode).toBe(201);
+  });
+
   it('lets administration choose the professional', async () => {
     const response = await createFor(owner, {
       clientMembershipId: ana.membershipId,

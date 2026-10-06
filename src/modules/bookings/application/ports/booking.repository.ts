@@ -29,6 +29,8 @@ export interface CreateBookingCommand {
   readonly now: Date;
   /** Para quién es la reserva cuando la hace el equipo; sin él, para quien la pide. */
   readonly clientMembershipId?: string | undefined;
+  /** Rejilla de inicios más fina cuando pone la cita el equipo (p. ej. cada 15 minutos). */
+  readonly slotStepMinutes?: number | undefined;
 }
 
 export type CreateBookingOutcome =

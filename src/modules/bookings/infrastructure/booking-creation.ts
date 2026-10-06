@@ -163,6 +163,13 @@ async function insertSessionAndBooking(
   return { kind: 'slot_unavailable' };
 }
 
+type LoadedFacts = NonNullable<Awaited<ReturnType<typeof loadSchedulingFacts>>>;
+
+/** Los datos del centro y del servicio, con la rejilla fina si la cita la pone el equipo. */
+function buildSchedulingInput(facts: LoadedFacts, command: CreateBookingCommand) {
+  return { ...facts, ...facts.service, stepMinutes: command.slotStepMinutes, now: command.now };
+}
+
 export async function createBookingInTransaction(
   client: TenantTransactionClient,
   actor: ActorContext,
@@ -179,7 +186,7 @@ export async function createBookingInTransaction(
   if (!facts) return { kind: 'service_not_found' };
 
   const decision = findBookableSlot({
-    scheduling: { ...facts, ...facts.service, now: command.now },
+    scheduling: buildSchedulingInput(facts, command),
     startsAt: command.startsAt,
     preferredStaffMembershipId: command.preferredStaffMembershipId,
   });

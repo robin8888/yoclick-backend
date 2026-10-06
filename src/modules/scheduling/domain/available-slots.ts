@@ -28,6 +28,11 @@ export interface SlotCalculationInput {
   readonly fromDate: string;
   readonly toDate: string;
   readonly durationMinutes: number;
+  /**
+   * Cada cuántos minutos puede empezar un hueco. Sin él, cada `durationMinutes` desde la apertura
+   * (lo que ve la clientela); el equipo lo baja (p. ej. a 15) para elegir horas como las 10:30.
+   */
+  readonly stepMinutes?: number | undefined;
   readonly minNoticeMinutes: number;
   readonly bookingWindowDays: number;
   readonly now: Date;
@@ -67,21 +72,27 @@ function overlaps(first: { startsAt: Date; endsAt: Date }, second: BusyInterval)
 }
 
 /**
- * Rejilla del día: un hueco cada `durationMinutes` desde la apertura de cada tramo, y el hueco ha
+ * Rejilla del día: un hueco cada `stepMinutes` (por defecto, la duración) desde la apertura de cada tramo, y el hueco ha
  * de caber entero en el tramo. Se cuenta en tiempo real desde la apertura, así que un día con cambio
  * de hora no desplaza ni inventa huecos.
  */
 function buildGridOfInterval(
-  input: { date: string; timeZone: string; durationMinutes: number },
+  input: {
+    date: string;
+    timeZone: string;
+    durationMinutes: number;
+    stepMinutes?: number | undefined;
+  },
   interval: OpeningInterval,
 ): { startsAt: Date; endsAt: Date }[] {
   const intervalStart = zonedDateTimeToUtc(input.date, interval.opensAt, input.timeZone);
   const intervalEnd = zonedDateTimeToUtc(input.date, interval.closesAt, input.timeZone);
   const grid: { startsAt: Date; endsAt: Date }[] = [];
+  const stepMinutes = input.stepMinutes ?? input.durationMinutes;
   let startsAt = intervalStart;
   while (addMinutes(startsAt, input.durationMinutes) <= intervalEnd) {
     grid.push({ startsAt, endsAt: addMinutes(startsAt, input.durationMinutes) });
-    startsAt = addMinutes(startsAt, input.durationMinutes);
+    startsAt = addMinutes(startsAt, stepMinutes);
   }
   return grid;
 }

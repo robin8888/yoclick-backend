@@ -50,6 +50,7 @@ export class AvailabilityController {
       fromDate: query.from,
       toDate: query.to,
       staffMembershipId: query.staffMembershipId ?? null,
+      stepMinutes: query.stepMinutes ?? null,
       now: new Date(),
     });
     return {

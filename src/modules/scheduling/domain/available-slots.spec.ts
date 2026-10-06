@@ -69,6 +69,24 @@ describe('calculateAvailableSlots', () => {
     ]);
   });
 
+  it('starts a slot every step when the team asks for a finer grid, still fitting the shift', () => {
+    const starts = startsOf(
+      buildInput({
+        durationMinutes: 60,
+        stepMinutes: 15,
+        openingHours: { mon: [{ opensAt: '09:00', closesAt: '11:00' }] },
+      }),
+    );
+
+    expect(starts).toEqual([
+      '2026-10-05T07:00:00.000Z',
+      '2026-10-05T07:15:00.000Z',
+      '2026-10-05T07:30:00.000Z',
+      '2026-10-05T07:45:00.000Z',
+      '2026-10-05T08:00:00.000Z',
+    ]);
+  });
+
   it('only offers slots that fit entirely inside a shift', () => {
     const slots = startsOf(buildInput({ durationMinutes: 90 }));
 

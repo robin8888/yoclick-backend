@@ -15,6 +15,8 @@ export interface AvailabilityRequest {
   readonly fromDate: string;
   readonly toDate: string;
   readonly staffMembershipId: string | null;
+  /** Rejilla más fina para el equipo; la clientela siempre ve la rejilla por duración. */
+  readonly stepMinutes: number | null;
   readonly now: Date;
 }
 
@@ -62,6 +64,7 @@ export class GetAvailabilityUseCase {
       ...facts.service,
       fromDate,
       toDate,
+      stepMinutes: actor.role === 'client' ? undefined : (request.stepMinutes ?? undefined),
       now: request.now,
       staff: facts.staff.filter(
         (member) =>
