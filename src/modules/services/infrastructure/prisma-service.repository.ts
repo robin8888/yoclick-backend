@@ -18,6 +18,7 @@ const TEAM_ROLES = ['owner', 'admin', 'staff'] as const;
 
 /** Solo cuenta quien sigue en el equipo: una baja no debe aparecer como profesional. */
 const WITH_ACTIVE_STAFF = {
+  room: { select: { id: true, name: true } },
   staff: {
     where: { membership: { status: 'active', role: { in: [...TEAM_ROLES] } } },
     orderBy: [{ membership: { joinedAt: 'asc' } }, { membershipId: 'asc' }],
@@ -39,6 +40,7 @@ function toServiceView(service: ServiceWithStaff): ServiceView {
     bookingWindowDays: service.bookingWindowDays,
     minNoticeMinutes: service.minNoticeMinutes,
     isVisible: service.isVisible,
+    room: service.room,
     staff: service.staff.map(({ membership }) => ({
       membershipId: membership.id,
       fullName: membership.user.fullName,
@@ -64,6 +66,11 @@ async function areAllActiveTeamMembers(
     where: { id: { in: uniqueIds }, status: 'active', role: { in: [...TEAM_ROLES] } },
   });
   return matchingCount === uniqueIds.length;
+}
+
+/** La RLS acota a este centro y `archivedAt` excluye las salas quitadas. */
+async function isActiveRoom(client: TenantTransactionClient, roomId: string): Promise<boolean> {
+  return (await client.room.count({ where: { id: roomId, archivedAt: null } })) === 1;
 }
 
 async function readServiceWithStaff(
@@ -111,6 +118,9 @@ export class PrismaServiceRepository implements ServiceRepository {
       if (!(await areAllActiveTeamMembers(client, newService.staffMembershipIds))) {
         return { kind: 'unknown_staff' };
       }
+      if (newService.roomId !== null && !(await isActiveRoom(client, newService.roomId))) {
+        return { kind: 'unknown_room' };
+      }
       const lastService = await client.service.aggregate({ _max: { sortOrder: true } });
       const serviceId = generateUuidV7();
       await client.service.create({
@@ -123,6 +133,7 @@ export class PrismaServiceRepository implements ServiceRepository {
           durationMinutes: newService.durationMinutes,
           priceCents: newService.priceCents,
           color: newService.color,
+          roomId: newService.roomId,
           // Lo no enviado toma el valor por defecto de la tabla.
           ...(newService.bookingWindowDays !== undefined && {
             bookingWindowDays: newService.bookingWindowDays,
@@ -154,6 +165,9 @@ export class PrismaServiceRepository implements ServiceRepository {
         !(await areAllActiveTeamMembers(client, patch.staffMembershipIds))
       ) {
         return { kind: 'unknown_staff' };
+      }
+      if (typeof patch.roomId === 'string' && !(await isActiveRoom(client, patch.roomId))) {
+        return { kind: 'unknown_room' };
       }
       await client.service.update({ where: { id: serviceId }, data: toUpdateData(patch) });
       if (patch.staffMembershipIds !== undefined) {

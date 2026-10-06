@@ -94,6 +94,7 @@ describe('services', () => {
         bookingWindowDays: 30,
         minNoticeMinutes: 120,
         isVisible: true,
+        room: null,
         staff: [{ membershipId: center.ownerMembershipId, fullName: 'owner' }],
       });
     });

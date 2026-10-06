@@ -24,9 +24,11 @@ export class ListServicesUseCase {
 function unwrapWriteOutcome(outcome: ServiceWriteOutcome): ServiceView {
   if (outcome.kind === 'saved') return outcome.service;
   if (outcome.kind === 'not_found') throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
-  throw new DomainError('VALIDATION_FAILED', HTTP_STATUS.badRequest, [
-    { path: 'staffMembershipIds', code: 'unknown_staff_member' },
-  ]);
+  const invalidField =
+    outcome.kind === 'unknown_room'
+      ? { path: 'roomId', code: 'unknown_room' }
+      : { path: 'staffMembershipIds', code: 'unknown_staff_member' };
+  throw new DomainError('VALIDATION_FAILED', HTTP_STATUS.badRequest, [invalidField]);
 }
 
 export interface CreateServiceRequest {

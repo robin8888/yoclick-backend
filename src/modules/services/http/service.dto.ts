@@ -34,6 +34,8 @@ const serviceShape = {
   bookingWindowDays: z.number().int(),
   minNoticeMinutes: z.number().int(),
   isVisible: z.boolean(),
+  /** Sala o recurso donde se da; `null` = sin sala fija. */
+  room: z.strictObject({ id: z.uuid(), name: z.string() }).nullable(),
   staff: z.array(z.strictObject(serviceStaffShape)),
 };
 
@@ -75,6 +77,7 @@ export class CreateServiceRequestDto extends createZodDto(
     bookingWindowDays: bookingWindowSchema.optional(),
     minNoticeMinutes: minNoticeSchema.optional(),
     isVisible: z.boolean().optional(),
+    roomId: z.uuid().optional(),
     staffMembershipIds: staffIdsSchema.optional(),
   }),
 ) {}
@@ -91,6 +94,7 @@ export class UpdateServiceRequestDto extends createZodDto(
       bookingWindowDays: bookingWindowSchema.optional(),
       minNoticeMinutes: minNoticeSchema.optional(),
       isVisible: z.boolean().optional(),
+      roomId: z.uuid().nullable().optional(),
       staffMembershipIds: staffIdsSchema.optional(),
     })
     .refine((patch) => Object.keys(patch).length > 0, 'send at least one field to change'),

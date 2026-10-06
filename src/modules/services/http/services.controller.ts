@@ -98,6 +98,7 @@ export class ServicesController {
         bookingWindowDays: body.bookingWindowDays,
         minNoticeMinutes: body.minNoticeMinutes,
         isVisible: body.isVisible,
+        roomId: body.roomId ?? null,
         staffMembershipIds: body.staffMembershipIds,
       },
     });

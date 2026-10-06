@@ -158,6 +158,7 @@ model Center {
   services      Service[]
   classSessions ClassSession[]
   bookings      Booking[]
+  rooms         Room[]
 
   @@map("centers")
 }
@@ -356,16 +357,36 @@ model Service {
   cancelNoticeMinutes Int?        @map("cancel_notice_minutes")
   isVisible           Boolean     @default(true) @map("is_visible")
   sortOrder           Int         @default(0) @map("sort_order")
+  /// Sala o recurso donde se da; nulo = sin sala fija.
+  roomId              String?     @map("room_id") @db.Uuid
   archivedAt          DateTime?   @map("archived_at") @db.Timestamptz
   createdAt           DateTime    @default(now()) @map("created_at") @db.Timestamptz
   updatedAt           DateTime    @updatedAt @map("updated_at") @db.Timestamptz
 
   center        Center         @relation(fields: [centerId], references: [id])
+  room          Room?          @relation(fields: [roomId], references: [id])
   staff         ServiceStaff[]
   classSessions ClassSession[]
 
   @@index([centerId, sortOrder])
   @@map("services")
+}
+
+/// Sala o recurso del centro (Sala 1, Tatami, Zona de peso libre). Se archiva, no se borra.
+model Room {
+  id         String    @id @db.Uuid
+  centerId   String    @map("center_id") @db.Uuid
+  name       String
+  /// Aforo máximo de la sala.
+  capacity   Int       @default(1)
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  center   Center    @relation(fields: [centerId], references: [id])
+  services Service[]
+
+  @@index([centerId])
+  @@map("rooms")
 }
 
 /// Quién del equipo puede atender un servicio.

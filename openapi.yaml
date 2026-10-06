@@ -1745,6 +1745,157 @@ paths:
       summary: Registra la llegada de la clienta cuyo QR se ha escaneado, en su cita confirmada de ahora (desde 60 minutos antes hasta que termina). El personal solo en las clases que atiende; administración en cualquiera. 422 CHECKIN_CODE_INVALID si el código es falso, caduco o de otro centro; 409 CHECKIN_NO_BOOKING si no tiene cita para registrar. Repetirlo devuelve la misma llegada.
       tags:
         - attendance
+  /v1/centers/{centerId}/agenda/summary:
+    get:
+      operationId: agenda_get_day_summary
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: date
+          required: true
+          in: query
+          schema:
+            format: date
+            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DaySummaryResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: "Cifras de la cabecera de la agenda del centro: ocupación del día (tiempo reservado sobre el tiempo abierto del equipo que atiende servicios), clientes nuevos de la semana y clientes activos."
+      tags:
+        - reports
+  /v1/centers/{centerId}/rooms:
+    get:
+      operationId: rooms_list
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoomListResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Salas y recursos del centro (no archivados), por orden de creación.
+      tags:
+        - rooms
+    post:
+      operationId: rooms_create
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRoomRequestDto"
+      responses:
+        "201":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoomResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Añade una sala o recurso con su aforo máximo. 409 si ya hay una activa con ese nombre.
+      tags:
+        - rooms
+  /v1/centers/{centerId}/rooms/{roomId}:
+    delete:
+      operationId: rooms_archive
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: roomId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "204":
+          description: ""
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: "Quita la sala: deja de ofrecerse y los servicios que la usaban quedan sin sala fija."
+      tags:
+        - rooms
   /health:
     get:
       operationId: health_check_liveness
@@ -3257,6 +3408,8 @@ components:
           format: date-time
           pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
           nullable: true
+        version:
+          type: string
       required:
         - id
         - slug
@@ -3275,6 +3428,7 @@ components:
         - holidays
         - cancelPolicy
         - trialEndsAt
+        - version
       additionalProperties: false
     UpdateCenterSettingsRequestDto:
       type: object
@@ -3492,6 +3646,20 @@ components:
                 maximum: 9007199254740991
               isVisible:
                 type: boolean
+              room:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  name:
+                    type: string
+                required:
+                  - id
+                  - name
+                additionalProperties: false
+                nullable: true
               staff:
                 type: array
                 items:
@@ -3519,6 +3687,7 @@ components:
               - bookingWindowDays
               - minNoticeMinutes
               - isVisible
+              - room
               - staff
             additionalProperties: false
       required:
@@ -3556,6 +3725,10 @@ components:
           maximum: 86400
         isVisible:
           type: boolean
+        roomId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
         staffMembershipIds:
           minItems: 1
           maxItems: 50
@@ -3610,6 +3783,20 @@ components:
           maximum: 9007199254740991
         isVisible:
           type: boolean
+        room:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            name:
+              type: string
+          required:
+            - id
+            - name
+          additionalProperties: false
+          nullable: true
         staff:
           type: array
           items:
@@ -3637,6 +3824,7 @@ components:
         - bookingWindowDays
         - minNoticeMinutes
         - isVisible
+        - room
         - staff
       additionalProperties: false
     UpdateServiceRequestDto:
@@ -3674,6 +3862,11 @@ components:
           maximum: 86400
         isVisible:
           type: boolean
+        roomId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          nullable: true
         staffMembershipIds:
           minItems: 1
           maxItems: 50
@@ -4536,6 +4729,91 @@ components:
         - checkedInAt
         - isFirstCheckIn
         - booking
+      additionalProperties: false
+    DaySummaryResponseDto:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+        occupancyPercent:
+          type: integer
+          minimum: 0
+          maximum: 100
+          nullable: true
+        newClientsThisWeek:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        activeClientCount:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+      required:
+        - date
+        - occupancyPercent
+        - newClientsThisWeek
+        - activeClientCount
+      additionalProperties: false
+    RoomListResponseDto:
+      type: object
+      properties:
+        rooms:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              name:
+                type: string
+              capacity:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+            required:
+              - id
+              - name
+              - capacity
+            additionalProperties: false
+      required:
+        - rooms
+      additionalProperties: false
+    CreateRoomRequestDto:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        capacity:
+          default: 1
+          type: integer
+          minimum: 1
+          maximum: 500
+      required:
+        - name
+      additionalProperties: false
+    RoomResponseDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        name:
+          type: string
+        capacity:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+      required:
+        - id
+        - name
+        - capacity
       additionalProperties: false
     HealthResponseDto:
       type: object

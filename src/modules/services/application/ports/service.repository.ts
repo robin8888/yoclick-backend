@@ -17,6 +17,8 @@ export interface ServiceView {
   readonly bookingWindowDays: number;
   readonly minNoticeMinutes: number;
   readonly isVisible: boolean;
+  /** Sala o recurso donde se da; `null` = sin sala fija. */
+  readonly room: { readonly id: string; readonly name: string } | null;
   readonly staff: readonly ServiceStaffMember[];
 }
 
@@ -29,6 +31,7 @@ export interface NewService {
   readonly bookingWindowDays: number | undefined;
   readonly minNoticeMinutes: number | undefined;
   readonly isVisible: boolean | undefined;
+  readonly roomId: string | null;
   readonly staffMembershipIds: readonly string[];
 }
 
@@ -42,6 +45,7 @@ export interface ServicePatch {
   readonly bookingWindowDays?: number | undefined;
   readonly minNoticeMinutes?: number | undefined;
   readonly isVisible?: boolean | undefined;
+  readonly roomId?: string | null | undefined;
   readonly staffMembershipIds?: readonly string[] | undefined;
 }
 
@@ -49,6 +53,8 @@ export type ServiceWriteOutcome =
   | { readonly kind: 'saved'; readonly service: ServiceView }
   /** Alguna de las personas indicadas no es del equipo activo de este centro. */
   | { readonly kind: 'unknown_staff' }
+  /** La sala no existe, está archivada o es de otro centro. */
+  | { readonly kind: 'unknown_room' }
   | { readonly kind: 'not_found' };
 
 export interface ServiceRepository {
