@@ -26,6 +26,7 @@ import {
   GroupResponseDto,
   GroupRouteParamsDto,
 } from './client.dto';
+import { ActivityRecorder } from '../../activity/application/activity-recorder';
 
 @ApiTags('clients')
 @ApiBearerAuth('bearer')
@@ -37,6 +38,7 @@ export class GroupsController {
     private readonly listGroups: ListGroupsUseCase,
     private readonly createGroup: CreateGroupUseCase,
     private readonly archiveGroup: ArchiveGroupUseCase,
+    private readonly activity: ActivityRecorder,
   ) {}
 
   @Get()
@@ -67,13 +69,13 @@ export class GroupsController {
     @Body() body: CreateGroupRequestDto,
   ): Promise<Record<string, unknown>> {
     assertRouteTargetsActorCenter(actor, params.centerId);
-    return {
-      ...(await this.createGroup.execute(actor, {
-        name: body.name,
-        level: body.level ?? null,
-        instructorMembershipId: body.instructorMembershipId ?? null,
-      })),
-    };
+    const group = await this.createGroup.execute(actor, {
+      name: body.name,
+      level: body.level ?? null,
+      instructorMembershipId: body.instructorMembershipId ?? null,
+    });
+    await this.activity.record(actor, { kind: 'group_created', subject: group.name });
+    return { ...group };
   }
 
   @Delete(':groupId')
@@ -90,5 +92,6 @@ export class GroupsController {
   ): Promise<void> {
     assertRouteTargetsActorCenter(actor, params.centerId);
     await this.archiveGroup.execute(actor, params.groupId);
+    await this.activity.record(actor, { kind: 'group_archived' });
   }
 }

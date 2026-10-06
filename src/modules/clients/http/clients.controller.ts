@@ -26,6 +26,7 @@ import {
   ClientRouteParamsDto,
   UpdateClientRequestDto,
 } from './client.dto';
+import { ActivityRecorder } from '../../activity/application/activity-recorder';
 
 function serializeClient(client: ClientView): Record<string, unknown> {
   return {
@@ -46,6 +47,7 @@ export class ClientsController {
     private readonly listClients: ListClientsUseCase,
     private readonly getClient: GetClientUseCase,
     private readonly updateClient: UpdateClientUseCase,
+    private readonly activity: ActivityRecorder,
   ) {}
 
   @Get()
@@ -66,6 +68,7 @@ export class ClientsController {
       search: query.search === undefined || query.search === '' ? null : query.search,
       status: query.status ?? null,
       groupId: query.groupId ?? null,
+      scope: query.scope,
       limit: query.limit,
       offset: query.offset,
     });
@@ -100,6 +103,8 @@ export class ClientsController {
     @Body() body: UpdateClientRequestDto,
   ): Promise<Record<string, unknown>> {
     assertRouteTargetsActorCenter(actor, params.centerId);
-    return serializeClient(await this.updateClient.execute(actor, params.membershipId, body));
+    const client = await this.updateClient.execute(actor, params.membershipId, body);
+    await this.activity.record(actor, { kind: 'client_updated', subject: client.fullName });
+    return serializeClient(client);
   }
 }

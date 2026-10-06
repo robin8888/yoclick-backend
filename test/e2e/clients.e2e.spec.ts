@@ -215,6 +215,13 @@ describe('clients and groups', () => {
       expect(others.clients).toEqual([]);
     });
 
+    it('lets a professional list the whole center when choosing who to book', async () => {
+      const everyone = await listClients('?scope=center', staff.userId);
+
+      expect(everyone.totalClientCount).toBeGreaterThanOrEqual(1);
+      expect(namesOf(everyone)).toContain('ana');
+    });
+
     it('is closed to clients and needs the second factor for administration', async () => {
       const asClient = await world.call('GET', clientsUrl(), ana.userId, {
         centerId: center.centerId,

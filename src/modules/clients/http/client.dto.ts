@@ -28,6 +28,11 @@ export class ClientListQueryDto extends createZodDto(
     status: z.enum(CLIENT_STATUS_FILTERS).optional(),
     /** Solo las personas de este grupo. */
     groupId: z.uuid().optional(),
+    /**
+     * Solo cambia algo para la profesional: `mine` (por defecto) son quienes han reservado con
+     * ella; `center` son todas las del centro, para ponerle una cita a alguien nuevo.
+     */
+    scope: z.enum(['mine', 'center']).default('mine'),
     limit: z.coerce
       .number()
       .int()

@@ -17,12 +17,13 @@ export class ListClientsUseCase {
 
   async execute(
     actor: ActorContext,
-    query: Omit<ClientListQuery, 'now' | 'staffMembershipId'>,
+    query: Omit<ClientListQuery, 'now' | 'staffMembershipId'> & { scope: 'mine' | 'center' },
   ): Promise<ClientListResult> {
+    const { scope, ...listQuery } = query;
     return this.clients.listClients(actor, {
-      ...query,
+      ...listQuery,
       now: new Date(),
-      staffMembershipId: actor.role === 'staff' ? actor.membershipId : null,
+      staffMembershipId: actor.role === 'staff' && scope === 'mine' ? actor.membershipId : null,
     });
   }
 }
