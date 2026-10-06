@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TenantPrismaService } from '../../../shared/database/tenant-prisma.service';
 import {
+  type ActiveSessionRecord,
   type NewRefreshToken,
   type RotationRequest,
   type SessionRepository,
@@ -42,6 +43,7 @@ export class PrismaSessionRepository implements SessionRepository {
           expiresAt: true,
           revokedAt: true,
           mfaVerified: true,
+          deviceName: true,
         },
       }),
     );
@@ -81,6 +83,39 @@ export class PrismaSessionRepository implements SessionRepository {
         data: { revokedAt: now },
       }),
     );
+  }
+
+  async listActiveOfUser(userId: string, now: Date): Promise<ActiveSessionRecord[]> {
+    return this.tenantPrismaService.runInPublicContext(async (client) => {
+      const currentTokens = await client.refreshToken.findMany({
+        where: { userId, revokedAt: null, expiresAt: { gt: now } },
+        orderBy: { createdAt: 'desc' },
+        select: { familyId: true, deviceName: true, createdAt: true },
+      });
+      const firstTokens = await client.refreshToken.groupBy({
+        by: ['familyId'],
+        where: { userId, familyId: { in: currentTokens.map(({ familyId }) => familyId) } },
+        _min: { createdAt: true },
+      });
+      return currentTokens.map((token) => ({
+        familyId: token.familyId,
+        deviceName: token.deviceName,
+        startedAt:
+          firstTokens.find(({ familyId }) => familyId === token.familyId)?._min.createdAt ??
+          token.createdAt,
+        lastActiveAt: token.createdAt,
+      }));
+    });
+  }
+
+  async revokeFamilyOfUser(userId: string, familyId: string, now: Date): Promise<boolean> {
+    const result = await this.tenantPrismaService.runInPublicContext((client) =>
+      client.refreshToken.updateMany({
+        where: { userId, familyId, revokedAt: null },
+        data: { revokedAt: now },
+      }),
+    );
+    return result.count > 0;
   }
 
   async revokeAllOfUser(userId: string, now: Date): Promise<void> {

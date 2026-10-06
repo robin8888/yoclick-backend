@@ -17,6 +17,8 @@ export interface StoredRefreshToken {
   readonly expiresAt: Date;
   readonly revokedAt: Date | null;
   readonly isMfaVerified: boolean;
+  /** El dispositivo con el que se inició sesión; se conserva al renovar. */
+  readonly deviceName: string | null;
 }
 
 export interface RotationRequest {
@@ -25,7 +27,20 @@ export interface RotationRequest {
   readonly now: Date;
 }
 
+/** Un inicio de sesión que sigue abierto en algún dispositivo de la persona. */
+export interface ActiveSessionRecord {
+  readonly familyId: string;
+  readonly deviceName: string | null;
+  /** Cuándo se inició sesión en ese dispositivo. */
+  readonly startedAt: Date;
+  /** La última vez que el dispositivo renovó su sesión. */
+  readonly lastActiveAt: Date;
+}
+
 export interface SessionRepository {
+  listActiveOfUser(userId: string, now: Date): Promise<ActiveSessionRecord[]>;
+  /** Cierra la sesión de un dispositivo, solo si es de esa persona. `false` si no existe o es ajena. */
+  revokeFamilyOfUser(userId: string, familyId: string, now: Date): Promise<boolean>;
   create(newToken: NewRefreshToken): Promise<void>;
   findByTokenHash(tokenHash: string): Promise<StoredRefreshToken | null>;
   /**

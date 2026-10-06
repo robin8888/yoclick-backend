@@ -5,6 +5,7 @@ import {
   type MfaRepository,
 } from '../../src/modules/auth/application/ports/mfa.repository';
 import {
+  type ActiveSessionRecord,
   type NewRefreshToken,
   type RotationRequest,
   type SessionRepository,
@@ -294,6 +295,29 @@ export class InMemorySessionRepository implements SessionRepository {
     return Promise.resolve();
   }
 
+  listActiveOfUser(userId: string, now: Date): Promise<ActiveSessionRecord[]> {
+    const active = this.tokens.filter(
+      (token) =>
+        token.userId === userId && token.revokedAtMutable === null && token.expiresAt > now,
+    );
+    return Promise.resolve(
+      active.map((token) => ({
+        familyId: token.familyId,
+        deviceName: token.deviceName,
+        startedAt: now,
+        lastActiveAt: now,
+      })),
+    );
+  }
+
+  revokeFamilyOfUser(userId: string, familyId: string, now: Date): Promise<boolean> {
+    const family = this.tokens.filter(
+      (token) => token.userId === userId && token.familyId === familyId,
+    );
+    for (const token of family) token.revokedAtMutable ??= now;
+    return Promise.resolve(family.length > 0);
+  }
+
   activeTokensOf(userId: string): number {
     return this.tokens.filter((token) => token.userId === userId && token.revokedAtMutable === null)
       .length;
@@ -306,6 +330,7 @@ export class InMemorySessionRepository implements SessionRepository {
       familyId: token.familyId,
       expiresAt: token.expiresAt,
       isMfaVerified: token.isMfaVerified,
+      deviceName: token.deviceName,
       revokedAt: token.revokedAtMutable,
     };
   }

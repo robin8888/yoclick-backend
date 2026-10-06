@@ -46,6 +46,11 @@ import { TotpEngine } from './infrastructure/totp-engine';
 import { PasswordController } from './http/password.controller';
 import { RegistrationController } from './http/registration.controller';
 import { SessionController } from './http/session.controller';
+import { OpenSessionsController } from './http/open-sessions.controller';
+import {
+  ListOpenSessionsUseCase,
+  RevokeOpenSessionUseCase,
+} from './application/open-sessions.use-cases';
 import { ClientAddressHasher } from './infrastructure/client-address.hasher';
 import { DisabledBreachedPasswordChecker } from './infrastructure/disabled-breached-password.checker';
 import { HmacVerificationCodeHasher } from './infrastructure/hmac-verification-code.hasher';
@@ -55,7 +60,13 @@ import { PrismaVerificationCodeRepository } from './infrastructure/prisma-verifi
 import { PwnedPasswordsChecker } from './infrastructure/pwned-passwords.checker';
 
 @Module({
-  controllers: [RegistrationController, SessionController, PasswordController, MfaController],
+  controllers: [
+    RegistrationController,
+    SessionController,
+    OpenSessionsController,
+    PasswordController,
+    MfaController,
+  ],
   providers: [
     PasswordHasher,
     SecretEncryptor,
@@ -80,6 +91,8 @@ import { PwnedPasswordsChecker } from './infrastructure/pwned-passwords.checker'
     LoginUseCase,
     RefreshSessionUseCase,
     LogoutUseCase,
+    ListOpenSessionsUseCase,
+    RevokeOpenSessionUseCase,
     AccountPasswordChanger,
     ReauthenticationChecker,
     ChangePasswordUseCase,

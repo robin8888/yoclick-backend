@@ -383,4 +383,67 @@ describe('sessions: login, refresh and logout', () => {
       expect(response.statusCode).toBe(204);
     });
   });
+
+  describe('open sessions: list and close another device', () => {
+    interface OpenSessionsBody {
+      sessions: { id: string; deviceName: string | null; isCurrent: boolean }[];
+    }
+
+    const listSessions = (session: SessionBody) =>
+      post(
+        '/v1/me/sessions/list',
+        { refreshToken: session.refreshToken },
+        { authorization: `Bearer ${session.accessToken}` },
+      );
+
+    it('lists the devices with an open session and marks the one asking as current', async () => {
+      const phone = await loginSession();
+      await loginSession();
+
+      const response = await listSessions(phone);
+
+      expect(response.statusCode).toBe(200);
+      const { sessions } = response.json<OpenSessionsBody>();
+      expect(sessions).toHaveLength(2);
+      expect(sessions.filter(({ isCurrent }) => isCurrent)).toHaveLength(1);
+      expect(sessions[0]?.deviceName).toBe('iPhone de Robin');
+    });
+
+    it('closes another device, which can no longer refresh, and keeps this one', async () => {
+      const phone = await loginSession();
+      const tablet = await loginSession();
+      const { sessions } = (await listSessions(phone)).json<OpenSessionsBody>();
+      const tabletSession = sessions.find(({ isCurrent }) => !isCurrent);
+
+      const revoked = await post(
+        `/v1/me/sessions/${tabletSession?.id ?? ''}/revoke`,
+        {},
+        { authorization: `Bearer ${phone.accessToken}` },
+      );
+
+      expect(revoked.statusCode).toBe(204);
+      const tabletRefresh = await post('/v1/auth/refresh', { refreshToken: tablet.refreshToken });
+      const phoneRefresh = await post('/v1/auth/refresh', { refreshToken: phone.refreshToken });
+      expect(tabletRefresh.statusCode).toBe(401);
+      expect(phoneRefresh.statusCode).toBe(200);
+    });
+
+    it('answers 404 when closing a session of another person', async () => {
+      await createVerifiedAccount(OTHER_EMAIL);
+      const attacker = await loginSession(OTHER_EMAIL);
+      const victim = await loginSession(EMAIL);
+      const { sessions } = (await listSessions(victim)).json<OpenSessionsBody>();
+
+      const response = await post(
+        `/v1/me/sessions/${sessions[0]?.id ?? ''}/revoke`,
+        {},
+        { authorization: `Bearer ${attacker.accessToken}` },
+      );
+
+      expect(response.statusCode).toBe(404);
+      expect(
+        (await post('/v1/auth/refresh', { refreshToken: victim.refreshToken })).statusCode,
+      ).toBe(200);
+    });
+  });
 });

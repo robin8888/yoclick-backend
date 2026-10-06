@@ -69,7 +69,8 @@ export class SessionIssuer {
       userId: input.current.userId,
       familyId: input.current.familyId,
       tokenHash: refresh.tokenHash,
-      deviceName: input.deviceName,
+      // Si la app no vuelve a decir el dispositivo, sigue siendo el de la sesión que se renueva.
+      deviceName: input.deviceName ?? input.current.deviceName,
       isMfaVerified: input.current.isMfaVerified,
     });
     const wasRotated = await this.sessions.rotate({
