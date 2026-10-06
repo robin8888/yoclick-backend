@@ -169,6 +169,36 @@ describe('center settings (ETag / If-Match)', () => {
       });
     });
 
+    it('saves the contact and tax details and the sector, and refuses malformed ones', async () => {
+      const etag = await currentEtag();
+      const saved = await call('PATCH', owner, {
+        ifMatch: etag,
+        body: {
+          sectorId: 'yoga',
+          phone: '+34 600 123 456',
+          contactEmail: 'hola@studionorte.es',
+          legalName: 'Studio Norte S.L.',
+          taxId: 'b12345678',
+          taxAddress: 'Calle Mayor 1, Madrid',
+        },
+      });
+      const invalidTaxId = await call('PATCH', owner, {
+        ifMatch: saved.headers['etag'] as string,
+        body: { taxId: '12' },
+      });
+
+      expect(saved.statusCode).toBe(200);
+      expect(saved.json()).toMatchObject({
+        sectorId: 'yoga',
+        phone: '+34 600 123 456',
+        contactEmail: 'hola@studionorte.es',
+        legalName: 'Studio Norte S.L.',
+        taxId: 'B12345678',
+        taxAddress: 'Calle Mayor 1, Madrid',
+      });
+      expect(invalidTaxId.statusCode).toBe(400);
+    });
+
     it('lets an admin edit, and null clears an optional field', async () => {
       await call('PATCH', owner, { ifMatch: await currentEtag(), body: { city: 'Madrid' } });
 

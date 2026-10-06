@@ -1,5 +1,6 @@
 import {
   type JoinDecision,
+  type JoinSource,
   type MembershipRoleName,
   type MembershipStatusName,
 } from '../../domain/join-decision';
@@ -25,6 +26,8 @@ export interface JoinCommand {
   readonly centerId: string;
   /** Código normalizado que presentó la persona, si lo hizo. */
   readonly presentedJoinCode: string | null;
+  /** Por dónde llegó; `null` si la app no lo dijo. */
+  readonly source: JoinSource | null;
 }
 
 export interface JoinOutcome {

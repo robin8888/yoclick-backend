@@ -1,3 +1,4 @@
+export type JoinSource = 'qr' | 'link' | 'code' | 'search';
 export type CenterStatusName = 'trial' | 'active' | 'past_due' | 'suspended';
 export type MembershipStatusName = 'invited' | 'active' | 'blocked' | 'left';
 export type MembershipRoleName = 'owner' | 'admin' | 'staff' | 'client';

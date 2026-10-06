@@ -12,7 +12,7 @@ import {
   type ListedCenter,
   type PublicCenterSummary,
 } from '../application/ports/join.repository';
-import { decideJoin, type JoinFacts } from '../domain/join-decision';
+import { decideJoin, type JoinDecision, type JoinFacts } from '../domain/join-decision';
 
 const PUBLIC_CENTER_FIELDS = {
   id: true,
@@ -44,6 +44,12 @@ function toPublicCenterSummary(row: PublicCenterRow): PublicCenterSummary {
     city: row.city,
     logoUrl: buildCenterLogoUrl(row.id, row.logoUpdatedAt),
   };
+}
+
+interface AppliedDecision {
+  decision: JoinDecision;
+  command: JoinCommand;
+  existing: Awaited<ReturnType<TenantTransactionClient['membership']['findUnique']>>;
 }
 
 @Injectable()
@@ -118,10 +124,25 @@ export class PrismaJoinRepository implements JoinRepository {
     };
 
     const decision = decideJoin(facts);
+    return this.applyDecision(client, { decision, command, existing });
+  }
+
+  private async applyDecision(
+    client: TenantTransactionClient,
+    { decision, command, existing }: AppliedDecision,
+  ): Promise<JoinOutcome> {
+    const { userId, centerId, source } = command;
     switch (decision) {
       case 'create_membership': {
         const created = await client.membership.create({
-          data: { id: generateUuidV7(), centerId, userId, role: 'client', status: 'active' },
+          data: {
+            id: generateUuidV7(),
+            centerId,
+            userId,
+            role: 'client',
+            status: 'active',
+            joinSource: source,
+          },
         });
         return { decision, membership: created };
       }
@@ -129,7 +150,7 @@ export class PrismaJoinRepository implements JoinRepository {
         // Quien volvió a unirse lo hace como cliente: dejar el cargo de antes no lo restituye.
         const reactivated = await client.membership.update({
           where: { centerId_userId: { centerId, userId } },
-          data: { status: 'active', role: 'client' },
+          data: { status: 'active', role: 'client', joinSource: source },
         });
         return { decision, membership: reactivated };
       }

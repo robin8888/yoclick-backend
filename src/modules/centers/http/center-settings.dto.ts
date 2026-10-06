@@ -1,5 +1,6 @@
 import { createZodDto } from '../../../shared/http/create-zod-dto';
 import { z } from 'zod';
+import { SECTOR_IDS } from '../../onboarding/http/create-center.dto';
 import {
   areIntervalsConsistent,
   isValidTimeOfDay,
@@ -10,6 +11,10 @@ import {
 const MIN_CENTER_NAME_LENGTH = 2;
 const MAX_CENTER_NAME_LENGTH = 80;
 const MAX_TEXT_LENGTH = 200;
+/** Teléfono con prefijo opcional, espacios y guiones: 6 a 20 caracteres. */
+const PHONE_PATTERN = /^\+?\d[\d -]{5,19}$/;
+/** CIF o NIF españoles: 9 caracteres entre letras y cifras. */
+const TAX_ID_PATTERN = /^[A-Za-z0-9]{9}$/;
 const MAX_INTERVALS_PER_DAY = 4;
 const MAX_HOLIDAYS = 100;
 const MAX_HOLIDAY_LABEL_LENGTH = 60;
@@ -63,6 +68,12 @@ const centerSettingsShape = {
   isListed: z.boolean(),
   city: z.string().nullable(),
   address: z.string().nullable(),
+  phone: z.string().nullable(),
+  contactEmail: z.string().nullable(),
+  /** Datos fiscales: razón social, CIF/NIF y dirección fiscal. */
+  legalName: z.string().nullable(),
+  taxId: z.string().nullable(),
+  taxAddress: z.string().nullable(),
   latitude: z.number().nullable(),
   longitude: z.number().nullable(),
   openingHours: openingHoursSchema.nullable(),
@@ -85,6 +96,8 @@ export class UpdateCenterSettingsRequestDto extends createZodDto(
   z
     .strictObject({
       name: z.string().trim().min(MIN_CENTER_NAME_LENGTH).max(MAX_CENTER_NAME_LENGTH).optional(),
+      /** Cambia el vocabulario de la app (profesor, alumno, sesión…). */
+      sectorId: z.enum(SECTOR_IDS).optional(),
       brandColor: z
         .string()
         .regex(/^#[0-9A-Fa-f]{6}$/)
@@ -98,6 +111,17 @@ export class UpdateCenterSettingsRequestDto extends createZodDto(
       isListed: z.boolean().optional(),
       city: z.string().trim().min(1).max(MAX_TEXT_LENGTH).nullable().optional(),
       address: z.string().trim().min(1).max(MAX_TEXT_LENGTH).nullable().optional(),
+      phone: z.string().trim().regex(PHONE_PATTERN).nullable().optional(),
+      contactEmail: z.email().max(MAX_TEXT_LENGTH).nullable().optional(),
+      legalName: z.string().trim().min(1).max(MAX_TEXT_LENGTH).nullable().optional(),
+      taxId: z
+        .string()
+        .trim()
+        .regex(TAX_ID_PATTERN)
+        .transform((taxId) => taxId.toUpperCase())
+        .nullable()
+        .optional(),
+      taxAddress: z.string().trim().min(1).max(MAX_TEXT_LENGTH).nullable().optional(),
       latitude: z.number().min(-MAX_LATITUDE).max(MAX_LATITUDE).nullable().optional(),
       longitude: z.number().min(-MAX_LONGITUDE).max(MAX_LONGITUDE).nullable().optional(),
       openingHours: openingHoursSchema.optional(),

@@ -55,6 +55,8 @@ export class JoinCenterRequestDto extends createZodDto(
   z.strictObject({
     /** Obligatorio para un centro privado; un centro listado en el directorio no lo necesita. */
     joinCode: z.string().min(1).max(MAX_JOIN_CODE_INPUT_LENGTH).optional(),
+    /** Por dónde llega la persona: QR, enlace, código escrito o buscador de centros. */
+    source: z.enum(['qr', 'link', 'code', 'search']).optional(),
   }),
 ) {}
 

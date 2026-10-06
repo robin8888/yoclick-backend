@@ -22,6 +22,7 @@ import {
   CenterSettingsResponseDto,
   UpdateCenterSettingsRequestDto,
 } from './center-settings.dto';
+import { ActivityRecorder } from '../../activity/application/activity-recorder';
 
 function serializeSettings({ settings, etag }: VersionedCenterSettings): Record<string, unknown> {
   // `updatedAt` es la versión: viaja en el ETag y, para quien no lee cabeceras (la app), en `version`.
@@ -44,6 +45,7 @@ export class CenterSettingsController {
   constructor(
     private readonly getSettings: GetCenterSettingsUseCase,
     private readonly updateSettings: UpdateCenterSettingsUseCase,
+    private readonly activity: ActivityRecorder,
   ) {}
 
   @Get()
@@ -83,6 +85,7 @@ export class CenterSettingsController {
       ifMatchHeader,
       patch: body,
     });
+    await this.activity.record(actor, { kind: 'settings_updated' });
     void reply.header('etag', versioned.etag);
     return serializeSettings(versioned);
   }

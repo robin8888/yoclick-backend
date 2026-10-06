@@ -85,6 +85,7 @@ export class JoinController {
         userId,
         centerId: params.centerId,
         joinCode: body.joinCode,
+        source: body.source,
       })),
     };
   }

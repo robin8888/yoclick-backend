@@ -26,6 +26,11 @@ export interface CenterSettings {
   readonly isListed: boolean;
   readonly city: string | null;
   readonly address: string | null;
+  readonly phone: string | null;
+  readonly contactEmail: string | null;
+  readonly legalName: string | null;
+  readonly taxId: string | null;
+  readonly taxAddress: string | null;
   readonly latitude: number | null;
   readonly longitude: number | null;
   readonly openingHours: OpeningHours | null;
@@ -37,11 +42,17 @@ export interface CenterSettings {
 /** Solo lo que la administración puede cambiar. El slug, el código, el estado y el plan no están aquí. */
 export interface CenterSettingsPatch {
   readonly name?: string | undefined;
+  readonly sectorId?: string | undefined;
   readonly brandColor?: string | undefined;
   readonly timezone?: string | undefined;
   readonly isListed?: boolean | undefined;
   readonly city?: string | null | undefined;
   readonly address?: string | null | undefined;
+  readonly phone?: string | null | undefined;
+  readonly contactEmail?: string | null | undefined;
+  readonly legalName?: string | null | undefined;
+  readonly taxId?: string | null | undefined;
+  readonly taxAddress?: string | null | undefined;
   readonly latitude?: number | null | undefined;
   readonly longitude?: number | null | undefined;
   readonly openingHours?: OpeningHours | undefined;

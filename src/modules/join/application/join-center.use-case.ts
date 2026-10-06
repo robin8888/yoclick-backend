@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { DomainError } from '../../../shared/errors/domain-error';
 import { HTTP_STATUS } from '../../../shared/errors/http-status';
-import { type JoinDecision } from '../domain/join-decision';
+import { type JoinDecision, type JoinSource } from '../domain/join-decision';
 import { normalizeJoinCode } from '../domain/join-code';
 import { JOIN_REPOSITORY, type JoinOutcome, type JoinRepository } from './ports/join.repository';
 
@@ -9,6 +9,7 @@ export interface JoinCenterRequest {
   readonly userId: string;
   readonly centerId: string;
   readonly joinCode: string | undefined;
+  readonly source: JoinSource | undefined;
 }
 
 export interface JoinedCenter {
@@ -48,6 +49,7 @@ export class JoinCenterUseCase {
       userId: request.userId,
       centerId: request.centerId,
       presentedJoinCode,
+      source: request.source ?? null,
     });
 
     const refusal = REFUSALS[outcome.decision];
