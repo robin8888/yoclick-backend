@@ -15,7 +15,7 @@ export function isValidTimeOfDay(time: string): boolean {
   return TIME_PATTERN.test(time);
 }
 
-function toMinutesSinceMidnight(time: string): number {
+export function toMinutesSinceMidnight(time: string): number {
   const [hours = '0', minutes = '0'] = time.split(':');
   return Number(hours) * MINUTES_PER_HOUR + Number(minutes);
 }
