@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { createZodDto } from '../../../shared/http/create-zod-dto';
+import { videoViewShape } from '../../videos/http/video.dto';
 import {
   MAX_ITEM_CATEGORY_LENGTH,
   MAX_ITEM_NAME_LENGTH,
@@ -31,6 +32,8 @@ const itemSchema = z.strictObject({
   category: optionalText(MAX_ITEM_CATEGORY_LENGTH),
   /** Texto libre: «4 × 10 · 16 kg», «5 min». */
   prescription: optionalText(MAX_ITEM_PRESCRIPTION_LENGTH),
+  /** Un vídeo ya subido (`POST /videos`, propósito `exercise`) que muestra cómo se hace. */
+  videoId: z.uuid().nullable().default(null),
 });
 
 /** A una persona o a un grupo: exactamente uno de los dos. */
@@ -58,6 +61,8 @@ const exerciseShape = {
   name: z.string(),
   category: z.string().nullable(),
   prescription: z.string().nullable(),
+  /** Nulo si no tiene vídeo, o si todavía no está listo y aprobado y quien lo pide es clientela. */
+  video: z.strictObject(videoViewShape).nullable(),
 };
 
 const assignmentShape = {

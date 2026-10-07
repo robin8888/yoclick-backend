@@ -25,6 +25,9 @@ class CenterSubscriptionResponseDto extends createZodDto(
     /** Tope de clientes activos del plan; `null` si no tiene. */
     maxClients: z.number().int().nullable(),
     activeClientCount: z.number().int(),
+    /** Espacio de vídeo contratado en bytes (plan Premium); `null` si el plan no incluye vídeo. */
+    videoStorageLimitBytes: z.number().int().nullable(),
+    videoStorageUsedBytes: z.number().int(),
   }),
 ) {}
 

@@ -9,6 +9,8 @@ export interface RoutineItemInput {
   readonly name: string;
   readonly category: string | null;
   readonly prescription: string | null;
+  /** Vídeo que muestra cómo se hace; solo en centros con vídeo. */
+  readonly videoId: string | null;
 }
 
 /** A quién se asigna: a una persona o a un grupo, nunca a las dos cosas. */

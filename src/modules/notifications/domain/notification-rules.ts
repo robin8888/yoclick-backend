@@ -6,6 +6,8 @@ export const NOTIFICATION_KINDS = [
   'absence_added',
   'booking_affected_by_absence',
   'routine_assigned',
+  'staff_video_submitted',
+  'staff_video_reviewed',
 ] as const;
 export type NotificationKindName = (typeof NOTIFICATION_KINDS)[number];
 
@@ -87,5 +89,11 @@ export type AbsenceNotificationData = {
 /** Los datos del aviso de una rutina asignada. */
 export type RoutineNotificationData = {
   readonly routineName: string;
+  readonly actorName: string;
+};
+
+/** Los datos del aviso de un vídeo de presentación: quién lo subió y quién hizo el cambio. */
+export type VideoNotificationData = {
+  readonly uploaderName: string;
   readonly actorName: string;
 };

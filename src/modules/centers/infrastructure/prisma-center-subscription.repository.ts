@@ -14,12 +14,30 @@ export class PrismaCenterSubscriptionRepository implements CenterSubscriptionRep
     return this.tenantPrismaService.runInTenantContext(actor, async (client) => {
       const center = await client.center.findUniqueOrThrow({
         where: { id: actor.centerId },
-        select: { status: true, trialEndsAt: true, maxClients: true },
+        select: {
+          status: true,
+          trialEndsAt: true,
+          maxClients: true,
+          videoStorageLimitBytes: true,
+        },
       });
       const activeClientCount = await client.membership.count({
         where: { role: 'client', status: 'active' },
       });
-      return { ...center, activeClientCount };
+      const videoStorage = await client.video.aggregate({
+        _sum: { sizeBytes: true },
+        where: { status: { not: 'failed' } },
+      });
+      return {
+        status: center.status,
+        trialEndsAt: center.trialEndsAt,
+        maxClients: center.maxClients,
+        activeClientCount,
+        // Un centro llega como mucho a unos cientos de GB: cabe sin pérdida en un número.
+        videoStorageLimitBytes:
+          center.videoStorageLimitBytes === null ? null : Number(center.videoStorageLimitBytes),
+        videoStorageUsedBytes: Number(videoStorage._sum.sizeBytes ?? BigInt(0)),
+      };
     });
   }
 }

@@ -12,20 +12,28 @@ import {
   type NewRoutine,
   type RoutineAssignmentView,
   type RoutineDetail,
+  type RoutineItemView,
   type RoutineRepository,
   type RoutineSummary,
 } from '../application/ports/routine.repository';
 import { type RoutineNotificationData } from '../../notifications/domain/notification-rules';
+import { VIDEO_SELECT } from '../../videos/infrastructure/video-select';
 import { type AssignmentTarget } from '../domain/routine-rules';
 
 const ITEM_ORDER = { orderBy: { position: 'asc' } } as const;
+const ITEM_SELECT = {
+  name: true,
+  category: true,
+  prescription: true,
+  video: { select: VIDEO_SELECT },
+} as const;
 
 interface RoutineRow {
   readonly id: string;
   readonly name: string;
   readonly note: string | null;
   readonly createdAt: Date;
-  readonly items: readonly { name: string; category: string | null; prescription: string | null }[];
+  readonly items: readonly RoutineItemView[];
   readonly assignments: readonly {
     id: string;
     assignedAt: Date;
@@ -35,7 +43,7 @@ interface RoutineRow {
 }
 
 const DETAIL_INCLUDE = {
-  items: { ...ITEM_ORDER, select: { name: true, category: true, prescription: true } },
+  items: { ...ITEM_ORDER, select: ITEM_SELECT },
   assignments: {
     orderBy: { assignedAt: 'desc' },
     select: {
@@ -66,6 +74,16 @@ function toDetail(row: RoutineRow): RoutineDetail {
     assignments: row.assignments.map(toAssignmentView),
     createdAt: row.createdAt,
   };
+}
+
+/** Los vídeos de los ejercicios tienen que existir en este centro (el aislamiento por centro ya filtra el resto). */
+async function allVideosExist(
+  client: TenantTransactionClient,
+  items: readonly { videoId: string | null }[],
+): Promise<boolean> {
+  const videoIds = new Set(items.flatMap(({ videoId }) => (videoId === null ? [] : [videoId])));
+  if (videoIds.size === 0) return true;
+  return (await client.video.count({ where: { id: { in: [...videoIds] } } })) === videoIds.size;
 }
 
 async function isValidTarget(
@@ -183,6 +201,7 @@ export class PrismaRoutineRepository implements RoutineRepository {
       if (routine.assignTo && !(await isValidTarget(client, routine.assignTo))) {
         return { kind: 'unknown_target' } as const;
       }
+      if (!(await allVideosExist(client, routine.items))) return { kind: 'unknown_video' } as const;
       await client.routine.create({ data: buildCreateData(actor, routine) });
       if (routine.assignTo) {
         await recordAssignmentNotices(client, actor, {
@@ -302,7 +321,7 @@ export class PrismaRoutineRepository implements RoutineRepository {
               id: true,
               name: true,
               note: true,
-              items: { ...ITEM_ORDER, select: { name: true, category: true, prescription: true } },
+              items: { ...ITEM_ORDER, select: ITEM_SELECT },
             },
           },
         },

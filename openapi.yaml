@@ -3146,6 +3146,204 @@ paths:
       summary: Quita la asignación de una rutina.
       tags:
         - routines
+  /v1/centers/{centerId}/videos:
+    post:
+      operationId: videos_start_upload
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartVideoUploadRequestDto"
+      responses:
+        "201":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StartVideoUploadResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Reserva un vídeo y devuelve la firma para subirlo directamente al servicio de vídeo. 403 VIDEO_NOT_INCLUDED si el plan no incluye vídeo; 409 VIDEO_QUOTA_EXCEEDED si no cabe.
+      tags:
+        - videos
+  /v1/centers/{centerId}/videos/{videoId}:
+    get:
+      operationId: videos_get
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: videoId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VideoResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: El estado de un vídeo; mientras se sube o se procesa, consulta al servicio de vídeo.
+      tags:
+        - videos
+    delete:
+      operationId: videos_delete
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: videoId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "204":
+          description: ""
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Borra un vídeo (el del equipo, solo quien lo subió; la administración, cualquiera).
+      tags:
+        - videos
+  /v1/centers/{centerId}/videos/{videoId}/review:
+    post:
+      operationId: videos_review
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: videoId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewVideoRequestDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VideoResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Aprueba o pide cambios en un vídeo de presentación pendiente; quien lo subió lo sabe por un aviso push.
+      tags:
+        - videos
+  /v1/centers/{centerId}/team-profiles:
+    get:
+      operationId: videos_list_team_profiles
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamProfilesResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: El equipo con su vídeo de presentación. La clientela solo ve los listos y aprobados; la administración, todos.
+      tags:
+        - videos
   /v1/centers/{centerId}/activity:
     get:
       operationId: activity_list
@@ -5413,11 +5611,22 @@ components:
           type: integer
           minimum: -9007199254740991
           maximum: 9007199254740991
+        videoStorageLimitBytes:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+          nullable: true
+        videoStorageUsedBytes:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
       required:
         - status
         - trialEndsAt
         - maxClients
         - activeClientCount
+        - videoStorageLimitBytes
+        - videoStorageUsedBytes
       additionalProperties: false
     ServiceListResponseDto:
       type: object
@@ -7233,6 +7442,8 @@ components:
                   - absence_added
                   - booking_affected_by_absence
                   - routine_assigned
+                  - staff_video_submitted
+                  - staff_video_reviewed
               data:
                 type: object
                 additionalProperties:
@@ -7364,10 +7575,68 @@ components:
               prescription:
                 type: string
                 nullable: true
+              video:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  title:
+                    type: string
+                  status:
+                    type: string
+                    enum:
+                      - uploading
+                      - processing
+                      - ready
+                      - failed
+                  reviewStatus:
+                    type: string
+                    enum:
+                      - approved
+                      - pending
+                      - changes_requested
+                  reviewNote:
+                    type: string
+                    nullable: true
+                  durationSeconds:
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                    nullable: true
+                  playback:
+                    type: object
+                    properties:
+                      streamUrl:
+                        type: string
+                      thumbnailUrl:
+                        type: string
+                      expiresAt:
+                        type: string
+                        format: date-time
+                        pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                    required:
+                      - streamUrl
+                      - thumbnailUrl
+                      - expiresAt
+                    additionalProperties: false
+                    nullable: true
+                required:
+                  - id
+                  - title
+                  - status
+                  - reviewStatus
+                  - reviewNote
+                  - durationSeconds
+                  - playback
+                additionalProperties: false
+                nullable: true
             required:
               - name
               - category
               - prescription
+              - video
             additionalProperties: false
         assignments:
           type: array
@@ -7437,10 +7706,68 @@ components:
                     prescription:
                       type: string
                       nullable: true
+                    video:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        title:
+                          type: string
+                        status:
+                          type: string
+                          enum:
+                            - uploading
+                            - processing
+                            - ready
+                            - failed
+                        reviewStatus:
+                          type: string
+                          enum:
+                            - approved
+                            - pending
+                            - changes_requested
+                        reviewNote:
+                          type: string
+                          nullable: true
+                        durationSeconds:
+                          type: integer
+                          minimum: -9007199254740991
+                          maximum: 9007199254740991
+                          nullable: true
+                        playback:
+                          type: object
+                          properties:
+                            streamUrl:
+                              type: string
+                            thumbnailUrl:
+                              type: string
+                            expiresAt:
+                              type: string
+                              format: date-time
+                              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                          required:
+                            - streamUrl
+                            - thumbnailUrl
+                            - expiresAt
+                          additionalProperties: false
+                          nullable: true
+                      required:
+                        - id
+                        - title
+                        - status
+                        - reviewStatus
+                        - reviewNote
+                        - durationSeconds
+                        - playback
+                      additionalProperties: false
+                      nullable: true
                   required:
                     - name
                     - category
                     - prescription
+                    - video
                   additionalProperties: false
               assignedAt:
                 type: string
@@ -7489,6 +7816,12 @@ components:
                 maxLength: 120
                 default: null
                 nullable: true
+              videoId:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                default: null
+                nullable: true
             required:
               - name
             additionalProperties: false
@@ -7519,6 +7852,263 @@ components:
           type: string
           format: uuid
           pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+      additionalProperties: false
+    StartVideoUploadRequestDto:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 120
+        sizeBytes:
+          type: integer
+          exclusiveMinimum: true
+          maximum: 524288000
+          minimum: 0
+        purpose:
+          type: string
+          enum:
+            - exercise
+            - profile
+      required:
+        - title
+        - sizeBytes
+        - purpose
+      additionalProperties: false
+    StartVideoUploadResponseDto:
+      type: object
+      properties:
+        video:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            title:
+              type: string
+            status:
+              type: string
+              enum:
+                - uploading
+                - processing
+                - ready
+                - failed
+            reviewStatus:
+              type: string
+              enum:
+                - approved
+                - pending
+                - changes_requested
+            reviewNote:
+              type: string
+              nullable: true
+            durationSeconds:
+              type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+              nullable: true
+            playback:
+              type: object
+              properties:
+                streamUrl:
+                  type: string
+                thumbnailUrl:
+                  type: string
+                expiresAt:
+                  type: string
+                  format: date-time
+                  pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+              required:
+                - streamUrl
+                - thumbnailUrl
+                - expiresAt
+              additionalProperties: false
+              nullable: true
+          required:
+            - id
+            - title
+            - status
+            - reviewStatus
+            - reviewNote
+            - durationSeconds
+            - playback
+          additionalProperties: false
+        upload:
+          type: object
+          properties:
+            endpoint:
+              type: string
+            headers:
+              type: object
+              additionalProperties:
+                type: string
+            expiresAt:
+              type: string
+              format: date-time
+              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+          required:
+            - endpoint
+            - headers
+            - expiresAt
+          additionalProperties: false
+      required:
+        - video
+        - upload
+      additionalProperties: false
+    VideoResponseDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        title:
+          type: string
+        status:
+          type: string
+          enum:
+            - uploading
+            - processing
+            - ready
+            - failed
+        reviewStatus:
+          type: string
+          enum:
+            - approved
+            - pending
+            - changes_requested
+        reviewNote:
+          type: string
+          nullable: true
+        durationSeconds:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+          nullable: true
+        playback:
+          type: object
+          properties:
+            streamUrl:
+              type: string
+            thumbnailUrl:
+              type: string
+            expiresAt:
+              type: string
+              format: date-time
+              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+          required:
+            - streamUrl
+            - thumbnailUrl
+            - expiresAt
+          additionalProperties: false
+          nullable: true
+      required:
+        - id
+        - title
+        - status
+        - reviewStatus
+        - reviewNote
+        - durationSeconds
+        - playback
+      additionalProperties: false
+    ReviewVideoRequestDto:
+      type: object
+      properties:
+        decision:
+          type: string
+          enum:
+            - approve
+            - request_changes
+        note:
+          type: string
+          minLength: 1
+          maxLength: 300
+      required:
+        - decision
+      additionalProperties: false
+    TeamProfilesResponseDto:
+      type: object
+      properties:
+        members:
+          type: array
+          items:
+            type: object
+            properties:
+              membershipId:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              fullName:
+                type: string
+              staffTitle:
+                type: string
+                nullable: true
+              video:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  title:
+                    type: string
+                  status:
+                    type: string
+                    enum:
+                      - uploading
+                      - processing
+                      - ready
+                      - failed
+                  reviewStatus:
+                    type: string
+                    enum:
+                      - approved
+                      - pending
+                      - changes_requested
+                  reviewNote:
+                    type: string
+                    nullable: true
+                  durationSeconds:
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                    nullable: true
+                  playback:
+                    type: object
+                    properties:
+                      streamUrl:
+                        type: string
+                      thumbnailUrl:
+                        type: string
+                      expiresAt:
+                        type: string
+                        format: date-time
+                        pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                    required:
+                      - streamUrl
+                      - thumbnailUrl
+                      - expiresAt
+                    additionalProperties: false
+                    nullable: true
+                required:
+                  - id
+                  - title
+                  - status
+                  - reviewStatus
+                  - reviewNote
+                  - durationSeconds
+                  - playback
+                additionalProperties: false
+                nullable: true
+            required:
+              - membershipId
+              - fullName
+              - staffTitle
+              - video
+            additionalProperties: false
+      required:
+        - members
       additionalProperties: false
     ActivityResponseDto:
       type: object

@@ -16,6 +16,8 @@ import { type ActorContext } from '../../../shared/tenancy/actor-context';
 import { assertRouteTargetsActorCenter } from '../../../shared/tenancy/assert-route-targets-actor-center';
 import { ActivityRecorder } from '../../activity/application/activity-recorder';
 import { PushDispatcher } from '../../push/application/push-dispatcher';
+import { VideoPresenter } from '../../videos/application/video-presenter';
+import { isVideoVisibleToClients } from '../../videos/domain/video-rules';
 import {
   ArchiveRoutineUseCase,
   AssignRoutineUseCase,
@@ -29,6 +31,7 @@ import {
 import {
   type ClientRoutineView,
   type RoutineDetail,
+  type RoutineItemView,
 } from '../application/ports/routine.repository';
 import { buildAssignmentTarget } from '../domain/routine-rules';
 import {
@@ -43,10 +46,30 @@ import {
   RoutineRouteParamsDto,
 } from './routine.dto';
 
-function serializeDetail(routine: RoutineDetail): Record<string, unknown> {
+/** La clientela solo ve el vídeo de un ejercicio cuando está listo y aprobado. */
+function presentItems(
+  items: readonly RoutineItemView[],
+  presenter: VideoPresenter,
+  viewer: { readonly isClient: boolean },
+): Record<string, unknown>[] {
+  return items.map((item) => ({
+    name: item.name,
+    category: item.category,
+    prescription: item.prescription,
+    video:
+      item.video === null || (viewer.isClient && !isVideoVisibleToClients(item.video))
+        ? null
+        : presenter.present(item.video, viewer),
+  }));
+}
+
+function serializeDetail(
+  routine: RoutineDetail,
+  presenter: VideoPresenter,
+): Record<string, unknown> {
   return {
     ...routine,
-    items: [...routine.items],
+    items: presentItems(routine.items, presenter, { isClient: false }),
     assignments: routine.assignments.map((assignment) => ({
       ...assignment,
       assignedAt: assignment.assignedAt.toISOString(),
@@ -55,8 +78,15 @@ function serializeDetail(routine: RoutineDetail): Record<string, unknown> {
   };
 }
 
-function serializeMine(routine: ClientRoutineView): Record<string, unknown> {
-  return { ...routine, items: [...routine.items], assignedAt: routine.assignedAt.toISOString() };
+function serializeMine(
+  routine: ClientRoutineView,
+  presenter: VideoPresenter,
+): Record<string, unknown> {
+  return {
+    ...routine,
+    items: presentItems(routine.items, presenter, { isClient: true }),
+    assignedAt: routine.assignedAt.toISOString(),
+  };
 }
 
 /** Lo que se consulta: la biblioteca de ejercicios, las rutinas del centro y las que recibe una persona. */
@@ -71,6 +101,7 @@ export class RoutineLibraryController {
     private readonly listMyRoutines: ListMyRoutinesUseCase,
     private readonly listRoutines: ListRoutinesUseCase,
     private readonly getRoutine: GetRoutineUseCase,
+    private readonly presenter: VideoPresenter,
   ) {}
 
   @Get('exercise-library')
@@ -121,7 +152,7 @@ export class RoutineLibraryController {
     @Param() params: RoutineRouteParamsDto,
   ): Promise<Record<string, unknown>> {
     assertRouteTargetsActorCenter(actor, params.centerId);
-    return serializeDetail(await this.getRoutine.execute(actor, params.routineId));
+    return serializeDetail(await this.getRoutine.execute(actor, params.routineId), this.presenter);
   }
 
   @Get('my-routines')
@@ -136,7 +167,11 @@ export class RoutineLibraryController {
     @Param() params: CenterRouteParamsDto,
   ): Promise<Record<string, unknown>> {
     assertRouteTargetsActorCenter(actor, params.centerId);
-    return { routines: (await this.listMyRoutines.execute(actor)).map(serializeMine) };
+    return {
+      routines: (await this.listMyRoutines.execute(actor)).map((routine) =>
+        serializeMine(routine, this.presenter),
+      ),
+    };
   }
 }
 
@@ -152,6 +187,7 @@ export class RoutinesController {
     private readonly archiveRoutine: ArchiveRoutineUseCase,
     private readonly activity: ActivityRecorder,
     private readonly push: PushDispatcher,
+    private readonly presenter: VideoPresenter,
   ) {}
 
   @Post('routines')
@@ -178,7 +214,7 @@ export class RoutinesController {
     });
     await this.activity.record(actor, { kind: 'routine_created', subject: routine.name });
     await this.push.flushCenter(actor);
-    return serializeDetail(routine);
+    return serializeDetail(routine, this.presenter);
   }
 
   @Delete('routines/:routineId')
@@ -211,6 +247,7 @@ export class RoutineAssignmentsController {
     private readonly unassignRoutine: UnassignRoutineUseCase,
     private readonly activity: ActivityRecorder,
     private readonly push: PushDispatcher,
+    private readonly presenter: VideoPresenter,
   ) {}
 
   @Post('routines/:routineId/assignments')
@@ -237,7 +274,7 @@ export class RoutineAssignmentsController {
     });
     await this.activity.record(actor, { kind: 'routine_assigned', subject: routine.name });
     await this.push.flushCenter(actor);
-    return serializeDetail(routine);
+    return serializeDetail(routine, this.presenter);
   }
 
   @Delete('routines/:routineId/assignments/:assignmentId')

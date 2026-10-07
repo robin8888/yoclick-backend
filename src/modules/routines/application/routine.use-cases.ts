@@ -42,7 +42,7 @@ export class CreateRoutineUseCase {
       items: request.items,
       assignTo: request.assignTo,
     });
-    if (outcome.kind === 'unknown_target') throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
+    if (outcome.kind !== 'created') throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
     return outcome.routine;
   }
 }

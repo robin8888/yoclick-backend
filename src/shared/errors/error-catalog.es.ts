@@ -67,6 +67,12 @@ export const ERROR_CATALOG = {
   CHECKIN_NO_BOOKING: {
     title: 'Esta persona no tiene una cita confirmada para registrar ahora',
   },
+  VIDEO_NOT_INCLUDED: { title: 'El plan de este centro no incluye vídeo' },
+  VIDEO_TOO_LARGE: { title: 'El vídeo es demasiado grande. Máximo 500 MB' },
+  VIDEO_QUOTA_EXCEEDED: {
+    title: 'El centro ha llenado su espacio de vídeo. Borra alguno o amplía el plan',
+  },
+  VIDEO_NOT_REVIEWABLE: { title: 'Este vídeo no está pendiente de revisión' },
   INTERNAL_ERROR: { title: 'Algo ha fallado de nuestro lado. Inténtalo de nuevo' },
 } as const;
 

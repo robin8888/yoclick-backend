@@ -25,6 +25,7 @@
     "db:deploy": "prisma migrate deploy",
     "postinstall": "prisma generate",
     "openapi:gen": "nest build && node dist/openapi/generate-openapi.js",
+    "videos:check": "nest build && node scripts/check-bunny-stream.cjs",
     "keys:generate": "node scripts/generate-development-jwt-keys.cjs",
     "db:seed": "nest build && node dist/seed/run-seed.js",
     "db:backfill-center-defaults": "nest build && node dist/seed/run-backfill-center-defaults.js"

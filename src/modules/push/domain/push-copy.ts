@@ -17,6 +17,8 @@ const COPY_BY_KIND: Readonly<Record<string, PushCopy>> = {
   absence_added: { title: 'Ausencia en el equipo', body: OPEN_APP_BODY },
   booking_affected_by_absence: { title: 'Tu cita puede cambiar', body: OPEN_APP_BODY },
   routine_assigned: { title: 'Tienes una rutina nueva', body: OPEN_APP_BODY },
+  staff_video_submitted: { title: 'Hay un vídeo por revisar', body: OPEN_APP_BODY },
+  staff_video_reviewed: { title: 'Han revisado tu vídeo', body: OPEN_APP_BODY },
 };
 
 const FALLBACK_COPY: PushCopy = { title: 'Tienes un aviso nuevo', body: OPEN_APP_BODY };

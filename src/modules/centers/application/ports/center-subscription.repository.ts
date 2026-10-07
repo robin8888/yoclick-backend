@@ -6,6 +6,9 @@ export interface CenterSubscriptionFacts {
   /** Tope de clientes activos del plan; `null` si no tiene. */
   readonly maxClients: number | null;
   readonly activeClientCount: number;
+  /** Espacio de vídeo contratado; `null` si el plan no incluye vídeo. */
+  readonly videoStorageLimitBytes: number | null;
+  readonly videoStorageUsedBytes: number;
 }
 
 export interface CenterSubscriptionRepository {

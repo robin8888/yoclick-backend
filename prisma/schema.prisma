@@ -102,8 +102,27 @@ enum NotificationKind {
   absence_added
   booking_affected_by_absence
   routine_assigned
+  staff_video_submitted
+  staff_video_reviewed
 
   @@map("notification_kind")
+}
+
+enum VideoStatus {
+  uploading
+  processing
+  ready
+  failed
+
+  @@map("video_status")
+}
+
+enum VideoReviewStatus {
+  approved
+  pending
+  changes_requested
+
+  @@map("video_review_status")
 }
 
 /// Por dónde se unió una persona al centro; sirve para contar «este mes se han unido».
@@ -197,9 +216,12 @@ model Center {
   cancelPolicy  Json?        @map("cancel_policy")
   /// Cu�ndo se subi� el logo vigente; nulo = sin logo. Sirve de versi�n de cach� sin leer los bytes.
   logoUpdatedAt DateTime?    @map("logo_updated_at") @db.Timestamptz
+  /// Espacio de vídeo contratado (plan Premium). Nulo = el plan no incluye vídeo. Solo lo cambia Yoclick.
+  videoStorageLimitBytes BigInt? @map("video_storage_limit_bytes")
   createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz
   updatedAt     DateTime     @updatedAt @map("updated_at") @db.Timestamptz
 
+  videos              Video[]
   memberships         Membership[]
   invitations         Invitation[]
   logo                CenterLogo?
@@ -250,13 +272,17 @@ model Membership {
   joinSource  JoinSource?      @map("join_source")
   /// Permisos extra del equipo, p. ej. ["health:read"]. Un array de cadenas validado por la API.
   permissions Json             @default("[]")
+  /// Solo equipo: su vídeo de presentación (lo ven los clientes cuando el centro lo ha aprobado).
+  profileVideoId String?       @unique @map("profile_video_id") @db.Uuid
   createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz
   updatedAt   DateTime         @updatedAt @map("updated_at") @db.Timestamptz
 
   center Center       @relation(fields: [centerId], references: [id])
   user   User         @relation(fields: [userId], references: [id])
   group  ClientGroup? @relation("GroupMembers", fields: [groupId], references: [id])
+  profileVideo Video? @relation("ProfileVideo", fields: [profileVideoId], references: [id], onDelete: SetNull)
 
+  uploadedVideos      Video[]             @relation("VideoUploader")
   instructedGroups    ClientGroup[]       @relation("GroupInstructor")
   notifications       Notification[]      @relation("NotificationRecipient")
   serviceAssignments  ServiceStaff[]
@@ -543,8 +569,11 @@ model RoutineItem {
   category     String?
   /// Texto libre: «4 × 10 · 16 kg», «5 min».
   prescription String?
+  /// Vídeo que muestra cómo se hace el ejercicio (solo centros con vídeo).
+  videoId      String? @map("video_id") @db.Uuid
 
   routine Routine @relation(fields: [routineId], references: [id], onDelete: Cascade)
+  video   Video?  @relation(fields: [videoId], references: [id], onDelete: SetNull)
 
   @@unique([routineId, position])
   @@map("routine_items")
@@ -693,4 +722,31 @@ model Booking {
   @@index([centerId, clientMembershipId, status])
   @@index([centerId, startedAt])
   @@map("bookings")
+}
+
+/// Un vídeo alojado en el servicio de vídeo (Bunny Stream). La base de datos solo guarda sus datos;
+/// el fichero y su reproducción adaptativa viven fuera.
+model Video {
+  id                    String            @id @db.Uuid
+  centerId              String            @map("center_id") @db.Uuid
+  /// Identificador del vídeo en el servicio de vídeo.
+  providerVideoId       String            @unique @map("provider_video_id")
+  title                 String
+  status                VideoStatus       @default(uploading)
+  /// Los de rutinas nacen aprobados; el de presentación del equipo espera la revisión del centro.
+  reviewStatus          VideoReviewStatus @default(approved) @map("review_status")
+  reviewNote            String?           @map("review_note")
+  /// Lo que el móvil dice que va a subir (para reservar espacio) y, al procesarse, lo que ocupa de verdad.
+  sizeBytes             BigInt            @default(0) @map("size_bytes")
+  durationSeconds       Int?              @map("duration_seconds")
+  uploadedByMembershipId String           @map("uploaded_by_membership_id") @db.Uuid
+  createdAt             DateTime          @default(now()) @map("created_at") @db.Timestamptz
+
+  center       Center        @relation(fields: [centerId], references: [id])
+  uploadedBy   Membership    @relation("VideoUploader", fields: [uploadedByMembershipId], references: [id])
+  routineItems RoutineItem[]
+  profileOf    Membership?   @relation("ProfileVideo")
+
+  @@index([centerId])
+  @@map("videos")
 }

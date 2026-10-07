@@ -28,6 +28,11 @@ function productionEnvironment(overrides: Record<string, unknown> = {}): Record<
     BREVO_API_KEY: 'fake-api-key',
     EMAIL_FROM_ADDRESS: 'no-reply@yoclick.app',
     PUSH_PROVIDER: 'expo',
+    VIDEO_PROVIDER: 'bunny',
+    BUNNY_STREAM_LIBRARY_ID: '12345',
+    BUNNY_STREAM_API_KEY: 'fake-bunny-api-key',
+    BUNNY_STREAM_TOKEN_KEY: 'fake-bunny-token-key',
+    BUNNY_STREAM_CDN_HOSTNAME: 'vz-fake.b-cdn.net',
     ...overrides,
   });
 }
@@ -235,6 +240,26 @@ describe('parseEnvironment', () => {
       },
     );
 
+    it.each([
+      'BUNNY_STREAM_LIBRARY_ID',
+      'BUNNY_STREAM_API_KEY',
+      'BUNNY_STREAM_TOKEN_KEY',
+      'BUNNY_STREAM_CDN_HOSTNAME',
+    ])('requires %s when Bunny Stream is selected', (variableName) => {
+      expect(() =>
+        parseEnvironment(
+          developmentEnvironment({
+            VIDEO_PROVIDER: 'bunny',
+            BUNNY_STREAM_LIBRARY_ID: '12345',
+            BUNNY_STREAM_API_KEY: 'key',
+            BUNNY_STREAM_TOKEN_KEY: 'token',
+            BUNNY_STREAM_CDN_HOSTNAME: 'vz-fake.b-cdn.net',
+            [variableName]: undefined,
+          }),
+        ),
+      ).toThrow(new RegExp(variableName));
+    });
+
     it('does not require provider credentials for the console mailer', () => {
       expect(() => parseEnvironment(developmentEnvironment())).not.toThrow();
     });
@@ -256,6 +281,7 @@ describe('parseEnvironment', () => {
       ['PASSWORD_BREACH_CHECK', 'disabled'],
       ['EMAIL_PROVIDER', 'console'],
       ['PUSH_PROVIDER', 'console'],
+      ['VIDEO_PROVIDER', 'fake'],
       ['ALLOW_DISPOSABLE_EMAILS', 'true'],
     ])('rejects %s=%s in production', (variableName, unsafeValue) => {
       expect(() =>

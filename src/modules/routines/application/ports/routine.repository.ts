@@ -1,5 +1,14 @@
 import { type ActorContext } from '../../../../shared/tenancy/actor-context';
+import { type StoredVideo } from '../../../videos/application/ports/video.repository';
 import { type AssignmentTarget, type RoutineItemInput } from '../../domain/routine-rules';
+
+/** Un ejercicio tal como se muestra: con su vídeo, si lo tiene. */
+export interface RoutineItemView {
+  readonly name: string;
+  readonly category: string | null;
+  readonly prescription: string | null;
+  readonly video: StoredVideo | null;
+}
 
 export interface RoutineSummary {
   readonly id: string;
@@ -21,7 +30,7 @@ export interface RoutineDetail {
   readonly id: string;
   readonly name: string;
   readonly note: string | null;
-  readonly items: readonly RoutineItemInput[];
+  readonly items: readonly RoutineItemView[];
   readonly assignments: readonly RoutineAssignmentView[];
   readonly createdAt: Date;
 }
@@ -40,7 +49,7 @@ export interface ClientRoutineView {
   readonly id: string;
   readonly name: string;
   readonly note: string | null;
-  readonly items: readonly RoutineItemInput[];
+  readonly items: readonly RoutineItemView[];
   /** La asignación más reciente que le llega (directa o por su grupo). */
   readonly assignedAt: Date;
 }
@@ -48,7 +57,9 @@ export interface ClientRoutineView {
 export type CreateRoutineOutcome =
   | { readonly kind: 'created'; readonly routine: RoutineDetail }
   /** La persona o el grupo no existen en este centro, o no son clientes ni grupos activos. */
-  | { readonly kind: 'unknown_target' };
+  | { readonly kind: 'unknown_target' }
+  /** Algún vídeo de los ejercicios no existe en este centro. */
+  | { readonly kind: 'unknown_video' };
 
 export type AssignRoutineOutcome =
   | { readonly kind: 'assigned'; readonly assignmentId: string }

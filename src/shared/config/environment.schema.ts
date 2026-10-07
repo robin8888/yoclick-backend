@@ -59,6 +59,14 @@ const baseEnvironmentSchema = z.object({
   PUSH_PROVIDER: z.enum(['console', 'expo']).default('console'),
   // Opcional: solo si el proyecto de Expo exige token de acceso para enviar.
   EXPO_ACCESS_TOKEN: z.string().min(1).optional(),
+  // Vídeo: `bunny` los aloja en Bunny Stream; `fake` no llama a nadie (desarrollo y tests).
+  VIDEO_PROVIDER: z.enum(['fake', 'bunny']).default('fake'),
+  // Solo hacen falta con VIDEO_PROVIDER=bunny (se exigen en ese caso, ver más abajo).
+  BUNNY_STREAM_LIBRARY_ID: z.string().min(1).optional(),
+  BUNNY_STREAM_API_KEY: z.string().min(1).optional(),
+  BUNNY_STREAM_TOKEN_KEY: z.string().min(1).optional(),
+  // Dominio de reproducción de la librería, p. ej. vz-1234abcd-xyz.b-cdn.net
+  BUNNY_STREAM_CDN_HOSTNAME: z.string().min(1).optional(),
   EMAIL_PROVIDER: z.enum(['console', 'brevo']).default('console'),
   // Solo hacen falta con EMAIL_PROVIDER=brevo (se exigen en ese caso, ver más abajo).
   BREVO_API_KEY: z.string().min(1).optional(),
@@ -92,6 +100,11 @@ function listProviderRequirements(environment: ParsedEnvironment): ProductionReq
       isMet: environment.PUSH_PROVIDER !== 'console',
       path: 'PUSH_PROVIDER',
       message: 'must be a real provider in production: the console one only logs',
+    },
+    {
+      isMet: environment.VIDEO_PROVIDER !== 'fake',
+      path: 'VIDEO_PROVIDER',
+      message: 'must be a real provider in production: the fake one stores nothing',
     },
   ];
 }
@@ -151,10 +164,28 @@ function listEmailProviderRequirements(environment: ParsedEnvironment): Producti
   ];
 }
 
+const BUNNY_SETTINGS = [
+  'BUNNY_STREAM_LIBRARY_ID',
+  'BUNNY_STREAM_API_KEY',
+  'BUNNY_STREAM_TOKEN_KEY',
+  'BUNNY_STREAM_CDN_HOSTNAME',
+] as const;
+
+/** Con Bunny hacen falta sus cuatro valores; con `fake` no. */
+function listVideoProviderRequirements(environment: ParsedEnvironment): ProductionRequirement[] {
+  if (environment.VIDEO_PROVIDER !== 'bunny') return [];
+  return BUNNY_SETTINGS.map((path) => ({
+    isMet: environment[path] !== undefined,
+    path,
+    message: 'is required when VIDEO_PROVIDER=bunny',
+  }));
+}
+
 export const environmentSchema = baseEnvironmentSchema.superRefine((environment, context) => {
   const isProduction = environment.NODE_ENV === 'production';
   const requirements = [
     ...listEmailProviderRequirements(environment),
+    ...listVideoProviderRequirements(environment),
     ...(isProduction ? listProductionRequirements(environment) : []),
   ];
 
