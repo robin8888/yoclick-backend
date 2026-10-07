@@ -1,10 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { TenantPrismaService } from '../database/tenant-prisma.service';
 import { type MembershipRoleName } from './actor-context';
+import { readStoredPermissions, type TeamPermission } from './team-permissions';
 
 export interface ActiveMembership {
   readonly membershipId: string;
   readonly role: MembershipRoleName;
+  readonly permissions: readonly TeamPermission[];
 }
 
 /**
@@ -20,9 +22,15 @@ export class ActiveMembershipFinder {
     const membership = await this.tenantPrismaService.runInUserContext(userId, (client) =>
       client.membership.findFirst({
         where: { userId, centerId, status: 'active' },
-        select: { id: true, role: true },
+        select: { id: true, role: true, permissions: true },
       }),
     );
-    return membership ? { membershipId: membership.id, role: membership.role } : null;
+    return membership
+      ? {
+          membershipId: membership.id,
+          role: membership.role,
+          permissions: readStoredPermissions(membership.permissions),
+        }
+      : null;
   }
 }

@@ -11,6 +11,7 @@ import {
 } from '@nestjs/swagger';
 import { CurrentActor } from '../../../shared/auth/decorators/current-actor.decorator';
 import { Roles } from '../../../shared/auth/decorators/roles.decorator';
+import { AllowStaffWithPermission } from '../../../shared/auth/decorators/staff-permission.decorator';
 import { ProblemDetailsDto } from '../../../shared/errors/problem-details.dto';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
 import { assertRouteTargetsActorCenter } from '../../../shared/tenancy/assert-route-targets-actor-center';
@@ -58,6 +59,7 @@ export class RoomsController {
 
   @Post()
   @Roles('owner', 'admin')
+  @AllowStaffWithPermission('services:manage')
   @ApiOperation({
     operationId: 'rooms_create',
     summary:
@@ -77,6 +79,7 @@ export class RoomsController {
 
   @Delete(':roomId')
   @Roles('owner', 'admin')
+  @AllowStaffWithPermission('services:manage')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     operationId: 'rooms_archive',

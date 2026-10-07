@@ -4,6 +4,9 @@ import { DomainError } from '../../errors/domain-error';
 import { HTTP_STATUS } from '../../errors/http-status';
 import { readAccessPolicy } from '../access-policy';
 import { type AuthenticatedRequest } from '../authenticated-request';
+import { STAFF_PERMISSION_ROUTE_KEY } from '../decorators/staff-permission.decorator';
+import { type TeamPermission } from '../../tenancy/team-permissions';
+import { type ActorContext } from '../../tenancy/actor-context';
 
 const ADMINISTRATIVE_ROLES: ReadonlySet<string> = new Set(['owner', 'admin']);
 
@@ -24,7 +27,9 @@ export class AuthorizationGuard implements CanActivate {
         return true;
       case 'roles': {
         const { actor, isMfaVerified } = context.switchToHttp().getRequest<AuthenticatedRequest>();
-        const isRoleAllowed = actor !== undefined && policy.roles.includes(actor.role);
+        const isRoleAllowed =
+          actor !== undefined &&
+          (policy.roles.includes(actor.role) || this.isStaffWithGrantedPermission(actor, context));
         if (!isRoleAllowed) throw new DomainError('FORBIDDEN', HTTP_STATUS.forbidden);
         // Quien administra un centro necesita una sesión con segundo factor (SEC-47).
         if (ADMINISTRATIVE_ROLES.has(actor.role) && isMfaVerified !== true) {
@@ -35,5 +40,15 @@ export class AuthorizationGuard implements CanActivate {
       case 'undeclared':
         throw new DomainError('FORBIDDEN', HTTP_STATUS.forbidden);
     }
+  }
+
+  /** Una profesional con el permiso que la ruta acepta. Solo `staff`: nadie más gana acceso por esto. */
+  private isStaffWithGrantedPermission(actor: ActorContext, context: ExecutionContext): boolean {
+    if (actor.role !== 'staff') return false;
+    const requiredPermission = this.reflector.getAllAndOverride<TeamPermission | undefined>(
+      STAFF_PERMISSION_ROUTE_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+    return requiredPermission !== undefined && actor.permissions.includes(requiredPermission);
   }
 }

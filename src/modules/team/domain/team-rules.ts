@@ -1,15 +1,7 @@
 export type TeamRoleName = 'owner' | 'admin' | 'staff' | 'client';
 export type TeamMemberStatus = 'invited' | 'active' | 'blocked' | 'left';
 
-/** Permisos extra que el equipo puede recibir; el rol por sí solo no los concede. */
-export const TEAM_PERMISSIONS = [
-  'health:read',
-  'clients:manage',
-  'services:manage',
-  'agenda:manage',
-  'payments:view',
-  'reports:view',
-] as const;
+export { TEAM_PERMISSIONS } from '../../../shared/tenancy/team-permissions';
 
 const ROLE_RANK: Readonly<Record<TeamRoleName, number>> = {
   client: 0,

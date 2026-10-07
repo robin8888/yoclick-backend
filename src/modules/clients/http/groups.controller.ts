@@ -11,6 +11,7 @@ import {
 } from '@nestjs/swagger';
 import { CurrentActor } from '../../../shared/auth/decorators/current-actor.decorator';
 import { Roles } from '../../../shared/auth/decorators/roles.decorator';
+import { AllowStaffWithPermission } from '../../../shared/auth/decorators/staff-permission.decorator';
 import { ProblemDetailsDto } from '../../../shared/errors/problem-details.dto';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
 import { assertRouteTargetsActorCenter } from '../../../shared/tenancy/assert-route-targets-actor-center';
@@ -43,6 +44,7 @@ export class GroupsController {
 
   @Get()
   @Roles('owner', 'admin')
+  @AllowStaffWithPermission('clients:manage')
   @ApiOperation({
     operationId: 'groups_list',
     summary: 'Grupos de clientes del centro, con su nivel, quien los da y cuántas personas tienen.',
@@ -58,6 +60,7 @@ export class GroupsController {
 
   @Post()
   @Roles('owner', 'admin')
+  @AllowStaffWithPermission('clients:manage')
   @ApiOperation({
     operationId: 'groups_create',
     summary: 'Crea un grupo. 409 si ya hay uno activo con ese nombre.',
@@ -80,6 +83,7 @@ export class GroupsController {
 
   @Delete(':groupId')
   @Roles('owner', 'admin')
+  @AllowStaffWithPermission('clients:manage')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     operationId: 'groups_archive',

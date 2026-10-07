@@ -48,7 +48,7 @@ export class TenantGuard implements CanActivate {
       centerId,
       membershipId: membership.membershipId,
       role: membership.role,
-      permissions: [],
+      permissions: membership.permissions,
     };
     return true;
   }
