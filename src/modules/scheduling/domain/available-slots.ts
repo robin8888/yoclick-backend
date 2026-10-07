@@ -8,7 +8,9 @@ import {
   zonedDateTimeToUtc,
 } from '../../../shared/time/zoned-time';
 
-export interface StaffCandidate {
+import { isStaffAvailableForSlot, type StaffAvailabilityRules } from './staff-availability';
+
+export interface StaffCandidate extends StaffAvailabilityRules {
   readonly membershipId: string;
   readonly fullName: string;
 }
@@ -132,6 +134,7 @@ function calculateSlotsOfDate(input: SlotCalculationInput, date: string): Calcul
     .flatMap((candidate) => {
       const freeStaff = input.staff.filter(
         (member) =>
+          isStaffAvailableForSlot(member, candidate, input.timeZone) &&
           !input.busyIntervals.some(
             (busy) => busy.staffMembershipId === member.membershipId && overlaps(candidate, busy),
           ),
@@ -143,8 +146,8 @@ function calculateSlotsOfDate(input: SlotCalculationInput, date: string): Calcul
 }
 
 /**
- * Huecos reservables de un servicio: horario semanal del centro, menos festivos, menos lo ya
- * reservado por cada profesional, dentro de la antelación mínima y la ventana de reserva.
+ * Huecos reservables de un servicio: horario semanal del centro, menos festivos, menos el horario propio y las
+ * ausencias de cada profesional y lo ya reservado por él o ella, dentro de la antelación mínima y la ventana de reserva.
  * Todo el cálculo de fechas se hace en la zona horaria del centro; los resultados salen en UTC.
  */
 export function calculateAvailableSlots(input: SlotCalculationInput): CalculatedDay[] {

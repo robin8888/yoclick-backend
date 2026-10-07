@@ -102,6 +102,15 @@ enum NotificationKind {
 }
 
 /// Por dónde se unió una persona al centro; sirve para contar «este mes se han unido».
+enum AbsenceReason {
+  vacation
+  training
+  personal
+  other
+
+  @@map("absence_reason")
+}
+
 enum JoinSource {
   qr
   link
@@ -185,16 +194,18 @@ model Center {
   createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz
   updatedAt     DateTime     @updatedAt @map("updated_at") @db.Timestamptz
 
-  memberships   Membership[]
-  invitations   Invitation[]
-  logo          CenterLogo?
-  services      Service[]
-  classSessions ClassSession[]
-  bookings      Booking[]
-  rooms         Room[]
-  clientGroups  ClientGroup[]
-  notifications Notification[]
-  activityLogs  ActivityLog[]
+  memberships         Membership[]
+  invitations         Invitation[]
+  logo                CenterLogo?
+  services            Service[]
+  classSessions       ClassSession[]
+  bookings            Booking[]
+  rooms               Room[]
+  staffAvailabilities StaffAvailability[]
+  staffAbsences       StaffAbsence[]
+  clientGroups        ClientGroup[]
+  notifications       Notification[]
+  activityLogs        ActivityLog[]
 
   @@map("centers")
 }
@@ -238,14 +249,16 @@ model Membership {
   user   User         @relation(fields: [userId], references: [id])
   group  ClientGroup? @relation("GroupMembers", fields: [groupId], references: [id])
 
-  instructedGroups    ClientGroup[]  @relation("GroupInstructor")
-  notifications       Notification[] @relation("NotificationRecipient")
+  instructedGroups    ClientGroup[]      @relation("GroupInstructor")
+  notifications       Notification[]     @relation("NotificationRecipient")
   serviceAssignments  ServiceStaff[]
-  taughtClassSessions ClassSession[] @relation("StaffClassSessions")
-  bookings            Booking[]      @relation("ClientBookings")
-  startedBookings     Booking[]      @relation("BookingStartedBy")
-  endedBookings       Booking[]      @relation("BookingEndedBy")
-  checkedInBookings   Booking[]      @relation("BookingCheckedInBy")
+  taughtClassSessions ClassSession[]     @relation("StaffClassSessions")
+  bookings            Booking[]          @relation("ClientBookings")
+  availability        StaffAvailability?
+  absences            StaffAbsence[]
+  startedBookings     Booking[]          @relation("BookingStartedBy")
+  endedBookings       Booking[]          @relation("BookingEndedBy")
+  checkedInBookings   Booking[]          @relation("BookingCheckedInBy")
 
   @@unique([centerId, userId])
   @@index([centerId, role])
@@ -486,6 +499,38 @@ model Room {
 
   @@index([centerId])
   @@map("rooms")
+}
+
+/// Horario semanal propio de una persona del equipo. Sin fila sigue el horario del centro.
+model StaffAvailability {
+  membershipId String   @id @map("membership_id") @db.Uuid
+  centerId     String   @map("center_id") @db.Uuid
+  /// Mismo formato que el horario del centro: { mon: [{ opensAt, closesAt }], … }; un día sin tramos no trabaja.
+  weeklyHours  Json     @map("weekly_hours")
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  membership Membership @relation(fields: [membershipId], references: [id])
+  center     Center     @relation(fields: [centerId], references: [id])
+
+  @@index([centerId])
+  @@map("staff_availability")
+}
+
+/// Días en los que una persona del equipo no atiende (vacaciones, formación…); ambos extremos incluidos.
+model StaffAbsence {
+  id           String        @id @db.Uuid
+  centerId     String        @map("center_id") @db.Uuid
+  membershipId String        @map("membership_id") @db.Uuid
+  startsOn     DateTime      @map("starts_on") @db.Date
+  endsOn       DateTime      @map("ends_on") @db.Date
+  reason       AbsenceReason
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz
+
+  membership Membership @relation(fields: [membershipId], references: [id])
+  center     Center     @relation(fields: [centerId], references: [id])
+
+  @@index([centerId, membershipId])
+  @@map("staff_absences")
 }
 
 /// Quién del equipo puede atender un servicio.

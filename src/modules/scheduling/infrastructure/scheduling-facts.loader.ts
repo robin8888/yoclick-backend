@@ -45,6 +45,45 @@ async function findServiceWithStaff(client: TenantTransactionClient, query: Sche
   });
 }
 
+const UTC_MIDNIGHT_SUFFIX = 'T00:00:00Z';
+const ISO_DATE_LENGTH = 10;
+
+function toDateOnly(value: Date): string {
+  return value.toISOString().slice(0, ISO_DATE_LENGTH);
+}
+
+/** Añade a cada persona su horario propio y las ausencias que tocan el rango consultado. */
+async function addAvailability(
+  client: TenantTransactionClient,
+  staff: readonly StaffCandidate[],
+  dates: { fromDate: string; toDate: string },
+): Promise<StaffCandidate[]> {
+  const membershipIds = staff.map((member) => member.membershipId);
+  const availabilities = await client.staffAvailability.findMany({
+    where: { membershipId: { in: membershipIds } },
+  });
+  const absences = await client.staffAbsence.findMany({
+    where: {
+      membershipId: { in: membershipIds },
+      startsOn: { lte: new Date(dates.toDate + UTC_MIDNIGHT_SUFFIX) },
+      endsOn: { gte: new Date(dates.fromDate + UTC_MIDNIGHT_SUFFIX) },
+    },
+  });
+  return staff.map((member) => ({
+    ...member,
+    // Escrito por esta API tras validarlo con zod (disponibilidad del equipo).
+    weeklyHours:
+      (availabilities.find(({ membershipId }) => membershipId === member.membershipId)
+        ?.weeklyHours as OpeningHours | undefined) ?? null,
+    absences: absences
+      .filter(({ membershipId }) => membershipId === member.membershipId)
+      .map(({ startsOn, endsOn }) => ({
+        startsOn: toDateOnly(startsOn),
+        endsOn: toDateOnly(endsOn),
+      })),
+  }));
+}
+
 async function findBusyIntervals(
   client: TenantTransactionClient,
   staff: readonly StaffCandidate[],
@@ -77,11 +116,12 @@ export async function loadSchedulingFacts(
   const center = await client.center.findFirstOrThrow({
     select: { timezone: true, openingHours: true, holidays: true },
   });
-  const staff = service.staff.map(({ membership }) => ({
+  const baseStaff = service.staff.map(({ membership }) => ({
     membershipId: membership.id,
     fullName: membership.user.fullName,
   }));
   const { fromDate, toDate } = resolveLocalDates(query.dateRange, center.timezone);
+  const staff = await addAvailability(client, baseStaff, { fromDate, toDate });
   const range = getUtcRangeOfLocalDates(fromDate, toDate, center.timezone);
 
   return {

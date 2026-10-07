@@ -979,6 +979,184 @@ paths:
       summary: Anula una invitación pendiente.
       tags:
         - team
+  /v1/centers/{centerId}/team/{membershipId}/availability:
+    get:
+      operationId: team_get_availability
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: membershipId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffAvailabilityResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Horario propio y ausencias de una persona del equipo.
+      tags:
+        - team
+    put:
+      operationId: team_save_availability
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: membershipId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveStaffWeeklyHoursRequestDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffAvailabilityResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Guarda el horario semanal propio. Solo se puede reservar con la persona dentro de esos tramos y del horario del centro. `null` vuelve al horario del centro.
+      tags:
+        - team
+  /v1/centers/{centerId}/team/{membershipId}/absences:
+    post:
+      operationId: team_add_absence
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: membershipId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddStaffAbsenceRequestDto"
+      responses:
+        "201":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AddedStaffAbsenceResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Añade unos días de ausencia (vacaciones, formación…). No se pueden reservar citas con la persona esos días; las que ya había se cuentan en la respuesta para que el centro las reasigne.
+      tags:
+        - team
+  /v1/centers/{centerId}/team/{membershipId}/absences/{absenceId}:
+    delete:
+      operationId: team_remove_absence
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: membershipId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: absenceId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "204":
+          description: ""
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Quita una ausencia.
+      tags:
+        - team
   /v1/join/invitations/{code}:
     get:
       operationId: join_get_invitation
@@ -3929,6 +4107,319 @@ components:
         - email
         - role
         - expiresAt
+      additionalProperties: false
+    StaffAvailabilityResponseDto:
+      type: object
+      properties:
+        weeklyHours:
+          type: object
+          properties:
+            mon:
+              maxItems: 4
+              type: array
+              items:
+                type: object
+                properties:
+                  opensAt:
+                    type: string
+                  closesAt:
+                    type: string
+                required:
+                  - opensAt
+                  - closesAt
+                additionalProperties: false
+            tue:
+              maxItems: 4
+              type: array
+              items:
+                type: object
+                properties:
+                  opensAt:
+                    type: string
+                  closesAt:
+                    type: string
+                required:
+                  - opensAt
+                  - closesAt
+                additionalProperties: false
+            wed:
+              maxItems: 4
+              type: array
+              items:
+                type: object
+                properties:
+                  opensAt:
+                    type: string
+                  closesAt:
+                    type: string
+                required:
+                  - opensAt
+                  - closesAt
+                additionalProperties: false
+            thu:
+              maxItems: 4
+              type: array
+              items:
+                type: object
+                properties:
+                  opensAt:
+                    type: string
+                  closesAt:
+                    type: string
+                required:
+                  - opensAt
+                  - closesAt
+                additionalProperties: false
+            fri:
+              maxItems: 4
+              type: array
+              items:
+                type: object
+                properties:
+                  opensAt:
+                    type: string
+                  closesAt:
+                    type: string
+                required:
+                  - opensAt
+                  - closesAt
+                additionalProperties: false
+            sat:
+              maxItems: 4
+              type: array
+              items:
+                type: object
+                properties:
+                  opensAt:
+                    type: string
+                  closesAt:
+                    type: string
+                required:
+                  - opensAt
+                  - closesAt
+                additionalProperties: false
+            sun:
+              maxItems: 4
+              type: array
+              items:
+                type: object
+                properties:
+                  opensAt:
+                    type: string
+                  closesAt:
+                    type: string
+                required:
+                  - opensAt
+                  - closesAt
+                additionalProperties: false
+          required:
+            - mon
+            - tue
+            - wed
+            - thu
+            - fri
+            - sat
+            - sun
+          additionalProperties: false
+          nullable: true
+        absences:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              startsOn:
+                type: string
+                format: date
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+              endsOn:
+                type: string
+                format: date
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+              reason:
+                type: string
+                enum:
+                  - vacation
+                  - training
+                  - personal
+                  - other
+            required:
+              - id
+              - startsOn
+              - endsOn
+              - reason
+            additionalProperties: false
+      required:
+        - weeklyHours
+        - absences
+      additionalProperties: false
+    SaveStaffWeeklyHoursRequestDto:
+      type: object
+      properties:
+        weeklyHours:
+          type: object
+          properties:
+            mon:
+              maxItems: 4
+              type: array
+              items:
+                type: object
+                properties:
+                  opensAt:
+                    type: string
+                  closesAt:
+                    type: string
+                required:
+                  - opensAt
+                  - closesAt
+                additionalProperties: false
+            tue:
+              maxItems: 4
+              type: array
+              items:
+                type: object
+                properties:
+                  opensAt:
+                    type: string
+                  closesAt:
+                    type: string
+                required:
+                  - opensAt
+                  - closesAt
+                additionalProperties: false
+            wed:
+              maxItems: 4
+              type: array
+              items:
+                type: object
+                properties:
+                  opensAt:
+                    type: string
+                  closesAt:
+                    type: string
+                required:
+                  - opensAt
+                  - closesAt
+                additionalProperties: false
+            thu:
+              maxItems: 4
+              type: array
+              items:
+                type: object
+                properties:
+                  opensAt:
+                    type: string
+                  closesAt:
+                    type: string
+                required:
+                  - opensAt
+                  - closesAt
+                additionalProperties: false
+            fri:
+              maxItems: 4
+              type: array
+              items:
+                type: object
+                properties:
+                  opensAt:
+                    type: string
+                  closesAt:
+                    type: string
+                required:
+                  - opensAt
+                  - closesAt
+                additionalProperties: false
+            sat:
+              maxItems: 4
+              type: array
+              items:
+                type: object
+                properties:
+                  opensAt:
+                    type: string
+                  closesAt:
+                    type: string
+                required:
+                  - opensAt
+                  - closesAt
+                additionalProperties: false
+            sun:
+              maxItems: 4
+              type: array
+              items:
+                type: object
+                properties:
+                  opensAt:
+                    type: string
+                  closesAt:
+                    type: string
+                required:
+                  - opensAt
+                  - closesAt
+                additionalProperties: false
+          additionalProperties: false
+          nullable: true
+      required:
+        - weeklyHours
+      additionalProperties: false
+    AddStaffAbsenceRequestDto:
+      type: object
+      properties:
+        startsOn:
+          type: string
+          format: date
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+        endsOn:
+          type: string
+          format: date
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+        reason:
+          type: string
+          enum:
+            - vacation
+            - training
+            - personal
+            - other
+      required:
+        - startsOn
+        - endsOn
+        - reason
+      additionalProperties: false
+    AddedStaffAbsenceResponseDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        startsOn:
+          type: string
+          format: date
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+        endsOn:
+          type: string
+          format: date
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+        reason:
+          type: string
+          enum:
+            - vacation
+            - training
+            - personal
+            - other
+        affectedBookingCount:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+      required:
+        - id
+        - startsOn
+        - endsOn
+        - reason
+        - affectedBookingCount
       additionalProperties: false
     InvitationPreviewResponseDto:
       type: object

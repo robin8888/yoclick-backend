@@ -1,12 +1,8 @@
 import { createZodDto } from '../../../shared/http/create-zod-dto';
 import { z } from 'zod';
 import { SECTOR_IDS } from '../../onboarding/http/create-center.dto';
-import {
-  areIntervalsConsistent,
-  isValidTimeOfDay,
-  isValidTimeZone,
-  WEEKDAYS,
-} from '../domain/opening-hours';
+import { isValidTimeZone } from '../domain/opening-hours';
+import { openingHoursSchema } from './opening-hours.schema';
 
 const MIN_CENTER_NAME_LENGTH = 2;
 const MAX_CENTER_NAME_LENGTH = 80;
@@ -15,27 +11,12 @@ const MAX_TEXT_LENGTH = 200;
 const PHONE_PATTERN = /^\+?\d[\d -]{5,19}$/;
 /** CIF o NIF españoles: 9 caracteres entre letras y cifras. */
 const TAX_ID_PATTERN = /^[A-Za-z0-9]{9}$/;
-const MAX_INTERVALS_PER_DAY = 4;
 const MAX_HOLIDAYS = 100;
 const MAX_HOLIDAY_LABEL_LENGTH = 60;
 const MAX_FREE_CANCELLATION_HOURS = 168;
 const MAX_LATITUDE = 90;
 const MAX_LONGITUDE = 180;
 const MAX_TIME_ZONE_LENGTH = 64;
-
-const timeOfDaySchema = z.string().refine(isValidTimeOfDay, 'expected HH:MM');
-
-const dayIntervalsSchema = z
-  .array(z.strictObject({ opensAt: timeOfDaySchema, closesAt: timeOfDaySchema }))
-  .max(MAX_INTERVALS_PER_DAY)
-  .refine(areIntervalsConsistent, 'intervals must open before they close and not overlap');
-
-const openingHoursSchema = z.strictObject(
-  Object.fromEntries(WEEKDAYS.map((weekday) => [weekday, dayIntervalsSchema.optional()])) as Record<
-    (typeof WEEKDAYS)[number],
-    z.ZodOptional<typeof dayIntervalsSchema>
-  >,
-);
 
 const holidaySchema = z.strictObject({
   date: z.iso.date(),
