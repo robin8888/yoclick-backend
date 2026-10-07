@@ -101,6 +101,7 @@ enum NotificationKind {
   booking_cancelled_by_team
   absence_added
   booking_affected_by_absence
+  routine_assigned
 
   @@map("notification_kind")
 }

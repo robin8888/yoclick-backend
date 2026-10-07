@@ -57,6 +57,8 @@ export type AssignRoutineOutcome =
   | { readonly kind: 'already_assigned' };
 
 export interface RoutineRepository {
+  /** El tipo de centro (gym, yoga…): de él depende la biblioteca de ejercicios. */
+  findCenterSectorId(actor: ActorContext): Promise<string>;
   create(actor: ActorContext, routine: NewRoutine): Promise<CreateRoutineOutcome>;
   list(actor: ActorContext): Promise<RoutineSummary[]>;
   find(actor: ActorContext, routineId: string): Promise<RoutineDetail | null>;

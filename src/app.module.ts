@@ -10,6 +10,7 @@ import { TeamModule } from './modules/team/team.module';
 import { ServicesModule } from './modules/services/services.module';
 import { SchedulingModule } from './modules/scheduling/scheduling.module';
 import { BookingsModule } from './modules/bookings/bookings.module';
+import { RoutinesModule } from './modules/routines/routines.module';
 import { PushModule } from './modules/push/push.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ActivityModule } from './modules/activity/activity.module';
@@ -59,6 +60,7 @@ import { buildLoggerOptions } from './shared/logging/build-logger-options';
     ClientsModule,
     NotificationsModule,
     PushModule,
+    RoutinesModule,
     ActivityModule,
     PrivacyModule,
     HealthModule,

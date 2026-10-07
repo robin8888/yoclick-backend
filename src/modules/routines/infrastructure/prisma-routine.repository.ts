@@ -15,6 +15,7 @@ import {
   type RoutineRepository,
   type RoutineSummary,
 } from '../application/ports/routine.repository';
+import { type RoutineNotificationData } from '../../notifications/domain/notification-rules';
 import { type AssignmentTarget } from '../domain/routine-rules';
 
 const ITEM_ORDER = { orderBy: { position: 'asc' } } as const;
@@ -92,41 +93,103 @@ function targetColumns(target: AssignmentTarget): {
     : { clientMembershipId: null, groupId: target.groupId };
 }
 
+/** Lo que se guarda al crear: la rutina, sus ejercicios en orden y, si se pidió, su asignación. */
+function buildCreateData(actor: ActorContext, routine: NewRoutine) {
+  return {
+    id: routine.id,
+    centerId: actor.centerId,
+    name: routine.name,
+    note: routine.note,
+    createdByMembershipId: actor.membershipId,
+    items: {
+      create: routine.items.map((item, position) => ({
+        id: generateUuidV7(),
+        position,
+        ...item,
+      })),
+    },
+    ...(routine.assignTo && {
+      assignments: {
+        create: {
+          id: generateUuidV7(),
+          centerId: actor.centerId,
+          assignedByMembershipId: actor.membershipId,
+          ...targetColumns(routine.assignTo),
+        },
+      },
+    }),
+  };
+}
+
+/** Quién se entera de una rutina asignada: la persona, o todas las activas del grupo; menos quien la asignó. */
+async function findRecipientsOfTarget(
+  client: TenantTransactionClient,
+  target: AssignmentTarget,
+  actorMembershipId: string,
+): Promise<string[]> {
+  if (target.kind === 'client') {
+    return target.membershipId === actorMembershipId ? [] : [target.membershipId];
+  }
+  const members = await client.membership.findMany({
+    where: { groupId: target.groupId, role: 'client', status: 'active' },
+    select: { id: true },
+  });
+  return members.map(({ id }) => id).filter((id) => id !== actorMembershipId);
+}
+
+/** Deja el aviso de la rutina asignada; se escribe con la asignación y el envío al móvil ocurre después. */
+async function recordAssignmentNotices(
+  client: TenantTransactionClient,
+  actor: ActorContext,
+  request: { routineName: string; target: AssignmentTarget },
+): Promise<void> {
+  const recipients = await findRecipientsOfTarget(client, request.target, actor.membershipId);
+  if (recipients.length === 0) return;
+  const actorMember = await client.membership.findUnique({
+    where: { id: actor.membershipId },
+    select: { user: { select: { fullName: true } } },
+  });
+  const noticeData: RoutineNotificationData = {
+    routineName: request.routineName,
+    actorName: actorMember?.user.fullName ?? '',
+  };
+  await client.notification.createMany({
+    data: recipients.map((recipientMembershipId) => ({
+      id: generateUuidV7(),
+      centerId: actor.centerId,
+      recipientMembershipId,
+      kind: 'routine_assigned' as const,
+      data: noticeData,
+    })),
+  });
+}
+
 @Injectable()
 export class PrismaRoutineRepository implements RoutineRepository {
   constructor(private readonly tenantPrismaService: TenantPrismaService) {}
+
+  async findCenterSectorId(actor: ActorContext): Promise<string> {
+    const center = await this.tenantPrismaService.runInTenantContext(actor, (client) =>
+      client.center.findUniqueOrThrow({
+        where: { id: actor.centerId },
+        select: { sectorId: true },
+      }),
+    );
+    return center.sectorId;
+  }
 
   async create(actor: ActorContext, routine: NewRoutine): Promise<CreateRoutineOutcome> {
     return this.tenantPrismaService.runInTenantContext(actor, async (client) => {
       if (routine.assignTo && !(await isValidTarget(client, routine.assignTo))) {
         return { kind: 'unknown_target' } as const;
       }
-      await client.routine.create({
-        data: {
-          id: routine.id,
-          centerId: actor.centerId,
-          name: routine.name,
-          note: routine.note,
-          createdByMembershipId: actor.membershipId,
-          items: {
-            create: routine.items.map((item, position) => ({
-              id: generateUuidV7(),
-              position,
-              ...item,
-            })),
-          },
-          ...(routine.assignTo && {
-            assignments: {
-              create: {
-                id: generateUuidV7(),
-                centerId: actor.centerId,
-                assignedByMembershipId: actor.membershipId,
-                ...targetColumns(routine.assignTo),
-              },
-            },
-          }),
-        },
-      });
+      await client.routine.create({ data: buildCreateData(actor, routine) });
+      if (routine.assignTo) {
+        await recordAssignmentNotices(client, actor, {
+          routineName: routine.name,
+          target: routine.assignTo,
+        });
+      }
       const saved = await client.routine.findUniqueOrThrow({
         where: { id: routine.id },
         include: DETAIL_INCLUDE,
@@ -182,7 +245,7 @@ export class PrismaRoutineRepository implements RoutineRepository {
     return this.tenantPrismaService.runInTenantContext(actor, async (client) => {
       const routine = await client.routine.findFirst({
         where: { id: request.routineId, archivedAt: null },
-        select: { id: true },
+        select: { id: true, name: true },
       });
       if (!routine) return { kind: 'not_found' } as const;
       if (!(await isValidTarget(client, request.target)))
@@ -201,6 +264,10 @@ export class PrismaRoutineRepository implements RoutineRepository {
           assignedByMembershipId: actor.membershipId,
           ...columns,
         },
+      });
+      await recordAssignmentNotices(client, actor, {
+        routineName: routine.name,
+        target: request.target,
       });
       return { kind: 'assigned', assignmentId: request.assignmentId } as const;
     });

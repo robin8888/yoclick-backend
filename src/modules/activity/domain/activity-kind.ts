@@ -18,6 +18,9 @@ export const ACTIVITY_KINDS = [
   'join_code_regenerated',
   'booking_created_by_team',
   'booking_cancelled_by_team',
+  'routine_created',
+  'routine_assigned',
+  'routine_archived',
 ] as const;
 
 export type ActivityKind = (typeof ACTIVITY_KINDS)[number];

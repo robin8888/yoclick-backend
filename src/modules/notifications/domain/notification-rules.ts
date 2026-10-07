@@ -5,6 +5,7 @@ export const NOTIFICATION_KINDS = [
   'booking_cancelled_by_team',
   'absence_added',
   'booking_affected_by_absence',
+  'routine_assigned',
 ] as const;
 export type NotificationKindName = (typeof NOTIFICATION_KINDS)[number];
 
@@ -81,4 +82,10 @@ export type AbsenceNotificationData = {
   readonly reason: string;
   /** Citas que ya había en esos días, como texto: los datos del aviso son siempre texto. */
   readonly affectedBookingCount: string;
+};
+
+/** Los datos del aviso de una rutina asignada. */
+export type RoutineNotificationData = {
+  readonly routineName: string;
+  readonly actorName: string;
 };
