@@ -65,6 +65,9 @@ const baseEnvironmentSchema = z.object({
   BUNNY_STREAM_LIBRARY_ID: z.string().min(1).optional(),
   BUNNY_STREAM_API_KEY: z.string().min(1).optional(),
   BUNNY_STREAM_TOKEN_KEY: z.string().min(1).optional(),
+  // `enabled` firma los enlaces de reproducción (hay que activar Token Authentication en el pull zone de la
+  // librería y usar su clave); `disabled` los deja sin firmar, que es lo único que acepta un CDN sin esa protección.
+  BUNNY_STREAM_TOKEN_AUTH: z.enum(['enabled', 'disabled']).default('disabled'),
   // Dominio de reproducción de la librería, p. ej. vz-1234abcd-xyz.b-cdn.net
   BUNNY_STREAM_CDN_HOSTNAME: z.string().min(1).optional(),
   EMAIL_PROVIDER: z.enum(['console', 'brevo']).default('console'),
@@ -167,18 +170,25 @@ function listEmailProviderRequirements(environment: ParsedEnvironment): Producti
 const BUNNY_SETTINGS = [
   'BUNNY_STREAM_LIBRARY_ID',
   'BUNNY_STREAM_API_KEY',
-  'BUNNY_STREAM_TOKEN_KEY',
   'BUNNY_STREAM_CDN_HOSTNAME',
 ] as const;
 
 /** Con Bunny hacen falta sus cuatro valores; con `fake` no. */
 function listVideoProviderRequirements(environment: ParsedEnvironment): ProductionRequirement[] {
   if (environment.VIDEO_PROVIDER !== 'bunny') return [];
-  return BUNNY_SETTINGS.map((path) => ({
+  const requirements: ProductionRequirement[] = BUNNY_SETTINGS.map((path) => ({
     isMet: environment[path] !== undefined,
     path,
     message: 'is required when VIDEO_PROVIDER=bunny',
   }));
+  if (environment.BUNNY_STREAM_TOKEN_AUTH === 'enabled') {
+    requirements.push({
+      isMet: environment.BUNNY_STREAM_TOKEN_KEY !== undefined,
+      path: 'BUNNY_STREAM_TOKEN_KEY',
+      message: 'is required when BUNNY_STREAM_TOKEN_AUTH=enabled',
+    });
+  }
+  return requirements;
 }
 
 export const environmentSchema = baseEnvironmentSchema.superRefine((environment, context) => {

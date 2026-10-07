@@ -22,16 +22,13 @@ function createVideoHosting(configService: ConfigService<Environment, true>): Vi
   }
   // El esquema de entorno ya exige estos cuatro valores con VIDEO_PROVIDER=bunny.
   const read = (
-    name:
-      | 'BUNNY_STREAM_LIBRARY_ID'
-      | 'BUNNY_STREAM_API_KEY'
-      | 'BUNNY_STREAM_TOKEN_KEY'
-      | 'BUNNY_STREAM_CDN_HOSTNAME',
+    name: 'BUNNY_STREAM_LIBRARY_ID' | 'BUNNY_STREAM_API_KEY' | 'BUNNY_STREAM_CDN_HOSTNAME',
   ): string => configService.get(name, { infer: true });
   return new BunnyStreamVideoHosting({
     libraryId: read('BUNNY_STREAM_LIBRARY_ID'),
     apiKey: read('BUNNY_STREAM_API_KEY'),
-    tokenKey: read('BUNNY_STREAM_TOKEN_KEY'),
+    tokenKey: configService.get('BUNNY_STREAM_TOKEN_KEY', { infer: true }),
+    isTokenAuthEnabled: configService.get('BUNNY_STREAM_TOKEN_AUTH', { infer: true }) === 'enabled',
     cdnHostname: read('BUNNY_STREAM_CDN_HOSTNAME'),
   });
 }

@@ -22,6 +22,8 @@ export interface BunnyStreamSettings {
   readonly libraryId: string;
   readonly apiKey: string;
   readonly tokenKey: string;
+  /** Si el pull zone exige token en cada petición; si no, el enlace firmado no existe y da 404. */
+  readonly isTokenAuthEnabled: boolean;
   readonly cdnHostname: string;
 }
 
@@ -75,6 +77,14 @@ export class BunnyStreamVideoHosting implements VideoHosting {
 
   signPlayback(providerVideoId: string): VideoPlaybackLinks {
     const expiresAt = new Date(Date.now() + PLAYBACK_LINK_LIFETIME_MS);
+    if (!this.settings.isTokenAuthEnabled) {
+      const baseUrl = `https://${this.settings.cdnHostname}/${providerVideoId}`;
+      return {
+        streamUrl: `${baseUrl}/playlist.m3u8`,
+        thumbnailUrl: `${baseUrl}/thumbnail.jpg`,
+        expiresAt,
+      };
+    }
     const sign = (filePath: string): string =>
       signCdnDirectoryUrl({
         hostname: this.settings.cdnHostname,

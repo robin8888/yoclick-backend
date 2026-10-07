@@ -240,24 +240,37 @@ describe('parseEnvironment', () => {
       },
     );
 
-    it.each([
-      'BUNNY_STREAM_LIBRARY_ID',
-      'BUNNY_STREAM_API_KEY',
-      'BUNNY_STREAM_TOKEN_KEY',
-      'BUNNY_STREAM_CDN_HOSTNAME',
-    ])('requires %s when Bunny Stream is selected', (variableName) => {
+    it.each(['BUNNY_STREAM_LIBRARY_ID', 'BUNNY_STREAM_API_KEY', 'BUNNY_STREAM_CDN_HOSTNAME'])(
+      'requires %s when Bunny Stream is selected',
+      (variableName) => {
+        expect(() =>
+          parseEnvironment(
+            developmentEnvironment({
+              VIDEO_PROVIDER: 'bunny',
+              BUNNY_STREAM_LIBRARY_ID: '12345',
+              BUNNY_STREAM_API_KEY: 'key',
+              BUNNY_STREAM_TOKEN_KEY: 'token',
+              BUNNY_STREAM_CDN_HOSTNAME: 'vz-fake.b-cdn.net',
+              [variableName]: undefined,
+            }),
+          ),
+        ).toThrow(new RegExp(variableName));
+      },
+    );
+
+    it('asks for the token key only when the signed links are enabled', () => {
+      const bunny = {
+        VIDEO_PROVIDER: 'bunny',
+        BUNNY_STREAM_LIBRARY_ID: '12345',
+        BUNNY_STREAM_API_KEY: 'key',
+        BUNNY_STREAM_CDN_HOSTNAME: 'vz-fake.b-cdn.net',
+        BUNNY_STREAM_TOKEN_KEY: undefined,
+      };
+
+      expect(() => parseEnvironment(developmentEnvironment(bunny))).not.toThrow();
       expect(() =>
-        parseEnvironment(
-          developmentEnvironment({
-            VIDEO_PROVIDER: 'bunny',
-            BUNNY_STREAM_LIBRARY_ID: '12345',
-            BUNNY_STREAM_API_KEY: 'key',
-            BUNNY_STREAM_TOKEN_KEY: 'token',
-            BUNNY_STREAM_CDN_HOSTNAME: 'vz-fake.b-cdn.net',
-            [variableName]: undefined,
-          }),
-        ),
-      ).toThrow(new RegExp(variableName));
+        parseEnvironment(developmentEnvironment({ ...bunny, BUNNY_STREAM_TOKEN_AUTH: 'enabled' })),
+      ).toThrow(/BUNNY_STREAM_TOKEN_KEY/);
     });
 
     it('does not require provider credentials for the console mailer', () => {
