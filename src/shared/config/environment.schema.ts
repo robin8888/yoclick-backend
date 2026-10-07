@@ -55,6 +55,10 @@ const baseEnvironmentSchema = z.object({
   PASSWORD_BREACH_CHECK: z.enum(['enabled', 'disabled']).default('enabled'),
   // Límite de peticiones por IP (SEC-46, SEC-50). Solo se apaga en tests; en producción es obligatorio.
   RATE_LIMITING: z.enum(['enabled', 'disabled']).default('enabled'),
+  // Avisos al móvil: `expo` los entrega por el servicio de Expo; `console` solo los anota en el log.
+  PUSH_PROVIDER: z.enum(['console', 'expo']).default('console'),
+  // Opcional: solo si el proyecto de Expo exige token de acceso para enviar.
+  EXPO_ACCESS_TOKEN: z.string().min(1).optional(),
   EMAIL_PROVIDER: z.enum(['console', 'brevo']).default('console'),
   // Solo hacen falta con EMAIL_PROVIDER=brevo (se exigen en ese caso, ver más abajo).
   BREVO_API_KEY: z.string().min(1).optional(),
@@ -74,6 +78,22 @@ interface ProductionRequirement {
   readonly isMet: boolean;
   readonly path: string;
   readonly message: string;
+}
+
+/** Los proveedores de correo y de avisos push: en producción no puede quedarse el de desarrollo. */
+function listProviderRequirements(environment: ParsedEnvironment): ProductionRequirement[] {
+  return [
+    {
+      isMet: environment.EMAIL_PROVIDER !== 'console',
+      path: 'EMAIL_PROVIDER',
+      message: 'must be a real provider in production: the console one only prints',
+    },
+    {
+      isMet: environment.PUSH_PROVIDER !== 'console',
+      path: 'PUSH_PROVIDER',
+      message: 'must be a real provider in production: the console one only logs',
+    },
+  ];
 }
 
 /** Lo que en desarrollo se tolera y en producción hace que el proceso no arranque. */
@@ -105,11 +125,7 @@ function listProductionRequirements(environment: ParsedEnvironment): ProductionR
       path: 'PASSWORD_BREACH_CHECK',
       message: 'must be enabled in production',
     },
-    {
-      isMet: environment.EMAIL_PROVIDER !== 'console',
-      path: 'EMAIL_PROVIDER',
-      message: 'must be a real provider in production: the console one only prints',
-    },
+    ...listProviderRequirements(environment),
     {
       isMet: !environment.ALLOW_DISPOSABLE_EMAILS,
       path: 'ALLOW_DISPOSABLE_EMAILS',

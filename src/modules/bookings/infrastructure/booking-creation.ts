@@ -115,7 +115,7 @@ async function notifyBookingCreated(
 ): Promise<void> {
   await recordBookingNotification(client, {
     centerId: actor.centerId,
-    kind: 'booking_created',
+    change: 'created',
     bookingId: booking.id,
     clientMembershipId: command.clientMembershipId ?? actor.membershipId,
     staffMembershipId: booking.staffMembershipId,

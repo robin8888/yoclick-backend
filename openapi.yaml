@@ -1996,6 +1996,47 @@ paths:
       summary: Crea una cita para un cliente desde la agenda. Mismas reglas de hueco que la reserva del cliente. El personal solo puede ponerla en su propia agenda.
       tags:
         - bookings
+  /v1/centers/{centerId}/agenda/bookings/{bookingId}/cancel:
+    post:
+      operationId: agenda_cancel_booking
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: bookingId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Cancela una cita futura desde la agenda. La administración cancela cualquiera; el personal, solo las suyas. El cliente recibe un aviso push. Una ya cancelada, empezada o pasada responde 409 BOOKING_NOT_CANCELLABLE.
+      tags:
+        - bookings
   /v1/centers/{centerId}/session-records:
     get:
       operationId: session_records_list
@@ -2748,6 +2789,54 @@ paths:
       summary: Marca como leído un aviso propio. 404 si no existe o es de otra persona.
       tags:
         - notifications
+  /v1/me/push-token:
+    put:
+      operationId: me_register_push_device
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterPushDeviceRequestDto"
+      responses:
+        "204":
+          description: ""
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Registra este móvil para recibir avisos push. Si el token ya era de otra cuenta (otra persona usó antes el móvil), pasa a esta.
+      tags:
+        - me
+  /v1/me/push-token/unregister:
+    post:
+      operationId: me_unregister_push_device
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UnregisterPushDeviceRequestDto"
+      responses:
+        "204":
+          description: ""
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: "Da de baja este móvil: deja de recibir avisos push (al cerrar sesión)."
+      tags:
+        - me
   /v1/centers/{centerId}/activity:
     get:
       operationId: activity_list
@@ -6830,6 +6919,10 @@ components:
                 enum:
                   - booking_created
                   - booking_cancelled
+                  - booking_created_by_team
+                  - booking_cancelled_by_team
+                  - absence_added
+                  - booking_affected_by_absence
               data:
                 type: object
                 additionalProperties:
@@ -6856,6 +6949,30 @@ components:
       required:
         - unreadCount
         - notifications
+      additionalProperties: false
+    RegisterPushDeviceRequestDto:
+      type: object
+      properties:
+        token:
+          type: string
+          pattern: ^Expo(?:nent)?PushToken\[[A-Za-z0-9_-]{10,200}\]$
+        platform:
+          type: string
+          enum:
+            - ios
+            - android
+      required:
+        - token
+        - platform
+      additionalProperties: false
+    UnregisterPushDeviceRequestDto:
+      type: object
+      properties:
+        token:
+          type: string
+          pattern: ^Expo(?:nent)?PushToken\[[A-Za-z0-9_-]{10,200}\]$
+      required:
+        - token
       additionalProperties: false
     ActivityResponseDto:
       type: object

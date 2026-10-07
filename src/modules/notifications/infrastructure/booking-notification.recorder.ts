@@ -1,14 +1,14 @@
 import { v7 as generateUuidV7 } from 'uuid';
 import { type TenantTransactionClient } from '../../../shared/database/tenant-prisma.service';
 import {
-  selectNotificationRecipients,
+  planBookingNotices,
+  type BookingChange,
   type BookingNotificationData,
-  type NotificationKindName,
 } from '../domain/notification-rules';
 
 export interface BookingNotificationInput {
   readonly centerId: string;
-  readonly kind: Extract<NotificationKindName, 'booking_created' | 'booking_cancelled'>;
+  readonly change: BookingChange;
   readonly bookingId: string;
   readonly clientMembershipId: string;
   readonly staffMembershipId: string;
@@ -30,8 +30,9 @@ async function findFullName(
 }
 
 /**
- * Deja un aviso a quien da la cita y a quienes administran el centro. Se escribe en la misma
- * transacción que la reserva o la cancelación: o ocurren las dos cosas o ninguna.
+ * Deja los avisos de un cambio en una cita: al equipo y, si lo hizo el equipo, también al cliente.
+ * Se escribe en la misma transacción que la reserva o la cancelación: o ocurren las dos cosas o
+ * ninguna. El envío al móvil ocurre después, con `PushDispatcher`.
  */
 export async function recordBookingNotification(
   client: TenantTransactionClient,
@@ -41,25 +42,28 @@ export async function recordBookingNotification(
     where: { role: { in: ['owner', 'admin'] }, status: 'active' },
     select: { id: true },
   });
-  const recipients = selectNotificationRecipients({
+  const notices = planBookingNotices({
+    change: input.change,
+    clientMembershipId: input.clientMembershipId,
     staffMembershipId: input.staffMembershipId,
     administratorMembershipIds: administrators.map(({ id }) => id),
     actorMembershipId: input.actorMembershipId,
   });
-  if (recipients.length === 0) return;
+  if (notices.length === 0) return;
 
   const noticeData: BookingNotificationData = {
     clientName: await findFullName(client, input.clientMembershipId),
     serviceName: input.serviceName,
     startsAt: input.startsAt.toISOString(),
     staffName: await findFullName(client, input.staffMembershipId),
+    actorName: await findFullName(client, input.actorMembershipId),
   };
   await client.notification.createMany({
-    data: recipients.map((recipientMembershipId) => ({
+    data: notices.map(({ recipientMembershipId, kind }) => ({
       id: generateUuidV7(),
       centerId: input.centerId,
       recipientMembershipId,
-      kind: input.kind,
+      kind,
       data: noticeData,
       bookingId: input.bookingId,
     })),

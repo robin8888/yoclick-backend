@@ -33,6 +33,7 @@ import {
   CreateBookingUseCase,
   ListMyBookingsUseCase,
 } from '../application/booking.use-cases';
+import { PushDispatcher } from '../../push/application/push-dispatcher';
 import { type CreateBookingCommand } from '../application/ports/booking.repository';
 import {
   BookingResponseDto,
@@ -69,6 +70,7 @@ export class BookingsController {
     private readonly listMyBookings: ListMyBookingsUseCase,
     private readonly cancelBooking: CancelBookingUseCase,
     private readonly idempotency: IdempotencyService,
+    private readonly push: PushDispatcher,
   ) {}
 
   @Post()
@@ -107,6 +109,8 @@ export class BookingsController {
         return { status: HttpStatus.CREATED, body: serializeBooking(booking) as JsonValue };
       },
     });
+    // Tras confirmarse la reserva (también si es un reintento: el envío es idempotente).
+    await this.push.flushCenter(actor);
     return outcome.body;
   }
 
@@ -152,6 +156,7 @@ export class BookingsController {
       bookingId: params.bookingId,
       now: new Date(),
     });
+    await this.push.flushCenter(actor);
     return { booking: serializeBooking(result.booking), withinPolicy: result.withinPolicy };
   }
 }

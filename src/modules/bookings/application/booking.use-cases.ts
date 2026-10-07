@@ -135,3 +135,23 @@ export class GetDayAgendaUseCase {
     return this.bookings.listDayAgenda(actor, { date, staffMembershipId });
   }
 }
+
+/** El equipo cancela una cita desde la agenda: avisa al cliente por push. */
+@Injectable()
+export class CancelBookingByTeamUseCase {
+  constructor(@Inject(BOOKING_REPOSITORY) private readonly bookings: BookingRepository) {}
+
+  async execute(input: {
+    actor: ActorContext;
+    bookingId: string;
+    now: Date;
+  }): Promise<BookingView> {
+    const outcome = await this.bookings.cancelByTeam(input.actor, {
+      bookingId: input.bookingId,
+      now: input.now,
+    });
+    if (outcome.kind === 'not_found') throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
+    if (outcome.kind === 'not_cancellable') throw notCancellable();
+    return outcome.booking;
+  }
+}

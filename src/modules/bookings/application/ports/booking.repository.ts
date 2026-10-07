@@ -63,6 +63,13 @@ export interface DayAgenda {
   readonly entries: readonly AgendaEntryView[];
 }
 
+export type TeamCancellationOutcome =
+  | { readonly kind: 'cancelled'; readonly booking: BookingView }
+  /** No existe, o es de otra persona del equipo y quien pregunta es personal. */
+  | { readonly kind: 'not_found' }
+  /** Ya estaba cancelada, ya empezó o ya pasó. */
+  | { readonly kind: 'not_cancellable' };
+
 export interface BookingRepository {
   /**
    * Reserva en una sola transacción: recalcula el hueco, comprueba que el cliente no tiene otra
@@ -81,6 +88,14 @@ export interface BookingRepository {
     actor: ActorContext,
     cancellation: { bookingId: string; cancelledAt: Date; isWithinPolicy: boolean },
   ): Promise<BookingView | null>;
+  /**
+   * Cancela una reserva futura desde la agenda del centro. La administración cancela cualquiera; el
+   * personal, solo las de sus propias sesiones. Deja un aviso al cliente y al equipo.
+   */
+  cancelByTeam(
+    actor: ActorContext,
+    request: { bookingId: string; now: Date },
+  ): Promise<TeamCancellationOutcome>;
   listDayAgenda(
     actor: ActorContext,
     query: { date: string; staffMembershipId: string | null },

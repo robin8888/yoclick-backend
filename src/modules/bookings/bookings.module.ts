@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { IdempotencyModule } from '../../shared/idempotency/idempotency.module';
 import {
   CancelBookingUseCase,
+  CancelBookingByTeamUseCase,
   CreateBookingUseCase,
   GetDayAgendaUseCase,
   ListMyBookingsUseCase,
@@ -37,6 +38,7 @@ import { PrismaSessionRecordRepository } from './infrastructure/prisma-session-r
     CreateBookingUseCase,
     ListMyBookingsUseCase,
     CancelBookingUseCase,
+    CancelBookingByTeamUseCase,
     GetDayAgendaUseCase,
     StartSessionUseCase,
     EndSessionUseCase,

@@ -1,4 +1,4 @@
-import { selectNotificationRecipients } from './notification-rules';
+import { planBookingNotices, selectNotificationRecipients } from './notification-rules';
 
 describe('selectNotificationRecipients', () => {
   it.each([
@@ -23,4 +23,47 @@ describe('selectNotificationRecipients', () => {
       ).toEqual(expected);
     },
   );
+});
+
+describe('planBookingNotices', () => {
+  const base = {
+    clientMembershipId: 'client',
+    staffMembershipId: 'staff',
+    administratorMembershipIds: ['owner', 'admin'],
+  };
+
+  it('tells the team, not the client, when the client books', () => {
+    const notices = planBookingNotices({ ...base, change: 'created', actorMembershipId: 'client' });
+
+    expect(notices).toEqual([
+      { recipientMembershipId: 'staff', kind: 'booking_created' },
+      { recipientMembershipId: 'owner', kind: 'booking_created' },
+      { recipientMembershipId: 'admin', kind: 'booking_created' },
+    ]);
+  });
+
+  it('tells the client and the rest of the team when the administration cancels', () => {
+    const notices = planBookingNotices({
+      ...base,
+      change: 'cancelled',
+      actorMembershipId: 'owner',
+    });
+
+    expect(notices).toEqual([
+      { recipientMembershipId: 'client', kind: 'booking_cancelled_by_team' },
+      { recipientMembershipId: 'staff', kind: 'booking_cancelled' },
+      { recipientMembershipId: 'admin', kind: 'booking_cancelled' },
+    ]);
+  });
+
+  it('does not tell the instructor about what they did themselves', () => {
+    const notices = planBookingNotices({ ...base, change: 'created', actorMembershipId: 'staff' });
+
+    expect(notices.map(({ recipientMembershipId }) => recipientMembershipId)).toEqual([
+      'client',
+      'owner',
+      'admin',
+    ]);
+    expect(notices[0]?.kind).toBe('booking_created_by_team');
+  });
 });

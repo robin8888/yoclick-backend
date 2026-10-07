@@ -97,6 +97,10 @@ enum ClientLevel {
 enum NotificationKind {
   booking_created
   booking_cancelled
+  booking_created_by_team
+  booking_cancelled_by_team
+  absence_added
+  booking_affected_by_absence
 
   @@map("notification_kind")
 }
@@ -150,6 +154,7 @@ model User {
   memberships       Membership[]
   idempotencyKeys   IdempotencyKey[]
   consents          Consent[]
+  pushDevices       PushDevice[]
   verificationCodes VerificationCode[]
   refreshTokens     RefreshToken[]
   mfaFactor         MfaFactor?
@@ -202,6 +207,8 @@ model Center {
   bookings            Booking[]
   rooms               Room[]
   staffAvailabilities StaffAvailability[]
+  routines            Routine[]
+  routineAssignments  RoutineAssignment[]
   staffAbsences       StaffAbsence[]
   clientGroups        ClientGroup[]
   notifications       Notification[]
@@ -249,16 +256,19 @@ model Membership {
   user   User         @relation(fields: [userId], references: [id])
   group  ClientGroup? @relation("GroupMembers", fields: [groupId], references: [id])
 
-  instructedGroups    ClientGroup[]      @relation("GroupInstructor")
-  notifications       Notification[]     @relation("NotificationRecipient")
+  instructedGroups    ClientGroup[]       @relation("GroupInstructor")
+  notifications       Notification[]      @relation("NotificationRecipient")
   serviceAssignments  ServiceStaff[]
-  taughtClassSessions ClassSession[]     @relation("StaffClassSessions")
-  bookings            Booking[]          @relation("ClientBookings")
+  taughtClassSessions ClassSession[]      @relation("StaffClassSessions")
+  bookings            Booking[]           @relation("ClientBookings")
   availability        StaffAvailability?
+  authoredRoutines    Routine[]           @relation("RoutineAuthor")
+  receivedRoutines    RoutineAssignment[] @relation("RoutineClient")
+  assignedRoutines    RoutineAssignment[] @relation("RoutineAssigner")
   absences            StaffAbsence[]
-  startedBookings     Booking[]          @relation("BookingStartedBy")
-  endedBookings       Booking[]          @relation("BookingEndedBy")
-  checkedInBookings   Booking[]          @relation("BookingCheckedInBy")
+  startedBookings     Booking[]           @relation("BookingStartedBy")
+  endedBookings       Booking[]           @relation("BookingEndedBy")
+  checkedInBookings   Booking[]           @relation("BookingCheckedInBy")
 
   @@unique([centerId, userId])
   @@index([centerId, role])
@@ -439,13 +449,31 @@ model Notification {
   data                  Json
   bookingId             String?          @map("booking_id") @db.Uuid
   readAt                DateTime?        @map("read_at") @db.Timestamptz
+  /// Cuándo se envió el aviso al móvil; nulo mientras no se haya enviado (o no haya móvil registrado).
+  pushedAt              DateTime?        @map("pushed_at") @db.Timestamptz
   createdAt             DateTime         @default(now()) @map("created_at") @db.Timestamptz
 
   center    Center     @relation(fields: [centerId], references: [id])
   recipient Membership @relation("NotificationRecipient", fields: [recipientMembershipId], references: [id])
 
   @@index([centerId, recipientMembershipId, createdAt])
+  @@index([centerId, pushedAt])
   @@map("notifications")
+}
+
+/// Un móvil de una persona al que se le pueden enviar avisos push. El token lo da Expo.
+model PushDevice {
+  id         String   @id @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  token      String   @unique
+  platform   String
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  lastSeenAt DateTime @default(now()) @map("last_seen_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_devices")
 }
 
 /// Registro de actividad del centro: quién cambió qué. Solo se añade; no se edita ni se borra.
@@ -476,12 +504,71 @@ model ClientGroup {
   archivedAt             DateTime?    @map("archived_at") @db.Timestamptz
   createdAt              DateTime     @default(now()) @map("created_at") @db.Timestamptz
 
-  center     Center       @relation(fields: [centerId], references: [id])
-  instructor Membership?  @relation("GroupInstructor", fields: [instructorMembershipId], references: [id])
-  members    Membership[] @relation("GroupMembers")
+  center             Center              @relation(fields: [centerId], references: [id])
+  instructor         Membership?         @relation("GroupInstructor", fields: [instructorMembershipId], references: [id])
+  members            Membership[]        @relation("GroupMembers")
+  routineAssignments RoutineAssignment[]
 
   @@index([centerId])
   @@map("client_groups")
+}
+
+/// Rutina, práctica, secuencia o tarea: lo que el equipo prepara para sus clientes. Se archiva, no se borra.
+model Routine {
+  id                    String    @id @db.Uuid
+  centerId              String    @map("center_id") @db.Uuid
+  name                  String
+  /// Indicaciones generales que ve quien la recibe («descansa 90 s entre series»).
+  note                  String?
+  createdByMembershipId String    @map("created_by_membership_id") @db.Uuid
+  archivedAt            DateTime? @map("archived_at") @db.Timestamptz
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  center      Center              @relation(fields: [centerId], references: [id])
+  createdBy   Membership          @relation("RoutineAuthor", fields: [createdByMembershipId], references: [id])
+  items       RoutineItem[]
+  assignments RoutineAssignment[]
+
+  @@index([centerId])
+  @@map("routines")
+}
+
+/// Un ejercicio dentro de una rutina. El nombre se copia de la biblioteca (o se escribe): no hay clave a la biblioteca.
+model RoutineItem {
+  id           String  @id @db.Uuid
+  routineId    String  @map("routine_id") @db.Uuid
+  position     Int
+  name         String
+  category     String?
+  /// Texto libre: «4 × 10 · 16 kg», «5 min».
+  prescription String?
+
+  routine Routine @relation(fields: [routineId], references: [id], onDelete: Cascade)
+
+  @@unique([routineId, position])
+  @@map("routine_items")
+}
+
+/// A quién se asigna una rutina: a una persona o a un grupo (exactamente uno de los dos).
+model RoutineAssignment {
+  id                     String   @id @db.Uuid
+  centerId               String   @map("center_id") @db.Uuid
+  routineId              String   @map("routine_id") @db.Uuid
+  clientMembershipId     String?  @map("client_membership_id") @db.Uuid
+  groupId                String?  @map("group_id") @db.Uuid
+  assignedByMembershipId String   @map("assigned_by_membership_id") @db.Uuid
+  assignedAt             DateTime @default(now()) @map("assigned_at") @db.Timestamptz
+
+  center     Center       @relation(fields: [centerId], references: [id])
+  routine    Routine      @relation(fields: [routineId], references: [id], onDelete: Cascade)
+  client     Membership?  @relation("RoutineClient", fields: [clientMembershipId], references: [id], onDelete: Restrict)
+  group      ClientGroup? @relation(fields: [groupId], references: [id], onDelete: Restrict)
+  assignedBy Membership   @relation("RoutineAssigner", fields: [assignedByMembershipId], references: [id])
+
+  @@index([centerId, routineId])
+  @@index([clientMembershipId])
+  @@index([groupId])
+  @@map("routine_assignments")
 }
 
 /// Sala o recurso del centro (Sala 1, Tatami, Zona de peso libre). Se archiva, no se borra.

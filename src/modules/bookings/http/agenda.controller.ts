@@ -13,13 +13,19 @@ import { Roles } from '../../../shared/auth/decorators/roles.decorator';
 import { ProblemDetailsDto } from '../../../shared/errors/problem-details.dto';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
 import { assertRouteTargetsActorCenter } from '../../../shared/tenancy/assert-route-targets-actor-center';
-import { CreateBookingUseCase, GetDayAgendaUseCase } from '../application/booking.use-cases';
+import {
+  CancelBookingByTeamUseCase,
+  CreateBookingUseCase,
+  GetDayAgendaUseCase,
+} from '../application/booking.use-cases';
+import { PushDispatcher } from '../../push/application/push-dispatcher';
 import { DomainError } from '../../../shared/errors/domain-error';
 import { HTTP_STATUS } from '../../../shared/errors/http-status';
 import {
   AgendaQueryDto,
   AgendaResponseDto,
   BookingResponseDto,
+  BookingRouteParamsDto,
   CenterRouteParamsDto,
   CreateAgendaBookingRequestDto,
 } from './booking.dto';
@@ -38,7 +44,9 @@ export class AgendaController {
   constructor(
     private readonly getDayAgenda: GetDayAgendaUseCase,
     private readonly createBooking: CreateBookingUseCase,
+    private readonly cancelBookingByTeam: CancelBookingByTeamUseCase,
     private readonly activity: ActivityRecorder,
+    private readonly push: PushDispatcher,
   ) {}
 
   @Get()
@@ -107,6 +115,34 @@ export class AgendaController {
       kind: 'booking_created_by_team',
       subject: booking.service.name,
     });
+    await this.push.flushCenter(actor);
+    return serializeBooking(booking);
+  }
+
+  @Post('bookings/:bookingId/cancel')
+  @Roles('owner', 'admin', 'staff')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    operationId: 'agenda_cancel_booking',
+    summary:
+      'Cancela una cita futura desde la agenda. La administración cancela cualquiera; el personal, solo las suyas. El cliente recibe un aviso push. Una ya cancelada, empezada o pasada responde 409 BOOKING_NOT_CANCELLABLE.',
+  })
+  @ApiOkResponse({ type: BookingResponseDto })
+  async cancelForClient(
+    @CurrentActor() actor: ActorContext,
+    @Param() params: BookingRouteParamsDto,
+  ): Promise<Record<string, unknown>> {
+    assertRouteTargetsActorCenter(actor, params.centerId);
+    const booking = await this.cancelBookingByTeam.execute({
+      actor,
+      bookingId: params.bookingId,
+      now: new Date(),
+    });
+    await this.activity.record(actor, {
+      kind: 'booking_cancelled_by_team',
+      subject: booking.service.name,
+    });
+    await this.push.flushCenter(actor);
     return serializeBooking(booking);
   }
 }

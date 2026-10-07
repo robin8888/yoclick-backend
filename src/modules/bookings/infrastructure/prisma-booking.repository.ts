@@ -20,6 +20,7 @@ import {
   type CreateBookingCommand,
   type CreateBookingOutcome,
   type DayAgenda,
+  type TeamCancellationOutcome,
 } from '../application/ports/booking.repository';
 import { recordBookingNotification } from '../../notifications/infrastructure/booking-notification.recorder';
 import { createBookingInTransaction } from './booking-creation';
@@ -62,9 +63,9 @@ async function recordCancellationNotice(
 ): Promise<void> {
   await recordBookingNotification(client, {
     centerId: actor.centerId,
-    kind: 'booking_cancelled',
+    change: 'cancelled',
     bookingId: booking.id,
-    clientMembershipId: actor.membershipId,
+    clientMembershipId: booking.clientMembershipId,
     staffMembershipId: booking.classSession.staffMembership.id,
     serviceName: booking.classSession.service.name,
     startsAt: booking.classSession.startsAt,
@@ -159,6 +160,44 @@ export class PrismaBookingRepository implements BookingRepository {
       });
       await recordCancellationNotice(client, actor, booking);
       return toBookingView(booking);
+    });
+  }
+
+  async cancelByTeam(
+    actor: ActorContext,
+    request: { bookingId: string; now: Date },
+  ): Promise<TeamCancellationOutcome> {
+    return this.tenantPrismaService.runInTenantContext(actor, async (client) => {
+      const booking = await client.booking.findFirst({
+        where: {
+          id: request.bookingId,
+          ...(actor.role === 'staff' && {
+            classSession: { staffMembershipId: actor.membershipId },
+          }),
+        },
+        include: WITH_SESSION_DETAILS,
+      });
+      if (!booking) return { kind: 'not_found' } as const;
+      const isCancellable =
+        booking.status === 'confirmed' &&
+        booking.startedAt === null &&
+        booking.classSession.startsAt > request.now;
+      if (!isCancellable) return { kind: 'not_cancellable' } as const;
+
+      await client.booking.update({
+        where: { id: booking.id },
+        data: { status: 'cancelled', cancelledAt: request.now, cancelledBy: 'staff' },
+      });
+      await client.classSession.update({
+        where: { id: booking.classSessionId },
+        data: { status: 'cancelled' },
+      });
+      await recordCancellationNotice(client, actor, booking);
+      const cancelled = await client.booking.findUniqueOrThrow({
+        where: { id: booking.id },
+        include: WITH_SESSION_DETAILS,
+      });
+      return { kind: 'cancelled', booking: toBookingView(cancelled) } as const;
     });
   }
 

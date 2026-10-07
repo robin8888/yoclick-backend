@@ -91,7 +91,9 @@ describe('notifications', () => {
     const asClient = await world.call('GET', notificationsUrl(), ana.userId, {
       centerId: center.centerId,
     });
-    expect(asClient.statusCode).toBe(403);
+    // Quien hizo la reserva no recibe aviso de lo que él mismo hizo.
+    expect(asClient.statusCode).toBe(200);
+    expect(asClient.json<NotificationListBody>().unreadCount).toBe(0);
   });
 
   it('adds a notice when the client cancels, newest first', async () => {

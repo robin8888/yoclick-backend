@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { type Prisma } from '../../../generated/prisma/client';
-import { TenantPrismaService } from '../../../shared/database/tenant-prisma.service';
+import {
+  TenantPrismaService,
+  type TenantTransactionClient,
+} from '../../../shared/database/tenant-prisma.service';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
 import { getUtcRangeOfLocalDates } from '../../../shared/time/zoned-time';
 import { type OpeningHours, WEEKDAYS } from '../../centers/domain/opening-hours';
@@ -10,6 +13,7 @@ import {
   type StaffAvailabilityRepository,
   type StaffAvailabilityView,
 } from '../application/ports/staff-availability.repository';
+import { recordAbsenceNotices } from './absence-notices';
 
 const TEAM_ROLES = ['owner', 'admin', 'staff'] as const;
 const UTC_MIDNIGHT_SUFFIX = 'T00:00:00Z';
@@ -22,6 +26,28 @@ function fillMissingDays(hours: OpeningHours): OpeningHours {
 
 const toDateOnly = (value: Date): string => value.toISOString().slice(0, ISO_DATE_LENGTH);
 const fromDateOnly = (value: string): Date => new Date(value + UTC_MIDNIGHT_SUFFIX);
+
+async function findAffectedBookings(
+  client: TenantTransactionClient,
+  absence: NewAbsence,
+  range: { startsAt: Date; endsAt: Date },
+) {
+  return client.booking.findMany({
+    where: {
+      status: { not: 'cancelled' },
+      classSession: {
+        status: 'scheduled',
+        staffMembershipId: absence.membershipId,
+        startsAt: { gte: range.startsAt, lt: range.endsAt },
+      },
+    },
+    select: {
+      id: true,
+      clientMembershipId: true,
+      classSession: { select: { startsAt: true, service: { select: { name: true } } } },
+    },
+  });
+}
 
 @Injectable()
 export class PrismaStaffAvailabilityRepository implements StaffAvailabilityRepository {
@@ -92,16 +118,14 @@ export class PrismaStaffAvailabilityRepository implements StaffAvailabilityRepos
       });
       const center = await client.center.findFirstOrThrow({ select: { timezone: true } });
       const range = getUtcRangeOfLocalDates(absence.startsOn, absence.endsOn, center.timezone);
-      const affectedBookingCount = await client.booking.count({
-        where: {
-          status: { not: 'cancelled' },
-          classSession: {
-            status: 'scheduled',
-            staffMembershipId: absence.membershipId,
-            startsAt: { gte: range.startsAt, lt: range.endsAt },
-          },
-        },
+      const affectedBookings = await findAffectedBookings(client, absence, range);
+      await recordAbsenceNotices(client, {
+        centerId: actor.centerId,
+        absence,
+        actorMembershipId: actor.membershipId,
+        affectedBookings,
       });
+      const affectedBookingCount = affectedBookings.length;
       return { affectedBookingCount };
     });
   }

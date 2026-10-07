@@ -36,7 +36,7 @@ export class NotificationsController {
   ) {}
 
   @Get()
-  @Roles('owner', 'admin', 'staff')
+  @Roles('owner', 'admin', 'staff', 'client')
   @ApiOperation({
     operationId: 'notifications_list',
     summary:
@@ -60,7 +60,7 @@ export class NotificationsController {
   }
 
   @Post('read')
-  @Roles('owner', 'admin', 'staff')
+  @Roles('owner', 'admin', 'staff', 'client')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     operationId: 'notifications_read_all',
@@ -76,7 +76,7 @@ export class NotificationsController {
   }
 
   @Post(':notificationId/read')
-  @Roles('owner', 'admin', 'staff')
+  @Roles('owner', 'admin', 'staff', 'client')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     operationId: 'notifications_read',

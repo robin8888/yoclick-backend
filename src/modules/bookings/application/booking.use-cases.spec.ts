@@ -45,6 +45,7 @@ function buildRepository(overrides: Partial<BookingRepository> = {}): BookingRep
     listClientBookings: jest.fn(),
     findCancellationFacts: jest.fn(),
     markCancelled: jest.fn(),
+    cancelByTeam: jest.fn(),
     listDayAgenda: jest.fn(),
     ...overrides,
   };

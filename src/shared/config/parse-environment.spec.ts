@@ -27,6 +27,7 @@ function productionEnvironment(overrides: Record<string, unknown> = {}): Record<
     EMAIL_PROVIDER: 'brevo',
     BREVO_API_KEY: 'fake-api-key',
     EMAIL_FROM_ADDRESS: 'no-reply@yoclick.app',
+    PUSH_PROVIDER: 'expo',
     ...overrides,
   });
 }
@@ -254,6 +255,7 @@ describe('parseEnvironment', () => {
       ['RATE_LIMITING', 'disabled'],
       ['PASSWORD_BREACH_CHECK', 'disabled'],
       ['EMAIL_PROVIDER', 'console'],
+      ['PUSH_PROVIDER', 'console'],
       ['ALLOW_DISPOSABLE_EMAILS', 'true'],
     ])('rejects %s=%s in production', (variableName, unsafeValue) => {
       expect(() =>

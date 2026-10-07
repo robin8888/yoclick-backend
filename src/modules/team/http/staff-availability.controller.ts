@@ -22,6 +22,7 @@ import {
 import { CurrentActor } from '../../../shared/auth/decorators/current-actor.decorator';
 import { Roles } from '../../../shared/auth/decorators/roles.decorator';
 import { ProblemDetailsDto } from '../../../shared/errors/problem-details.dto';
+import { PushDispatcher } from '../../push/application/push-dispatcher';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
 import { assertRouteTargetsActorCenter } from '../../../shared/tenancy/assert-route-targets-actor-center';
 import {
@@ -52,6 +53,7 @@ export class StaffAvailabilityController {
     private readonly saveWeeklyHours: SaveStaffWeeklyHoursUseCase,
     private readonly addAbsence: AddStaffAbsenceUseCase,
     private readonly removeAbsence: RemoveStaffAbsenceUseCase,
+    private readonly push: PushDispatcher,
   ) {}
 
   @Get('availability')
@@ -103,15 +105,15 @@ export class StaffAvailabilityController {
     @Body() body: AddStaffAbsenceRequestDto,
   ): Promise<Record<string, unknown>> {
     assertRouteTargetsActorCenter(actor, params.centerId);
-    return {
-      ...(await this.addAbsence.execute({
-        actor,
-        membershipId: params.membershipId,
-        startsOn: body.startsOn,
-        endsOn: body.endsOn,
-        reason: body.reason,
-      })),
-    };
+    const added = await this.addAbsence.execute({
+      actor,
+      membershipId: params.membershipId,
+      startsOn: body.startsOn,
+      endsOn: body.endsOn,
+      reason: body.reason,
+    });
+    await this.push.flushCenter(actor);
+    return { ...added };
   }
 
   @Delete('absences/:absenceId')
