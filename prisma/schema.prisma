@@ -104,8 +104,27 @@ enum NotificationKind {
   routine_assigned
   staff_video_submitted
   staff_video_reviewed
+  privacy_request_received
+  privacy_request_resolved
 
   @@map("notification_kind")
+}
+
+enum PrivacyRequestKind {
+  access
+  rectification
+  erasure
+  objection
+
+  @@map("privacy_request_kind")
+}
+
+enum PrivacyRequestStatus {
+  open
+  completed
+  rejected
+
+  @@map("privacy_request_status")
 }
 
 enum VideoStatus {
@@ -222,6 +241,7 @@ model Center {
   updatedAt     DateTime     @updatedAt @map("updated_at") @db.Timestamptz
 
   videos              Video[]
+  privacyRequests     PrivacyRequest[]
   memberships         Membership[]
   invitations         Invitation[]
   logo                CenterLogo?
@@ -283,6 +303,8 @@ model Membership {
   profileVideo Video? @relation("ProfileVideo", fields: [profileVideoId], references: [id], onDelete: SetNull)
 
   uploadedVideos      Video[]             @relation("VideoUploader")
+  privacyRequests     PrivacyRequest[]    @relation("PrivacyRequester")
+  resolvedPrivacyRequests PrivacyRequest[] @relation("PrivacyResolver")
   instructedGroups    ClientGroup[]       @relation("GroupInstructor")
   notifications       Notification[]      @relation("NotificationRecipient")
   serviceAssignments  ServiceStaff[]
@@ -749,4 +771,30 @@ model Video {
 
   @@index([centerId])
   @@map("videos")
+}
+
+/// Solicitud de un derecho RGPD de un cliente al centro (el centro es el responsable del tratamiento).
+/// Se responde en un mes como mucho; no se borra, queda como constancia.
+model PrivacyRequest {
+  id                     String               @id @db.Uuid
+  centerId               String               @map("center_id") @db.Uuid
+  clientMembershipId     String               @map("client_membership_id") @db.Uuid
+  kind                   PrivacyRequestKind
+  status                 PrivacyRequestStatus @default(open)
+  /// Lo que la persona cuenta de su solicitud (opcional).
+  message                String?
+  /// Fecha límite de respuesta: un mes desde que se recibe.
+  dueAt                  DateTime             @map("due_at") @db.Timestamptz
+  resolvedAt             DateTime?            @map("resolved_at") @db.Timestamptz
+  resolvedByMembershipId String?              @map("resolved_by_membership_id") @db.Uuid
+  resolutionNote         String?              @map("resolution_note")
+  createdAt              DateTime             @default(now()) @map("created_at") @db.Timestamptz
+
+  center           Center      @relation(fields: [centerId], references: [id])
+  clientMembership Membership  @relation("PrivacyRequester", fields: [clientMembershipId], references: [id])
+  resolvedBy       Membership? @relation("PrivacyResolver", fields: [resolvedByMembershipId], references: [id], onDelete: Restrict)
+
+  @@index([centerId, status, dueAt])
+  @@index([clientMembershipId])
+  @@map("privacy_requests")
 }

@@ -8,6 +8,8 @@ export const NOTIFICATION_KINDS = [
   'routine_assigned',
   'staff_video_submitted',
   'staff_video_reviewed',
+  'privacy_request_received',
+  'privacy_request_resolved',
 ] as const;
 export type NotificationKindName = (typeof NOTIFICATION_KINDS)[number];
 
@@ -90,6 +92,13 @@ export type AbsenceNotificationData = {
 export type RoutineNotificationData = {
   readonly routineName: string;
   readonly actorName: string;
+};
+
+/** Los datos del aviso de una solicitud de derechos: quién la hizo, de qué derecho y cómo se resolvió. */
+export type PrivacyNotificationData = {
+  readonly clientName?: string;
+  readonly requestKind: string;
+  readonly outcome?: string;
 };
 
 /** Los datos del aviso de un vídeo de presentación: quién lo subió y quién hizo el cambio. */

@@ -21,6 +21,8 @@ export const ACTIVITY_KINDS = [
   'routine_created',
   'routine_assigned',
   'routine_archived',
+  'privacy_request_resolved',
+  'client_data_exported',
 ] as const;
 
 export type ActivityKind = (typeof ACTIVITY_KINDS)[number];

@@ -3454,6 +3454,207 @@ paths:
       summary: Cuántos clientes activos tienen concedido cada consentimiento (privacidad, salud, promociones, imagen y parental). Solo cifras, nunca quién.
       tags:
         - privacy
+  /v1/centers/{centerId}/privacy-requests:
+    post:
+      operationId: privacy_create_request
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePrivacyRequestDto"
+      responses:
+        "201":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrivacyRequestResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Pide al centro acceso, rectificación, supresión u oposición. El centro tiene un mes para responder y la administración lo sabe por push. 409 PRIVACY_REQUEST_ALREADY_OPEN si ya hay una abierta del mismo derecho.
+      tags:
+        - privacy
+    get:
+      operationId: privacy_list_requests
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrivacyRequestListResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: "Las solicitudes de la clientela: primero las abiertas (la que vence antes, arriba) y luego las resueltas."
+      tags:
+        - privacy
+  /v1/centers/{centerId}/privacy-requests/mine:
+    get:
+      operationId: privacy_list_my_requests
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrivacyRequestListResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Mis solicitudes al centro, de la más reciente a la más antigua.
+      tags:
+        - privacy
+  /v1/centers/{centerId}/privacy-requests/{requestId}/resolve:
+    post:
+      operationId: privacy_resolve_request
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: requestId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResolvePrivacyRequestDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrivacyRequestResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Marca la solicitud como atendida o rechazada (al rechazar hay que decir por qué) y la persona lo sabe por push. 409 PRIVACY_REQUEST_CLOSED si ya estaba resuelta.
+      tags:
+        - privacy
+  /v1/centers/{centerId}/clients/{membershipId}/data-export:
+    post:
+      operationId: privacy_export_client_data
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: membershipId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClientDataExportRequestDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClientDataExportResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: "Exporta lo que el centro guarda de una persona (RGPD art. 15): datos, citas, rutinas y solicitudes. Pide la contraseña de quien exporta y queda anotado."
+      tags:
+        - privacy
   /health:
     get:
       operationId: health_check_liveness
@@ -7478,6 +7679,8 @@ components:
                   - routine_assigned
                   - staff_video_submitted
                   - staff_video_reviewed
+                  - privacy_request_received
+                  - privacy_request_resolved
               data:
                 type: object
                 additionalProperties:
@@ -8234,6 +8437,296 @@ components:
         - marketing
         - image
         - parental
+      additionalProperties: false
+    CreatePrivacyRequestDto:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum:
+            - access
+            - rectification
+            - erasure
+            - objection
+        message:
+          type: string
+          maxLength: 500
+          default: null
+          nullable: true
+      required:
+        - kind
+      additionalProperties: false
+    PrivacyRequestResponseDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        clientMembershipId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        clientName:
+          type: string
+        kind:
+          type: string
+          enum:
+            - access
+            - rectification
+            - erasure
+            - objection
+        status:
+          type: string
+          enum:
+            - open
+            - completed
+            - rejected
+        message:
+          type: string
+          nullable: true
+        dueAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+        createdAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+        resolvedAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+          nullable: true
+        resolutionNote:
+          type: string
+          nullable: true
+      required:
+        - id
+        - clientMembershipId
+        - clientName
+        - kind
+        - status
+        - message
+        - dueAt
+        - createdAt
+        - resolvedAt
+        - resolutionNote
+      additionalProperties: false
+    PrivacyRequestListResponseDto:
+      type: object
+      properties:
+        requests:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              clientMembershipId:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              clientName:
+                type: string
+              kind:
+                type: string
+                enum:
+                  - access
+                  - rectification
+                  - erasure
+                  - objection
+              status:
+                type: string
+                enum:
+                  - open
+                  - completed
+                  - rejected
+              message:
+                type: string
+                nullable: true
+              dueAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+              createdAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+              resolvedAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                nullable: true
+              resolutionNote:
+                type: string
+                nullable: true
+            required:
+              - id
+              - clientMembershipId
+              - clientName
+              - kind
+              - status
+              - message
+              - dueAt
+              - createdAt
+              - resolvedAt
+              - resolutionNote
+            additionalProperties: false
+      required:
+        - requests
+      additionalProperties: false
+    ResolvePrivacyRequestDto:
+      type: object
+      properties:
+        outcome:
+          type: string
+          enum:
+            - completed
+            - rejected
+        note:
+          type: string
+          maxLength: 500
+          default: null
+          nullable: true
+      required:
+        - outcome
+      additionalProperties: false
+    ClientDataExportRequestDto:
+      type: object
+      properties:
+        password:
+          type: string
+          minLength: 1
+          maxLength: 256
+      required:
+        - password
+      additionalProperties: false
+    ClientDataExportResponseDto:
+      type: object
+      properties:
+        exportedAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+        person:
+          type: object
+          properties:
+            fullName:
+              type: string
+            email:
+              type: string
+            phone:
+              type: string
+              nullable: true
+            birthDate:
+              type: string
+              nullable: true
+          required:
+            - fullName
+            - email
+            - phone
+            - birthDate
+          additionalProperties: false
+        membership:
+          type: object
+          properties:
+            status:
+              type: string
+            joinedAt:
+              type: string
+              format: date-time
+              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+            level:
+              type: string
+              nullable: true
+            groupName:
+              type: string
+              nullable: true
+          required:
+            - status
+            - joinedAt
+            - level
+            - groupName
+          additionalProperties: false
+        bookings:
+          type: array
+          items:
+            type: object
+            properties:
+              serviceName:
+                type: string
+              startsAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+              status:
+                type: string
+              checkedInAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                nullable: true
+              cancelledAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                nullable: true
+            required:
+              - serviceName
+              - startsAt
+              - status
+              - checkedInAt
+              - cancelledAt
+            additionalProperties: false
+        routines:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              assignedAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+            required:
+              - name
+              - assignedAt
+            additionalProperties: false
+        privacyRequests:
+          type: array
+          items:
+            type: object
+            properties:
+              kind:
+                type: string
+              status:
+                type: string
+              createdAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+              resolvedAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                nullable: true
+            required:
+              - kind
+              - status
+              - createdAt
+              - resolvedAt
+            additionalProperties: false
+      required:
+        - exportedAt
+        - person
+        - membership
+        - bookings
+        - routines
+        - privacyRequests
       additionalProperties: false
     HealthResponseDto:
       type: object

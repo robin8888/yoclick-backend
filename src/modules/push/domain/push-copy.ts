@@ -19,6 +19,8 @@ const COPY_BY_KIND: Readonly<Record<string, PushCopy>> = {
   routine_assigned: { title: 'Tienes una rutina nueva', body: OPEN_APP_BODY },
   staff_video_submitted: { title: 'Hay un vídeo por revisar', body: OPEN_APP_BODY },
   staff_video_reviewed: { title: 'Han revisado tu vídeo', body: OPEN_APP_BODY },
+  privacy_request_received: { title: 'Nueva solicitud de datos', body: OPEN_APP_BODY },
+  privacy_request_resolved: { title: 'Han respondido a tu solicitud', body: OPEN_APP_BODY },
 };
 
 const FALLBACK_COPY: PushCopy = { title: 'Tienes un aviso nuevo', body: OPEN_APP_BODY };

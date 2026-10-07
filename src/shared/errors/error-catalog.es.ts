@@ -73,6 +73,8 @@ export const ERROR_CATALOG = {
     title: 'El centro ha llenado su espacio de vídeo. Borra alguno o amplía el plan',
   },
   VIDEO_NOT_REVIEWABLE: { title: 'Este vídeo no está pendiente de revisión' },
+  PRIVACY_REQUEST_ALREADY_OPEN: { title: 'Ya tienes una solicitud abierta de ese derecho' },
+  PRIVACY_REQUEST_CLOSED: { title: 'Esta solicitud ya está resuelta' },
   INTERNAL_ERROR: { title: 'Algo ha fallado de nuestro lado. Inténtalo de nuevo' },
 } as const;
 
