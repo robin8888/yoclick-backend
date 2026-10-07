@@ -3146,6 +3146,568 @@ paths:
       summary: Quita la asignación de una rutina.
       tags:
         - routines
+  /v1/centers/{centerId}/team-profiles/me:
+    put:
+      operationId: team_profiles_save_mine
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveProfileRequestDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfileResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Guarda mi titular, biografía, especialidades, idiomas y la autorización para publicar mi imagen. El perfil vuelve a borrador.
+      tags:
+        - team-profiles
+  /v1/centers/{centerId}/team-profiles/me/submit:
+    post:
+      operationId: team_profiles_submit_mine
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfileResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: "Envía mi perfil: el equipo espera la revisión del centro (que lo sabe por push) y la administración lo publica directamente. 409 PROFILE_CONSENT_REQUIRED sin autorización de publicar; 409 PROFILE_EMPTY si no hay nada que enseñar."
+      tags:
+        - team-profiles
+  /v1/centers/{centerId}/team-profiles/me/certifications:
+    post:
+      operationId: team_profiles_add_certification
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddCertificationRequestDto"
+      responses:
+        "201":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfileResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Añade una titulación a mi perfil (el centro la verifica después). El perfil vuelve a borrador.
+      tags:
+        - team-profiles
+  /v1/centers/{centerId}/team-profiles/me/certifications/{certificationId}:
+    delete:
+      operationId: team_profiles_remove_certification
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: certificationId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "204":
+          description: ""
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Quita una titulación de mi perfil.
+      tags:
+        - team-profiles
+  /v1/centers/{centerId}/team-settings:
+    get:
+      operationId: team_settings_get
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamSettingsResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Si el equipo se enseña en la web de reservas y si las opiniones se revisan antes de publicarse.
+      tags:
+        - team-profiles
+    put:
+      operationId: team_settings_save
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeamSettingsRequestDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamSettingsResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Cambia uno o los dos interruptores.
+      tags:
+        - team-profiles
+  /v1/centers/{centerId}/team-profiles/{membershipId}/reviews:
+    post:
+      operationId: staff_reviews_create
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: membershipId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReviewRequestDto"
+      responses:
+        "201":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffReviewResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Opina sobre quien te dio una sesión (de 1 a 5). Si el centro revisa las opiniones queda pendiente. 409 REVIEW_NOT_ALLOWED si no hay una sesión tuya con esa persona sin opinión.
+      tags:
+        - team-profiles
+    get:
+      operationId: staff_reviews_list
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: membershipId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffReviewListResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Las opiniones publicadas sobre una persona del equipo, de la más reciente a la más antigua.
+      tags:
+        - team-profiles
+  /v1/centers/{centerId}/staff-reviews/pending:
+    get:
+      operationId: staff_reviews_list_pending
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffReviewListResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Las opiniones que esperan la revisión del centro, de la más antigua a la más reciente.
+      tags:
+        - team-profiles
+  /v1/centers/{centerId}/staff-reviews/{reviewId}/moderate:
+    post:
+      operationId: staff_reviews_moderate
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: reviewId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModerateReviewRequestDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffReviewResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Publica o rechaza una opinión pendiente; si se publica, la persona del equipo lo sabe por push. 409 REVIEW_NOT_MODERABLE si ya estaba revisada.
+      tags:
+        - team-profiles
+  /v1/centers/{centerId}/team-profiles/{membershipId}/review:
+    post:
+      operationId: team_profiles_review
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: membershipId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewProfileRequestDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfileResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Aprueba y publica un perfil pendiente, o pide cambios (con una nota); la persona lo sabe por push. 409 PROFILE_NOT_REVIEWABLE si no estaba pendiente.
+      tags:
+        - team-profiles
+  /v1/centers/{centerId}/team-profiles/{membershipId}/certifications/{certificationId}/verify:
+    post:
+      operationId: team_profiles_verify_certification
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: membershipId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: certificationId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfileResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Marca una titulación como comprobada por el centro.
+      tags:
+        - team-profiles
+  /v1/centers/{centerId}/team-profiles:
+    get:
+      operationId: team_profiles_list
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfileListResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: El equipo con su perfil. La clientela solo ve los publicados; el equipo, los publicados y el suyo; la administración, todos.
+      tags:
+        - team-profiles
+  /v1/centers/{centerId}/team-profiles/{membershipId}:
+    get:
+      operationId: team_profiles_get
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: membershipId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfileResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: El perfil de una persona del equipo. 404 si no existe o todavía no está publicado.
+      tags:
+        - team-profiles
   /v1/centers/{centerId}/videos:
     post:
       operationId: videos_start_upload
@@ -3295,87 +3857,6 @@ paths:
       security:
         - bearer: []
       summary: Si el plan del centro incluye vídeo, el espacio contratado y el usado.
-      tags:
-        - videos
-  /v1/centers/{centerId}/videos/{videoId}/review:
-    post:
-      operationId: videos_review
-      parameters:
-        - name: X-Center-Id
-          in: header
-          required: true
-          schema:
-            type: string
-        - name: centerId
-          required: true
-          in: path
-          schema:
-            format: uuid
-            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
-            type: string
-        - name: videoId
-          required: true
-          in: path
-          schema:
-            format: uuid
-            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ReviewVideoRequestDto"
-      responses:
-        "200":
-          description: ""
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/VideoResponseDto"
-        default:
-          description: Error RFC 9457
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetailsDto"
-      security:
-        - bearer: []
-      summary: Aprueba o pide cambios en un vídeo de presentación pendiente; quien lo subió lo sabe por un aviso push.
-      tags:
-        - videos
-  /v1/centers/{centerId}/team-profiles:
-    get:
-      operationId: videos_list_team_profiles
-      parameters:
-        - name: X-Center-Id
-          in: header
-          required: true
-          schema:
-            type: string
-        - name: centerId
-          required: true
-          in: path
-          schema:
-            format: uuid
-            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
-            type: string
-      responses:
-        "200":
-          description: ""
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TeamProfilesResponseDto"
-        default:
-          description: Error RFC 9457
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetailsDto"
-      security:
-        - bearer: []
-      summary: El equipo con su vídeo de presentación. La clientela solo ve los listos y aprobados; la administración, todos.
       tags:
         - videos
   /v1/centers/{centerId}/activity:
@@ -4118,39 +4599,210 @@ components:
     ProfileResponseDto:
       type: object
       properties:
-        id:
+        membershipId:
           type: string
           format: uuid
           pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
-        email:
-          type: string
+        isMe:
+          type: boolean
         fullName:
           type: string
-        phone:
+        staffTitle:
           type: string
           nullable: true
-        birthDate:
+        headline:
           type: string
-          format: date
-          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
           nullable: true
-        locale:
+        bio:
           type: string
-        isEmailVerified:
+          nullable: true
+        specialties:
+          type: array
+          items:
+            type: string
+        languages:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum:
+            - draft
+            - pending
+            - published
+            - changes_requested
+        reviewNote:
+          type: string
+          nullable: true
+        hasPublishConsent:
           type: boolean
-        createdAt:
-          type: string
-          format: date-time
-          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+        certifications:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              name:
+                type: string
+              detail:
+                type: string
+                nullable: true
+              isVerified:
+                type: boolean
+            required:
+              - id
+              - name
+              - detail
+              - isVerified
+            additionalProperties: false
+        introVideo:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            title:
+              type: string
+            status:
+              type: string
+              enum:
+                - uploading
+                - processing
+                - ready
+                - failed
+            reviewStatus:
+              type: string
+              enum:
+                - approved
+                - pending
+                - changes_requested
+            reviewNote:
+              type: string
+              nullable: true
+            durationSeconds:
+              type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+              nullable: true
+            playback:
+              type: object
+              properties:
+                streamUrl:
+                  type: string
+                thumbnailUrl:
+                  type: string
+                expiresAt:
+                  type: string
+                  format: date-time
+                  pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+              required:
+                - streamUrl
+                - thumbnailUrl
+                - expiresAt
+              additionalProperties: false
+              nullable: true
+          required:
+            - id
+            - title
+            - status
+            - reviewStatus
+            - reviewNote
+            - durationSeconds
+            - playback
+          additionalProperties: false
+          nullable: true
+        techniqueVideos:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              title:
+                type: string
+              status:
+                type: string
+                enum:
+                  - uploading
+                  - processing
+                  - ready
+                  - failed
+              reviewStatus:
+                type: string
+                enum:
+                  - approved
+                  - pending
+                  - changes_requested
+              reviewNote:
+                type: string
+                nullable: true
+              durationSeconds:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+                nullable: true
+              playback:
+                type: object
+                properties:
+                  streamUrl:
+                    type: string
+                  thumbnailUrl:
+                    type: string
+                  expiresAt:
+                    type: string
+                    format: date-time
+                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                required:
+                  - streamUrl
+                  - thumbnailUrl
+                  - expiresAt
+                additionalProperties: false
+                nullable: true
+            required:
+              - id
+              - title
+              - status
+              - reviewStatus
+              - reviewNote
+              - durationSeconds
+              - playback
+            additionalProperties: false
+        rating:
+          type: object
+          properties:
+            average:
+              type: number
+            count:
+              type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+          required:
+            - average
+            - count
+          additionalProperties: false
+          nullable: true
       required:
-        - id
-        - email
+        - membershipId
+        - isMe
         - fullName
-        - phone
-        - birthDate
-        - locale
-        - isEmailVerified
-        - createdAt
+        - staffTitle
+        - headline
+        - bio
+        - specialties
+        - languages
+        - status
+        - reviewNote
+        - hasPublishConsent
+        - certifications
+        - introVideo
+        - techniqueVideos
+        - rating
       additionalProperties: false
     UpdateProfileRequestDto:
       type: object
@@ -7681,6 +8333,9 @@ components:
                   - staff_video_reviewed
                   - privacy_request_received
                   - privacy_request_resolved
+                  - staff_profile_submitted
+                  - staff_profile_reviewed
+                  - staff_review_received
               data:
                 type: object
                 additionalProperties:
@@ -8090,6 +8745,422 @@ components:
           format: uuid
           pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
       additionalProperties: false
+    SaveProfileRequestDto:
+      type: object
+      properties:
+        headline:
+          type: string
+          maxLength: 120
+          default: null
+          nullable: true
+        bio:
+          type: string
+          maxLength: 1000
+          default: null
+          nullable: true
+        specialties:
+          default: []
+          maxItems: 8
+          type: array
+          items:
+            type: string
+            maxLength: 40
+        languages:
+          default: []
+          maxItems: 8
+          type: array
+          items:
+            type: string
+            maxLength: 40
+        hasPublishConsent:
+          type: boolean
+      required:
+        - hasPublishConsent
+      additionalProperties: false
+    AddCertificationRequestDto:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        detail:
+          type: string
+          maxLength: 120
+          default: null
+          nullable: true
+      required:
+        - name
+      additionalProperties: false
+    TeamSettingsResponseDto:
+      type: object
+      properties:
+        showTeamOnWeb:
+          type: boolean
+        reviewsNeedApproval:
+          type: boolean
+      required:
+        - showTeamOnWeb
+        - reviewsNeedApproval
+      additionalProperties: false
+    TeamSettingsRequestDto:
+      type: object
+      properties:
+        showTeamOnWeb:
+          type: boolean
+        reviewsNeedApproval:
+          type: boolean
+      additionalProperties: false
+    CreateReviewRequestDto:
+      type: object
+      properties:
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+          maxLength: 500
+          default: null
+          nullable: true
+      required:
+        - rating
+      additionalProperties: false
+    StaffReviewResponseDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        staffMembershipId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        staffName:
+          type: string
+        authorLabel:
+          type: string
+        rating:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        comment:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum:
+            - pending
+            - published
+            - rejected
+        createdAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+      required:
+        - id
+        - staffMembershipId
+        - staffName
+        - authorLabel
+        - rating
+        - comment
+        - status
+        - createdAt
+      additionalProperties: false
+    StaffReviewListResponseDto:
+      type: object
+      properties:
+        reviews:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              staffMembershipId:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              staffName:
+                type: string
+              authorLabel:
+                type: string
+              rating:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+              comment:
+                type: string
+                nullable: true
+              status:
+                type: string
+                enum:
+                  - pending
+                  - published
+                  - rejected
+              createdAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+            required:
+              - id
+              - staffMembershipId
+              - staffName
+              - authorLabel
+              - rating
+              - comment
+              - status
+              - createdAt
+            additionalProperties: false
+      required:
+        - reviews
+      additionalProperties: false
+    ModerateReviewRequestDto:
+      type: object
+      properties:
+        decision:
+          type: string
+          enum:
+            - approve
+            - reject
+      required:
+        - decision
+      additionalProperties: false
+    ReviewProfileRequestDto:
+      type: object
+      properties:
+        decision:
+          type: string
+          enum:
+            - approve
+            - request_changes
+        note:
+          type: string
+          maxLength: 300
+          default: null
+          nullable: true
+      required:
+        - decision
+      additionalProperties: false
+    ProfileListResponseDto:
+      type: object
+      properties:
+        members:
+          type: array
+          items:
+            type: object
+            properties:
+              membershipId:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              isMe:
+                type: boolean
+              fullName:
+                type: string
+              staffTitle:
+                type: string
+                nullable: true
+              headline:
+                type: string
+                nullable: true
+              bio:
+                type: string
+                nullable: true
+              specialties:
+                type: array
+                items:
+                  type: string
+              languages:
+                type: array
+                items:
+                  type: string
+              status:
+                type: string
+                enum:
+                  - draft
+                  - pending
+                  - published
+                  - changes_requested
+              reviewNote:
+                type: string
+                nullable: true
+              hasPublishConsent:
+                type: boolean
+              certifications:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                    name:
+                      type: string
+                    detail:
+                      type: string
+                      nullable: true
+                    isVerified:
+                      type: boolean
+                  required:
+                    - id
+                    - name
+                    - detail
+                    - isVerified
+                  additionalProperties: false
+              introVideo:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  title:
+                    type: string
+                  status:
+                    type: string
+                    enum:
+                      - uploading
+                      - processing
+                      - ready
+                      - failed
+                  reviewStatus:
+                    type: string
+                    enum:
+                      - approved
+                      - pending
+                      - changes_requested
+                  reviewNote:
+                    type: string
+                    nullable: true
+                  durationSeconds:
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                    nullable: true
+                  playback:
+                    type: object
+                    properties:
+                      streamUrl:
+                        type: string
+                      thumbnailUrl:
+                        type: string
+                      expiresAt:
+                        type: string
+                        format: date-time
+                        pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                    required:
+                      - streamUrl
+                      - thumbnailUrl
+                      - expiresAt
+                    additionalProperties: false
+                    nullable: true
+                required:
+                  - id
+                  - title
+                  - status
+                  - reviewStatus
+                  - reviewNote
+                  - durationSeconds
+                  - playback
+                additionalProperties: false
+                nullable: true
+              techniqueVideos:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                    title:
+                      type: string
+                    status:
+                      type: string
+                      enum:
+                        - uploading
+                        - processing
+                        - ready
+                        - failed
+                    reviewStatus:
+                      type: string
+                      enum:
+                        - approved
+                        - pending
+                        - changes_requested
+                    reviewNote:
+                      type: string
+                      nullable: true
+                    durationSeconds:
+                      type: integer
+                      minimum: -9007199254740991
+                      maximum: 9007199254740991
+                      nullable: true
+                    playback:
+                      type: object
+                      properties:
+                        streamUrl:
+                          type: string
+                        thumbnailUrl:
+                          type: string
+                        expiresAt:
+                          type: string
+                          format: date-time
+                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                      required:
+                        - streamUrl
+                        - thumbnailUrl
+                        - expiresAt
+                      additionalProperties: false
+                      nullable: true
+                  required:
+                    - id
+                    - title
+                    - status
+                    - reviewStatus
+                    - reviewNote
+                    - durationSeconds
+                    - playback
+                  additionalProperties: false
+              rating:
+                type: object
+                properties:
+                  average:
+                    type: number
+                  count:
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                required:
+                  - average
+                  - count
+                additionalProperties: false
+                nullable: true
+            required:
+              - membershipId
+              - isMe
+              - fullName
+              - staffTitle
+              - headline
+              - bio
+              - specialties
+              - languages
+              - status
+              - reviewNote
+              - hasPublishConsent
+              - certifications
+              - introVideo
+              - techniqueVideos
+              - rating
+            additionalProperties: false
+      required:
+        - members
+      additionalProperties: false
     StartVideoUploadRequestDto:
       type: object
       properties:
@@ -8107,6 +9178,7 @@ components:
           enum:
             - exercise
             - profile
+            - technique
       required:
         - title
         - sizeBytes
@@ -8267,107 +9339,6 @@ components:
         - isIncluded
         - limitBytes
         - usedBytes
-      additionalProperties: false
-    ReviewVideoRequestDto:
-      type: object
-      properties:
-        decision:
-          type: string
-          enum:
-            - approve
-            - request_changes
-        note:
-          type: string
-          minLength: 1
-          maxLength: 300
-      required:
-        - decision
-      additionalProperties: false
-    TeamProfilesResponseDto:
-      type: object
-      properties:
-        members:
-          type: array
-          items:
-            type: object
-            properties:
-              membershipId:
-                type: string
-                format: uuid
-                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
-              isMe:
-                type: boolean
-              fullName:
-                type: string
-              staffTitle:
-                type: string
-                nullable: true
-              video:
-                type: object
-                properties:
-                  id:
-                    type: string
-                    format: uuid
-                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
-                  title:
-                    type: string
-                  status:
-                    type: string
-                    enum:
-                      - uploading
-                      - processing
-                      - ready
-                      - failed
-                  reviewStatus:
-                    type: string
-                    enum:
-                      - approved
-                      - pending
-                      - changes_requested
-                  reviewNote:
-                    type: string
-                    nullable: true
-                  durationSeconds:
-                    type: integer
-                    minimum: -9007199254740991
-                    maximum: 9007199254740991
-                    nullable: true
-                  playback:
-                    type: object
-                    properties:
-                      streamUrl:
-                        type: string
-                      thumbnailUrl:
-                        type: string
-                      expiresAt:
-                        type: string
-                        format: date-time
-                        pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
-                    required:
-                      - streamUrl
-                      - thumbnailUrl
-                      - expiresAt
-                    additionalProperties: false
-                    nullable: true
-                required:
-                  - id
-                  - title
-                  - status
-                  - reviewStatus
-                  - reviewNote
-                  - durationSeconds
-                  - playback
-                additionalProperties: false
-                nullable: true
-            required:
-              - membershipId
-              - isMe
-              - fullName
-              - staffTitle
-              - video
-            additionalProperties: false
-      required:
-        - members
       additionalProperties: false
     ActivityResponseDto:
       type: object

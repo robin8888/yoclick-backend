@@ -1,71 +1,19 @@
 import { Injectable } from '@nestjs/common';
-import { v7 as generateUuidV7 } from 'uuid';
 import {
   TenantPrismaService,
   type TenantTransactionClient,
 } from '../../../shared/database/tenant-prisma.service';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
-import { VIDEO_SELECT } from './video-select';
-import { type VideoNotificationData } from '../../notifications/domain/notification-rules';
 import {
   type NewVideo,
   type ProcessingUpdate,
-  type ReviewOutcome,
   type StoredVideo,
-  type TeamProfileView,
   type VideoRepository,
   type VideoStorageFacts,
 } from '../application/ports/video.repository';
+import { VIDEO_SELECT } from './video-select';
 
 const NO_BYTES = BigInt(0);
-
-async function readMemberName(
-  client: TenantTransactionClient,
-  membershipId: string,
-): Promise<string> {
-  const member = await client.membership.findUnique({
-    where: { id: membershipId },
-    select: { user: { select: { fullName: true } } },
-  });
-  return member?.user.fullName ?? '';
-}
-
-/** Deja el aviso; el envío al móvil ocurre después, cuando la acción ya está guardada. */
-async function recordVideoNotices(
-  client: TenantTransactionClient,
-  request: {
-    actor: ActorContext;
-    kind: 'staff_video_submitted' | 'staff_video_reviewed';
-    recipientMembershipIds: readonly string[];
-    uploaderMembershipId: string;
-  },
-): Promise<void> {
-  const recipients = request.recipientMembershipIds.filter(
-    (membershipId) => membershipId !== request.actor.membershipId,
-  );
-  if (recipients.length === 0) return;
-  const noticeData: VideoNotificationData = {
-    uploaderName: await readMemberName(client, request.uploaderMembershipId),
-    actorName: await readMemberName(client, request.actor.membershipId),
-  };
-  await client.notification.createMany({
-    data: recipients.map((recipientMembershipId) => ({
-      id: generateUuidV7(),
-      centerId: request.actor.centerId,
-      recipientMembershipId,
-      kind: request.kind,
-      data: noticeData,
-    })),
-  });
-}
-
-async function findAdministratorIds(client: TenantTransactionClient): Promise<string[]> {
-  const administrators = await client.membership.findMany({
-    where: { role: { in: ['owner', 'admin'] }, status: 'active' },
-    select: { id: true },
-  });
-  return administrators.map(({ id }) => id);
-}
 
 /** Pone el vídeo como el de presentación de la persona y borra el anterior; devuelve el que sobraba. */
 async function replaceProfileVideo(
@@ -83,6 +31,19 @@ async function replaceProfileVideo(
   if (!previous?.profileVideo) return null;
   await client.video.delete({ where: { id: previous.profileVideo.id } });
   return previous.profileVideo.providerVideoId;
+}
+
+/** Añadir un vídeo al perfil lo cambia: vuelve a borrador hasta que se envíe de nuevo a revisión. */
+async function markProfileAsDraft(
+  client: TenantTransactionClient,
+  actor: ActorContext,
+  membershipId: string,
+): Promise<void> {
+  await client.staffProfile.upsert({
+    where: { membershipId },
+    create: { membershipId, centerId: actor.centerId, status: 'draft' },
+    update: { status: 'draft' },
+  });
 }
 
 @Injectable()
@@ -106,6 +67,12 @@ export class PrismaVideoRepository implements VideoRepository {
     });
   }
 
+  async countTechniqueVideos(actor: ActorContext, membershipId: string): Promise<number> {
+    return this.tenantPrismaService.runInTenantContext(actor, (client) =>
+      client.video.count({ where: { techniqueOfMembershipId: membershipId } }),
+    );
+  }
+
   async create(
     actor: ActorContext,
     video: NewVideo,
@@ -118,13 +85,17 @@ export class PrismaVideoRepository implements VideoRepository {
           providerVideoId: video.providerVideoId,
           title: video.title,
           sizeBytes: video.requestedBytes,
-          reviewStatus: video.reviewStatus,
           uploadedByMembershipId: actor.membershipId,
+          ...(video.attachment?.kind === 'technique' && {
+            techniqueOfMembershipId: video.attachment.membershipId,
+          }),
         },
       });
-      if (video.profileOfMembershipId === null) return { replacedProviderVideoId: null };
+      if (video.attachment === null) return { replacedProviderVideoId: null };
+      await markProfileAsDraft(client, actor, video.attachment.membershipId);
+      if (video.attachment.kind === 'technique') return { replacedProviderVideoId: null };
       const replacedProviderVideoId = await replaceProfileVideo(client, {
-        membershipId: video.profileOfMembershipId,
+        membershipId: video.attachment.membershipId,
         videoId: video.id,
       });
       return { replacedProviderVideoId };
@@ -143,26 +114,9 @@ export class PrismaVideoRepository implements VideoRepository {
     update: ProcessingUpdate,
   ): Promise<StoredVideo | null> {
     return this.tenantPrismaService.runInTenantContext(actor, async (client) => {
-      const before = await client.video.findUnique({
-        where: { id: videoId },
-        select: VIDEO_SELECT,
-      });
-      if (!before) return null;
-      const saved = await client.video.update({
-        where: { id: videoId },
-        data: update,
-        select: VIDEO_SELECT,
-      });
-      const hasJustBecomeReady = before.status !== 'ready' && saved.status === 'ready';
-      if (hasJustBecomeReady && saved.reviewStatus === 'pending') {
-        await recordVideoNotices(client, {
-          actor,
-          kind: 'staff_video_submitted',
-          recipientMembershipIds: await findAdministratorIds(client),
-          uploaderMembershipId: saved.uploadedByMembershipId,
-        });
-      }
-      return saved;
+      const existing = await client.video.count({ where: { id: videoId } });
+      if (existing === 0) return null;
+      return client.video.update({ where: { id: videoId }, data: update, select: VIDEO_SELECT });
     });
   }
 
@@ -170,57 +124,5 @@ export class PrismaVideoRepository implements VideoRepository {
     await this.tenantPrismaService.runInTenantContext(actor, (client) =>
       client.video.deleteMany({ where: { id: videoId } }),
     );
-  }
-
-  async review(
-    actor: ActorContext,
-    request: { videoId: string; isApproved: boolean; note: string | null },
-  ): Promise<ReviewOutcome> {
-    return this.tenantPrismaService.runInTenantContext(actor, async (client) => {
-      const video = await client.video.findUnique({
-        where: { id: request.videoId },
-        select: { ...VIDEO_SELECT, profileOf: { select: { id: true } } },
-      });
-      if (!video) return { kind: 'not_found' } as const;
-      if (video.reviewStatus !== 'pending' || video.profileOf === null) {
-        return { kind: 'not_reviewable' } as const;
-      }
-      const saved = await client.video.update({
-        where: { id: request.videoId },
-        data: {
-          reviewStatus: request.isApproved ? 'approved' : 'changes_requested',
-          reviewNote: request.isApproved ? null : request.note,
-        },
-        select: VIDEO_SELECT,
-      });
-      await recordVideoNotices(client, {
-        actor,
-        kind: 'staff_video_reviewed',
-        recipientMembershipIds: [video.uploadedByMembershipId],
-        uploaderMembershipId: video.uploadedByMembershipId,
-      });
-      return { kind: 'reviewed', video: saved } as const;
-    });
-  }
-
-  async listTeamProfiles(actor: ActorContext): Promise<TeamProfileView[]> {
-    return this.tenantPrismaService.runInTenantContext(actor, async (client) => {
-      const members = await client.membership.findMany({
-        where: { role: { in: ['owner', 'admin', 'staff'] }, status: 'active' },
-        orderBy: { joinedAt: 'asc' },
-        select: {
-          id: true,
-          staffTitle: true,
-          user: { select: { fullName: true } },
-          profileVideo: { select: VIDEO_SELECT },
-        },
-      });
-      return members.map((member) => ({
-        membershipId: member.id,
-        fullName: member.user.fullName,
-        staffTitle: member.staffTitle,
-        video: member.profileVideo,
-      }));
-    });
   }
 }

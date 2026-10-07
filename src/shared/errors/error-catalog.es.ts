@@ -73,8 +73,22 @@ export const ERROR_CATALOG = {
     title: 'El centro ha llenado su espacio de vídeo. Borra alguno o amplía el plan',
   },
   VIDEO_NOT_REVIEWABLE: { title: 'Este vídeo no está pendiente de revisión' },
+  TECHNIQUE_VIDEO_LIMIT_REACHED: {
+    title: 'Ya tienes tres vídeos de técnica. Borra uno para subir otro',
+  },
   PRIVACY_REQUEST_ALREADY_OPEN: { title: 'Ya tienes una solicitud abierta de ese derecho' },
   PRIVACY_REQUEST_CLOSED: { title: 'Esta solicitud ya está resuelta' },
+  PROFILE_CONSENT_REQUIRED: {
+    title: 'Para enviar tu perfil tienes que autorizar que se publique tu imagen y tus vídeos',
+  },
+  PROFILE_EMPTY: { title: 'Añade algo a tu perfil antes de enviarlo' },
+  PROFILE_NOT_REVIEWABLE: { title: 'Este perfil no está pendiente de revisión' },
+  CERTIFICATION_LIMIT_REACHED: { title: 'Has llegado al máximo de titulaciones' },
+  REVIEW_NOT_ALLOWED: {
+    title:
+      'Solo puedes opinar de una sesión que hayas tenido con esta persona, y una vez por sesión',
+  },
+  REVIEW_NOT_MODERABLE: { title: 'Esta opinión ya está revisada' },
   INTERNAL_ERROR: { title: 'Algo ha fallado de nuestro lado. Inténtalo de nuevo' },
 } as const;
 

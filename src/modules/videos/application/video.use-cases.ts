@@ -5,9 +5,7 @@ import { DomainError } from '../../../shared/errors/domain-error';
 import { HTTP_STATUS } from '../../../shared/errors/http-status';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
 import {
-  decideInitialReviewStatus,
   decideVideoUpload,
-  isVideoVisibleToClients,
   mapBunnyStatusToVideoStatus,
   type VideoUploadDecision,
 } from '../domain/video-rules';
@@ -15,7 +13,7 @@ import { VIDEO_HOSTING, type VideoHosting, type VideoUploadTarget } from './port
 import {
   VIDEO_REPOSITORY,
   type StoredVideo,
-  type TeamProfileView,
+  type VideoAttachment,
   type VideoRepository,
   type VideoStorageFacts,
 } from './ports/video.repository';
@@ -28,11 +26,18 @@ const REFUSED_UPLOAD_ERRORS: Readonly<
   quota_exceeded: ['VIDEO_QUOTA_EXCEEDED', HTTP_STATUS.conflict],
 };
 
+const MAX_TECHNIQUE_VIDEOS = 3;
+
+function resolveAttachment(request: StartVideoUploadRequest): VideoAttachment | null {
+  if (request.purpose === 'exercise') return null;
+  return { kind: request.purpose, membershipId: request.actor.membershipId };
+}
+
 export interface StartVideoUploadRequest {
   readonly actor: ActorContext;
   readonly title: string;
   readonly sizeBytes: number;
-  readonly purpose: 'exercise' | 'profile';
+  readonly purpose: 'exercise' | 'profile' | 'technique';
 }
 
 @Injectable()
@@ -48,6 +53,7 @@ export class StartVideoUploadUseCase {
     request: StartVideoUploadRequest,
   ): Promise<{ video: StoredVideo; upload: VideoUploadTarget }> {
     await this.assertUploadAllowed(request);
+    await this.assertTechniqueRoom(request);
     const { providerVideoId } = await this.hosting.createVideo(request.title);
     const videoId = generateUuidV7();
     await this.saveOrDiscard(request, { videoId, providerVideoId });
@@ -64,19 +70,25 @@ export class StartVideoUploadUseCase {
     throw new DomainError(code, httpStatus);
   }
 
+  private async assertTechniqueRoom(request: StartVideoUploadRequest): Promise<void> {
+    if (request.purpose !== 'technique') return;
+    const count = await this.videos.countTechniqueVideos(request.actor, request.actor.membershipId);
+    if (count >= MAX_TECHNIQUE_VIDEOS) {
+      throw new DomainError('TECHNIQUE_VIDEO_LIMIT_REACHED', HTTP_STATUS.conflict);
+    }
+  }
+
   private async saveOrDiscard(
     request: StartVideoUploadRequest,
     ids: { videoId: string; providerVideoId: string },
   ): Promise<void> {
-    const isProfile = request.purpose === 'profile';
     try {
       const { replacedProviderVideoId } = await this.videos.create(request.actor, {
         id: ids.videoId,
         providerVideoId: ids.providerVideoId,
         title: request.title,
         requestedBytes: BigInt(request.sizeBytes),
-        reviewStatus: isProfile ? decideInitialReviewStatus(request.actor.role) : 'approved',
-        profileOfMembershipId: isProfile ? request.actor.membershipId : null,
+        attachment: resolveAttachment(request),
       });
       if (replacedProviderVideoId !== null) await this.deleteFromHosting(replacedProviderVideoId);
     } catch (error) {
@@ -145,38 +157,5 @@ export class DeleteVideoUseCase {
     }
     await this.videos.delete(actor, videoId);
     await this.hosting.deleteVideo(video.providerVideoId);
-  }
-}
-
-export interface ReviewVideoRequest {
-  readonly actor: ActorContext;
-  readonly videoId: string;
-  readonly isApproved: boolean;
-  readonly note: string | null;
-}
-
-@Injectable()
-export class ReviewVideoUseCase {
-  constructor(@Inject(VIDEO_REPOSITORY) private readonly videos: VideoRepository) {}
-
-  async execute(request: ReviewVideoRequest): Promise<StoredVideo> {
-    const outcome = await this.videos.review(request.actor, request);
-    if (outcome.kind === 'not_found') throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
-    if (outcome.kind === 'not_reviewable') {
-      throw new DomainError('VIDEO_NOT_REVIEWABLE', HTTP_STATUS.conflict);
-    }
-    return outcome.video;
-  }
-}
-
-@Injectable()
-export class ListTeamProfilesUseCase {
-  constructor(@Inject(VIDEO_REPOSITORY) private readonly videos: VideoRepository) {}
-
-  /** La clientela solo ve a quien tiene un vídeo listo y aprobado; la administración, a todo el equipo. */
-  async execute(actor: ActorContext): Promise<TeamProfileView[]> {
-    const profiles = await this.videos.listTeamProfiles(actor);
-    if (actor.role !== 'client') return profiles;
-    return profiles.filter(({ video }) => video !== null && isVideoVisibleToClients(video));
   }
 }

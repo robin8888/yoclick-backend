@@ -61,10 +61,6 @@ interface StartBody {
   upload: { endpoint: string; headers: Record<string, string>; expiresAt: string };
 }
 
-interface TeamProfilesBody {
-  members: { membershipId: string; isMe: boolean; fullName: string; video: VideoBody | null }[];
-}
-
 describe('videos', () => {
   let application: NestFastifyApplication;
   let world: BookingWorld;
@@ -116,13 +112,6 @@ describe('videos', () => {
     hosting.statusCode = BUNNY_FINISHED;
     const refreshed = await call('GET', `/videos/${video.id}`, userId);
     return refreshed.json<VideoBody>();
-  }
-
-  async function noticeKindsOf(userId: string): Promise<string[]> {
-    const response = await call('GET', '/notifications', userId);
-    return response
-      .json<{ notifications: { kind: string }[] }>()
-      .notifications.map(({ kind }) => kind);
   }
 
   beforeAll(async () => {
@@ -347,85 +336,30 @@ describe('videos', () => {
     });
   });
 
-  describe('the presentation video of the team', () => {
+  describe('the presentation and technique videos of a profile', () => {
     beforeEach(async () => {
       await includeVideoInPlan(5 * GIGABYTE);
     });
 
-    const teamProfiles = async (userId: string) =>
-      (await call('GET', '/team-profiles', userId)).json<TeamProfilesBody>().members;
+    const profileOf = async (userId: string) =>
+      (await call('GET', '/team-profiles', userId))
+        .json<{
+          members: {
+            isMe: boolean;
+            status: string;
+            introVideo: VideoBody | null;
+            techniqueVideos: VideoBody[];
+          }[];
+        }>()
+        .members.find(({ isMe }) => isMe);
 
-    it('waits for the center to review what the team uploads, and tells the administration', async () => {
+    it('puts the presentation video in the profile and sends the profile back to draft', async () => {
       const video = await startReadyVideo(staff.userId, { purpose: 'profile' });
 
-      expect(video).toMatchObject({ status: 'ready', reviewStatus: 'pending' });
-      expect(await noticeKindsOf(owner)).toContain('staff_video_submitted');
-      expect(pushSender.tokensFor('staff_video_submitted')).toEqual([TOKEN_OWNER]);
-      const forClients = await teamProfiles(ana.userId);
-      expect(forClients.every(({ video: profileVideo }) => profileVideo === null)).toBe(true);
-      expect(forClients).toHaveLength(0);
-    });
-
-    it('publishes what the administration uploads without review', async () => {
-      const video = await startReadyVideo(owner, { purpose: 'profile' });
+      const profile = await profileOf(staff.userId);
 
       expect(video.reviewStatus).toBe('approved');
-      const forClients = await teamProfiles(ana.userId);
-      expect(forClients.map(({ video: profileVideo }) => profileVideo?.id)).toEqual([video.id]);
-      expect(forClients[0]?.video?.playback).not.toBeNull();
-    });
-
-    it('lets the owner approve it, tells the person, and then the clients see it', async () => {
-      const video = await startReadyVideo(staff.userId, { purpose: 'profile' });
-      pushSender.sent.length = 0;
-
-      const review = await call('POST', `/videos/${video.id}/review`, owner, {
-        decision: 'approve',
-      });
-
-      expect(review.statusCode).toBe(200);
-      expect(review.json<VideoBody>().reviewStatus).toBe('approved');
-      expect(await noticeKindsOf(staff.userId)).toContain('staff_video_reviewed');
-      expect(pushSender.tokensFor('staff_video_reviewed')).toEqual([TOKEN_STAFF]);
-      const forClients = await teamProfiles(ana.userId);
-      expect(forClients.map(({ video: profileVideo }) => profileVideo?.id)).toEqual([video.id]);
-    });
-
-    it('lets the owner ask for changes with a note the person can read', async () => {
-      const video = await startReadyVideo(staff.userId, { purpose: 'profile' });
-
-      const review = await call('POST', `/videos/${video.id}/review`, owner, {
-        decision: 'request_changes',
-        note: 'Hay poca luz; grábalo en la sala grande.',
-      });
-
-      expect(review.json<VideoBody>()).toMatchObject({
-        reviewStatus: 'changes_requested',
-        reviewNote: 'Hay poca luz; grábalo en la sala grande.',
-      });
-      expect(await teamProfiles(ana.userId)).toHaveLength(0);
-      const members = await teamProfiles(owner);
-      expect(
-        members.find(({ membershipId }) => membershipId === staff.membershipId)?.video,
-      ).toMatchObject({
-        reviewStatus: 'changes_requested',
-      });
-    });
-
-    it('cannot be reviewed twice, nor by the team', async () => {
-      const video = await startReadyVideo(staff.userId, { purpose: 'profile' });
-
-      expect(
-        (await call('POST', `/videos/${video.id}/review`, staff.userId, { decision: 'approve' }))
-          .statusCode,
-      ).toBe(403);
-      await call('POST', `/videos/${video.id}/review`, owner, { decision: 'approve' });
-      const again = await call('POST', `/videos/${video.id}/review`, owner, {
-        decision: 'approve',
-      });
-
-      expect(again.statusCode).toBe(409);
-      expect(again.json<{ code: string }>().code).toBe('VIDEO_NOT_REVIEWABLE');
+      expect(profile).toMatchObject({ status: 'draft', introVideo: { id: video.id } });
     });
 
     it('replaces the previous presentation video and removes it from the video service', async () => {
@@ -438,22 +372,26 @@ describe('videos', () => {
       expect((await call('GET', `/videos/${first.id}`, owner)).statusCode).toBe(404);
     });
 
-    it('marks the row of the person who asks', async () => {
-      const members = await teamProfiles(staff.userId);
+    it('allows up to three technique videos and refuses the fourth', async () => {
+      for (let count = 0; count < 3; count += 1) {
+        await startReadyVideo(staff.userId, { purpose: 'technique' });
+      }
 
-      expect(members.filter(({ isMe }) => isMe).map(({ membershipId }) => membershipId)).toEqual([
-        staff.membershipId,
-      ]);
+      const fourth = await startUpload(staff.userId, { purpose: 'technique' });
+
+      expect(fourth.statusCode).toBe(409);
+      expect(fourth.json<{ code: string }>().code).toBe('TECHNIQUE_VIDEO_LIMIT_REACHED');
+      expect((await profileOf(staff.userId))?.techniqueVideos).toHaveLength(3);
     });
 
-    it('shows the whole team to the administration, with or without video', async () => {
-      await startReadyVideo(staff.userId, { purpose: 'profile' });
+    it('frees a place when a technique video is deleted', async () => {
+      const first = await startReadyVideo(staff.userId, { purpose: 'technique' });
+      await startReadyVideo(staff.userId, { purpose: 'technique' });
+      await startReadyVideo(staff.userId, { purpose: 'technique' });
 
-      const members = await teamProfiles(owner);
+      await call('DELETE', `/videos/${first.id}`, staff.userId);
 
-      expect(members.map(({ membershipId }) => membershipId)).toEqual(
-        expect.arrayContaining([center.ownerMembershipId, staff.membershipId]),
-      );
+      expect((await startUpload(staff.userId, { purpose: 'technique' })).statusCode).toBe(201);
     });
   });
 });

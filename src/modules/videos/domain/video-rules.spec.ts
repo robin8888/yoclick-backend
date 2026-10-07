@@ -1,5 +1,4 @@
 import {
-  decideInitialReviewStatus,
   decideVideoUpload,
   isVideoVisibleToClients,
   mapBunnyStatusToVideoStatus,
@@ -50,16 +49,6 @@ describe('decideVideoUpload', () => {
         requestedBytes: BigInt(MAX_VIDEO_SIZE_BYTES) + 1n,
       }),
     ).toBe('not_included');
-  });
-});
-
-describe('decideInitialReviewStatus', () => {
-  it.each([
-    ['staff', 'pending'],
-    ['admin', 'approved'],
-    ['owner', 'approved'],
-  ])('a video uploaded by %s starts as %s', (role, expected) => {
-    expect(decideInitialReviewStatus(role)).toBe(expected);
   });
 });
 

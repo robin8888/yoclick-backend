@@ -8,11 +8,8 @@ import {
   DeleteVideoUseCase,
   GetVideoPlanUseCase,
   GetVideoUseCase,
-  ListTeamProfilesUseCase,
-  ReviewVideoUseCase,
   StartVideoUploadUseCase,
 } from './application/video.use-cases';
-import { TeamVideoProfilesController } from './http/team-video-profiles.controller';
 import { VideoPlanController } from './http/video-plan.controller';
 import { VideoUploadsController } from './http/video-uploads.controller';
 import { BunnyStreamVideoHosting } from './infrastructure/bunny-stream-video-hosting';
@@ -42,7 +39,7 @@ function createVideoHosting(configService: ConfigService<Environment, true>): Vi
 /** Global: rutinas y perfiles del equipo necesitan firmar la reproducción sin importar este módulo. */
 @Global()
 @Module({
-  controllers: [VideoUploadsController, VideoPlanController, TeamVideoProfilesController],
+  controllers: [VideoUploadsController, VideoPlanController],
   providers: [
     { provide: VIDEO_HOSTING, inject: [ConfigService], useFactory: createVideoHosting },
     { provide: VIDEO_REPOSITORY, useClass: PrismaVideoRepository },
@@ -51,8 +48,6 @@ function createVideoHosting(configService: ConfigService<Environment, true>): Vi
     GetVideoPlanUseCase,
     GetVideoUseCase,
     DeleteVideoUseCase,
-    ReviewVideoUseCase,
-    ListTeamProfilesUseCase,
   ],
   exports: [VideoPresenter, VIDEO_HOSTING],
 })

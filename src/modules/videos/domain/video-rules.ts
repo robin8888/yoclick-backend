@@ -42,11 +42,6 @@ export function decideVideoUpload(facts: VideoUploadFacts): VideoUploadDecision 
   return isOverQuota ? 'quota_exceeded' : 'allowed';
 }
 
-/** El equipo propone su vídeo de presentación y el centro lo revisa; quien administra lo publica directamente. */
-export function decideInitialReviewStatus(uploaderRole: string): VideoReviewStatusName {
-  return uploaderRole === 'staff' ? 'pending' : 'approved';
-}
-
 /** Los clientes solo ven vídeos listos y aprobados por el centro. */
 export function isVideoVisibleToClients(video: {
   readonly status: VideoStatusName;

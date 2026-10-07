@@ -10,6 +10,9 @@ export const NOTIFICATION_KINDS = [
   'staff_video_reviewed',
   'privacy_request_received',
   'privacy_request_resolved',
+  'staff_profile_submitted',
+  'staff_profile_reviewed',
+  'staff_review_received',
 ] as const;
 export type NotificationKindName = (typeof NOTIFICATION_KINDS)[number];
 
@@ -99,6 +102,19 @@ export type PrivacyNotificationData = {
   readonly clientName?: string;
   readonly requestKind: string;
   readonly outcome?: string;
+};
+
+/** Los datos del aviso del perfil del equipo: de quién es, quién actuó y cómo se resolvió la revisión. */
+export type ProfileNotificationData = {
+  readonly staffName: string;
+  readonly actorName: string;
+  readonly outcome?: string;
+};
+
+/** Los datos del aviso de una opinión nueva: quién la escribió (nombre e inicial) y la puntuación. */
+export type ReviewNotificationData = {
+  readonly authorLabel: string;
+  readonly rating: string;
 };
 
 /** Los datos del aviso de un vídeo de presentación: quién lo subió y quién hizo el cambio. */

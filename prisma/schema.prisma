@@ -106,8 +106,28 @@ enum NotificationKind {
   staff_video_reviewed
   privacy_request_received
   privacy_request_resolved
+  staff_profile_submitted
+  staff_profile_reviewed
+  staff_review_received
 
   @@map("notification_kind")
+}
+
+enum StaffProfileStatus {
+  draft
+  pending
+  published
+  changes_requested
+
+  @@map("staff_profile_status")
+}
+
+enum StaffReviewStatus {
+  pending
+  published
+  rejected
+
+  @@map("staff_review_status")
 }
 
 enum PrivacyRequestKind {
@@ -237,10 +257,17 @@ model Center {
   logoUpdatedAt DateTime?    @map("logo_updated_at") @db.Timestamptz
   /// Espacio de vídeo contratado (plan Premium). Nulo = el plan no incluye vídeo. Solo lo cambia Yoclick.
   videoStorageLimitBytes BigInt? @map("video_storage_limit_bytes")
+  /// Las opiniones sobre el equipo se revisan antes de publicarse.
+  reviewsNeedApproval    Boolean   @default(true) @map("reviews_need_approval")
+  /// El equipo (fotos, vídeos y valoraciones) se enseña en la web de reservas.
+  showTeamOnWeb          Boolean   @default(true) @map("show_team_on_web")
   createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz
   updatedAt     DateTime     @updatedAt @map("updated_at") @db.Timestamptz
 
   videos              Video[]
+  staffProfiles       StaffProfile[]
+  staffCertifications StaffCertification[]
+  staffReviews        StaffReview[]
   privacyRequests     PrivacyRequest[]
   memberships         Membership[]
   invitations         Invitation[]
@@ -303,6 +330,13 @@ model Membership {
   profileVideo Video? @relation("ProfileVideo", fields: [profileVideoId], references: [id], onDelete: SetNull)
 
   uploadedVideos      Video[]             @relation("VideoUploader")
+  techniqueVideos     Video[]             @relation("TechniqueVideos")
+  staffProfile        StaffProfile?       @relation("StaffProfileOwner")
+  reviewedStaffProfiles StaffProfile[]    @relation("StaffProfileReviewer")
+  verifiedCertifications StaffCertification[] @relation("CertificationVerifier")
+  receivedStaffReviews StaffReview[]      @relation("ReviewedStaff")
+  writtenStaffReviews StaffReview[]        @relation("ReviewAuthor")
+  moderatedStaffReviews StaffReview[]     @relation("ReviewModerator")
   privacyRequests     PrivacyRequest[]    @relation("PrivacyRequester")
   resolvedPrivacyRequests PrivacyRequest[] @relation("PrivacyResolver")
   instructedGroups    ClientGroup[]       @relation("GroupInstructor")
@@ -738,6 +772,7 @@ model Booking {
   startedBy        Membership?  @relation("BookingStartedBy", fields: [startedByMembershipId], references: [id])
   endedBy          Membership?  @relation("BookingEndedBy", fields: [endedByMembershipId], references: [id])
   checkedInBy      Membership?  @relation("BookingCheckedInBy", fields: [checkedInByMembershipId], references: [id])
+  staffReview      StaffReview?
 
   @@unique([clientMembershipId, idempotencyKey])
   @@index([centerId, classSessionId])
@@ -766,6 +801,9 @@ model Video {
 
   center       Center        @relation(fields: [centerId], references: [id])
   uploadedBy   Membership    @relation("VideoUploader", fields: [uploadedByMembershipId], references: [id])
+  /// Si es uno de los vídeos de técnica de alguien del equipo (hasta tres).
+  techniqueOfMembershipId String? @map("technique_of_membership_id") @db.Uuid
+  techniqueOf  Membership?   @relation("TechniqueVideos", fields: [techniqueOfMembershipId], references: [id], onDelete: SetNull)
   routineItems RoutineItem[]
   profileOf    Membership?   @relation("ProfileVideo")
 
@@ -797,4 +835,76 @@ model PrivacyRequest {
   @@index([centerId, status, dueAt])
   @@index([clientMembershipId])
   @@map("privacy_requests")
+}
+
+/// Perfil profesional de quien da las sesiones: lo ven los clientes cuando el centro lo ha aprobado.
+model StaffProfile {
+  membershipId           String             @id @map("membership_id") @db.Uuid
+  centerId               String             @map("center_id") @db.Uuid
+  headline               String?
+  bio                    String?
+  specialties            String[]
+  languages              String[]
+  status                 StaffProfileStatus @default(draft)
+  /// Lo que el centro pide cambiar (con el estado `changes_requested`).
+  reviewNote             String?            @map("review_note")
+  /// Cuándo autorizó la persona publicar su imagen y sus vídeos; sin ello no se envía a revisión.
+  publishConsentAt       DateTime?          @map("publish_consent_at") @db.Timestamptz
+  submittedAt            DateTime?          @map("submitted_at") @db.Timestamptz
+  reviewedAt             DateTime?          @map("reviewed_at") @db.Timestamptz
+  reviewedByMembershipId String?            @map("reviewed_by_membership_id") @db.Uuid
+  updatedAt              DateTime           @updatedAt @map("updated_at") @db.Timestamptz
+
+  center         Center               @relation(fields: [centerId], references: [id])
+  membership     Membership           @relation("StaffProfileOwner", fields: [membershipId], references: [id])
+  reviewedBy     Membership?          @relation("StaffProfileReviewer", fields: [reviewedByMembershipId], references: [id], onDelete: Restrict)
+  certifications StaffCertification[]
+
+  @@index([centerId, status])
+  @@map("staff_profiles")
+}
+
+/// Una titulación del perfil. El centro la marca como verificada tras comprobarla.
+model StaffCertification {
+  id                     String    @id @db.Uuid
+  centerId               String    @map("center_id") @db.Uuid
+  membershipId           String    @map("membership_id") @db.Uuid
+  name                   String
+  /// Dónde y cuándo («Universidad, 2016»).
+  detail                 String?
+  verifiedAt             DateTime? @map("verified_at") @db.Timestamptz
+  verifiedByMembershipId String?   @map("verified_by_membership_id") @db.Uuid
+  createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  center     Center       @relation(fields: [centerId], references: [id])
+  profile    StaffProfile @relation(fields: [membershipId], references: [membershipId], onDelete: Cascade)
+  verifiedBy Membership?  @relation("CertificationVerifier", fields: [verifiedByMembershipId], references: [id], onDelete: Restrict)
+
+  @@index([membershipId])
+  @@map("staff_certifications")
+}
+
+/// Opinión de un cliente sobre quien le dio una sesión. Solo tras una sesión real, una por reserva.
+model StaffReview {
+  id                    String            @id @db.Uuid
+  centerId              String            @map("center_id") @db.Uuid
+  staffMembershipId     String            @map("staff_membership_id") @db.Uuid
+  clientMembershipId    String            @map("client_membership_id") @db.Uuid
+  bookingId             String            @unique @map("booking_id") @db.Uuid
+  rating                Int
+  comment               String?
+  status                StaffReviewStatus @default(pending)
+  createdAt             DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  moderatedAt           DateTime?         @map("moderated_at") @db.Timestamptz
+  moderatedByMembershipId String?         @map("moderated_by_membership_id") @db.Uuid
+
+  center    Center     @relation(fields: [centerId], references: [id])
+  booking   Booking    @relation(fields: [bookingId], references: [id])
+  staff     Membership @relation("ReviewedStaff", fields: [staffMembershipId], references: [id])
+  client    Membership @relation("ReviewAuthor", fields: [clientMembershipId], references: [id])
+  moderator Membership? @relation("ReviewModerator", fields: [moderatedByMembershipId], references: [id], onDelete: Restrict)
+
+  @@index([centerId, status])
+  @@index([staffMembershipId, status])
+  @@map("staff_reviews")
 }
