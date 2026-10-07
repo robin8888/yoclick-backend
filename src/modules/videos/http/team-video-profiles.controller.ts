@@ -80,6 +80,7 @@ export class TeamVideoProfilesController {
     return {
       members: profiles.map((profile) => ({
         ...profile,
+        isMe: profile.membershipId === actor.membershipId,
         video: profile.video && this.presenter.present(profile.video, { isClient }),
       })),
     };

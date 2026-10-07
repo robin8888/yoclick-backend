@@ -62,7 +62,7 @@ interface StartBody {
 }
 
 interface TeamProfilesBody {
-  members: { membershipId: string; fullName: string; video: VideoBody | null }[];
+  members: { membershipId: string; isMe: boolean; fullName: string; video: VideoBody | null }[];
 }
 
 describe('videos', () => {
@@ -436,6 +436,14 @@ describe('videos', () => {
       expect(second.id).not.toBe(first.id);
       expect(hosting.deletedVideoIds).toHaveLength(1);
       expect((await call('GET', `/videos/${first.id}`, owner)).statusCode).toBe(404);
+    });
+
+    it('marks the row of the person who asks', async () => {
+      const members = await teamProfiles(staff.userId);
+
+      expect(members.filter(({ isMe }) => isMe).map(({ membershipId }) => membershipId)).toEqual([
+        staff.membershipId,
+      ]);
     });
 
     it('shows the whole team to the administration, with or without video', async () => {

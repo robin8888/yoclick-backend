@@ -76,6 +76,8 @@ export class TeamProfilesResponseDto extends createZodDto(
     members: z.array(
       z.strictObject({
         membershipId: z.uuid(),
+        /** `true` en la fila de quien hace la petición. */
+        isMe: z.boolean(),
         fullName: z.string(),
         staffTitle: z.string().nullable(),
         video: z.strictObject(videoViewShape).nullable(),
