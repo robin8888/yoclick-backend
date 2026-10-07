@@ -197,6 +197,22 @@ describe('videos', () => {
       });
     });
 
+    it('tells the whole team if the plan includes video, and how much space is left', async () => {
+      const without = await call('GET', '/video-plan', staff.userId);
+      expect(without.json()).toEqual({ isIncluded: false, limitBytes: null, usedBytes: 0 });
+
+      await includeVideoInPlan(5 * GIGABYTE);
+      await startReadyVideo(owner);
+      const included = await call('GET', '/video-plan', staff.userId);
+
+      expect(included.json()).toEqual({
+        isIncluded: true,
+        limitBytes: 5 * GIGABYTE,
+        usedBytes: 50 * MEGABYTE,
+      });
+      expect((await call('GET', '/video-plan', ana.userId)).statusCode).toBe(403);
+    });
+
     it('tells a plan without video as null', async () => {
       const subscription = await call('GET', '/subscription', owner);
 

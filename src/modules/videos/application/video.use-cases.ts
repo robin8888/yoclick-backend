@@ -17,6 +17,7 @@ import {
   type StoredVideo,
   type TeamProfileView,
   type VideoRepository,
+  type VideoStorageFacts,
 } from './ports/video.repository';
 
 const REFUSED_UPLOAD_ERRORS: Readonly<
@@ -91,6 +92,15 @@ export class StartVideoUploadUseCase {
     } catch (error) {
       this.logger.warn(`Could not delete video ${providerVideoId} from the hosting service`, error);
     }
+  }
+}
+
+@Injectable()
+export class GetVideoPlanUseCase {
+  constructor(@Inject(VIDEO_REPOSITORY) private readonly videos: VideoRepository) {}
+
+  async execute(actor: ActorContext): Promise<VideoStorageFacts> {
+    return this.videos.readStorageFacts(actor);
   }
 }
 

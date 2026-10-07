@@ -48,6 +48,16 @@ export const videoViewShape = {
 
 export class VideoResponseDto extends createZodDto(z.strictObject(videoViewShape)) {}
 
+export class VideoPlanResponseDto extends createZodDto(
+  z.strictObject({
+    /** `false` si el plan del centro no incluye vídeo. */
+    isIncluded: z.boolean(),
+    /** Espacio contratado en bytes; nulo si no hay vídeo. */
+    limitBytes: z.number().int().nullable(),
+    usedBytes: z.number().int(),
+  }),
+) {}
+
 export class StartVideoUploadResponseDto extends createZodDto(
   z.strictObject({
     video: z.strictObject(videoViewShape),

@@ -3263,6 +3263,40 @@ paths:
       summary: Borra un vídeo (el del equipo, solo quien lo subió; la administración, cualquiera).
       tags:
         - videos
+  /v1/centers/{centerId}/video-plan:
+    get:
+      operationId: videos_get_plan
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VideoPlanResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Si el plan del centro incluye vídeo, el espacio contratado y el usado.
+      tags:
+        - videos
   /v1/centers/{centerId}/videos/{videoId}/review:
     post:
       operationId: videos_review
@@ -8011,6 +8045,25 @@ components:
         - reviewNote
         - durationSeconds
         - playback
+      additionalProperties: false
+    VideoPlanResponseDto:
+      type: object
+      properties:
+        isIncluded:
+          type: boolean
+        limitBytes:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+          nullable: true
+        usedBytes:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+      required:
+        - isIncluded
+        - limitBytes
+        - usedBytes
       additionalProperties: false
     ReviewVideoRequestDto:
       type: object
