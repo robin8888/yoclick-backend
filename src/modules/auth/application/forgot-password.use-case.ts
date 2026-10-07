@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { canRecoverPassword } from '../../../shared/auth/unactivated-account';
 import {
   USER_ACCOUNT_REPOSITORY,
   type UserAccountRepository,
@@ -11,7 +12,7 @@ export interface ForgotPasswordCommand {
 
 /**
  * Envía un código para cambiar la contraseña. No dice nunca si el correo existe: para uno desconocido
- * o con el correo sin confirmar no hace nada, y la respuesta HTTP es la misma (SEC-46).
+ * o con el correo sin confirmar (salvo una cuenta importada sin activar) no hace nada, y la respuesta HTTP es la misma (SEC-46).
  */
 @Injectable()
 export class ForgotPasswordUseCase {
@@ -22,7 +23,8 @@ export class ForgotPasswordUseCase {
 
   async execute(command: ForgotPasswordCommand): Promise<void> {
     const account = await this.users.findByEmail(command.email);
-    if (!account || account.emailVerifiedAt === null) return;
+    // Las cuentas que un centro creó al importar no tienen contraseña: así la fijan por primera vez.
+    if (!account || !canRecoverPassword(account)) return;
 
     await this.codeIssuer.issue(
       { userId: account.id, email: account.email, fullName: account.fullName },

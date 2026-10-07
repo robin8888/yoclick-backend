@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { DomainError } from '../../../shared/errors/domain-error';
 import { HTTP_STATUS } from '../../../shared/errors/http-status';
+import { canRecoverPassword } from '../../../shared/auth/unactivated-account';
 import { AccountPasswordChanger } from './account-password-changer';
 import { PasswordAcceptabilityChecker } from './password-acceptability.checker';
 import {
@@ -31,7 +32,7 @@ export class ResetPasswordUseCase {
 
   async execute(command: ResetPasswordCommand): Promise<void> {
     const account = await this.users.findByEmail(command.email);
-    if (!account || account.emailVerifiedAt === null) {
+    if (!account || !canRecoverPassword(account)) {
       throw new DomainError('VERIFICATION_CODE_INVALID', HTTP_STATUS.badRequest);
     }
 

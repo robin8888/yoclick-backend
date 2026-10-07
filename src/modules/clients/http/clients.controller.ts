@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Param, Patch, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiDefaultResponse,
@@ -9,9 +19,11 @@ import {
 } from '@nestjs/swagger';
 import { CurrentActor } from '../../../shared/auth/decorators/current-actor.decorator';
 import { Roles } from '../../../shared/auth/decorators/roles.decorator';
+import { AllowStaffWithPermission } from '../../../shared/auth/decorators/staff-permission.decorator';
 import { ProblemDetailsDto } from '../../../shared/errors/problem-details.dto';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
 import { assertRouteTargetsActorCenter } from '../../../shared/tenancy/assert-route-targets-actor-center';
+import { ImportClientsUseCase } from '../application/import-clients.use-case';
 import {
   GetClientUseCase,
   ListClientsUseCase,
@@ -24,6 +36,8 @@ import {
   ClientListResponseDto,
   ClientResponseDto,
   ClientRouteParamsDto,
+  ImportClientsRequestDto,
+  ImportClientsResponseDto,
   UpdateClientRequestDto,
 } from './client.dto';
 import { ActivityRecorder } from '../../activity/application/activity-recorder';
@@ -47,6 +61,7 @@ export class ClientsController {
     private readonly listClients: ListClientsUseCase,
     private readonly getClient: GetClientUseCase,
     private readonly updateClient: UpdateClientUseCase,
+    private readonly importClients: ImportClientsUseCase,
     private readonly activity: ActivityRecorder,
   ) {}
 
@@ -75,8 +90,32 @@ export class ClientsController {
     return { ...result, clients: result.clients.map(serializeClient) };
   }
 
+  @Post('import')
+  @HttpCode(HttpStatus.OK)
+  @Roles('owner', 'admin')
+  @ApiOperation({
+    operationId: 'clients_import',
+    summary:
+      'Importa clientes desde las filas de un archivo (nombre, correo, teléfono y nivel). Quien aún no tiene cuenta recibe una sin activar; no se envía ningún correo. Los que ya son clientes se actualizan; el resto de filas no importadas vuelven en el informe.',
+  })
+  @ApiOkResponse({ type: ImportClientsResponseDto })
+  async import(
+    @CurrentActor() actor: ActorContext,
+    @Param() params: CenterRouteParamsDto,
+    @Body() body: ImportClientsRequestDto,
+  ): Promise<Record<string, unknown>> {
+    assertRouteTargetsActorCenter(actor, params.centerId);
+    const report = await this.importClients.execute(actor, body.rows);
+    await this.activity.record(actor, {
+      kind: 'clients_imported',
+      subject: String(report.createdCount + report.updatedCount),
+    });
+    return { ...report };
+  }
+
   @Get(':membershipId')
   @Roles('owner', 'admin')
+  @AllowStaffWithPermission('clients:manage')
   @ApiOperation({
     operationId: 'clients_get',
     summary: 'Un cliente del centro con su nivel, su grupo y cómo va. 404 si no existe.',
@@ -92,6 +131,7 @@ export class ClientsController {
 
   @Patch(':membershipId')
   @Roles('owner', 'admin')
+  @AllowStaffWithPermission('clients:manage')
   @ApiOperation({
     operationId: 'clients_update',
     summary: 'Cambia el nivel de un cliente o su grupo; null quita el nivel o lo saca del grupo.',

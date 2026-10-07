@@ -15,6 +15,10 @@ import {
   RegenerateJoinCodeUseCase,
 } from './application/center-sharing.use-cases';
 import { CENTER_SHARING_REPOSITORY } from './application/ports/center-sharing.repository';
+import { GetCenterSubscriptionUseCase } from './application/get-center-subscription.use-case';
+import { CENTER_SUBSCRIPTION_REPOSITORY } from './application/ports/center-subscription.repository';
+import { CenterSubscriptionController } from './http/center-subscription.controller';
+import { PrismaCenterSubscriptionRepository } from './infrastructure/prisma-center-subscription.repository';
 import { CenterSharingController } from './http/center-sharing.controller';
 import { PrismaCenterSharingRepository } from './infrastructure/prisma-center-sharing.repository';
 import { LogoController } from './http/logo.controller';
@@ -29,6 +33,7 @@ import { PrismaCenterBrandingRepository } from './infrastructure/prisma-center-b
     BrandingController,
     CenterSettingsController,
     CenterSharingController,
+    CenterSubscriptionController,
     LogoController,
   ],
   providers: [
@@ -38,6 +43,8 @@ import { PrismaCenterBrandingRepository } from './infrastructure/prisma-center-b
     GetJoinStatsUseCase,
     RegenerateJoinCodeUseCase,
     { provide: CENTER_SHARING_REPOSITORY, useClass: PrismaCenterSharingRepository },
+    GetCenterSubscriptionUseCase,
+    { provide: CENTER_SUBSCRIPTION_REPOSITORY, useClass: PrismaCenterSubscriptionRepository },
     GetCenterSettingsUseCase,
     UpdateCenterSettingsUseCase,
     { provide: CENTER_SETTINGS_REPOSITORY, useClass: PrismaCenterSettingsRepository },

@@ -1209,6 +1209,40 @@ paths:
       summary: Cambia el código de unión del centro. El QR y el enlace anteriores dejan de funcionar; quien ya se unió no se ve afectado.
       tags:
         - centers
+  /v1/centers/{centerId}/subscription:
+    get:
+      operationId: centers_get_subscription
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CenterSubscriptionResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: "Estado del plan del centro: prueba o activo, fin de la prueba, tope de clientes y cuántos hay activos. La suscripción se gestiona y se paga en la web."
+      tags:
+        - centers
   /v1/centers/{centerId}/logo:
     get:
       operationId: centers_get_logo
@@ -1954,6 +1988,50 @@ paths:
       summary: "Cifras de la cabecera de la agenda del centro: ocupación del día (tiempo reservado sobre el tiempo abierto del equipo que atiende servicios), clientes nuevos de la semana y clientes activos."
       tags:
         - reports
+  /v1/centers/{centerId}/reports:
+    get:
+      operationId: reports_get_center_report
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: period
+          required: false
+          in: query
+          schema:
+            default: month
+            type: string
+            enum:
+              - week
+              - month
+              - quarter
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CenterReportResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: "Informes del centro de la última semana, mes (30 días) o trimestre (90 días): ingresos estimados por las citas, ocupación, retención, clientes inactivos, ocupación por servicio, horas por profesional y retención por mes de alta."
+      tags:
+        - reports
   /v1/centers/{centerId}/rooms:
     get:
       operationId: rooms_list
@@ -2144,6 +2222,46 @@ paths:
       security:
         - bearer: []
       summary: Clientes del centro por nombre (la profesional ve solo a quienes han reservado con ella), con búsqueda por nombre o correo y filtro por estado (activos, nuevos, inactivos o bloqueados). Con paginación por limit y offset.
+      tags:
+        - clients
+  /v1/centers/{centerId}/clients/import:
+    post:
+      operationId: clients_import
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImportClientsRequestDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportClientsResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Importa clientes desde las filas de un archivo (nombre, correo, teléfono y nivel). Quien aún no tiene cuenta recibe una sin activar; no se envía ningún correo. Los que ya son clientes se actualizan; el resto de filas no importadas vuelven en el informe.
       tags:
         - clients
   /v1/centers/{centerId}/clients/{membershipId}:
@@ -4382,6 +4500,36 @@ components:
       required:
         - joinCode
       additionalProperties: false
+    CenterSubscriptionResponseDto:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - trial
+            - active
+            - past_due
+            - suspended
+        trialEndsAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+          nullable: true
+        maxClients:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+          nullable: true
+        activeClientCount:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+      required:
+        - status
+        - trialEndsAt
+        - maxClients
+        - activeClientCount
+      additionalProperties: false
     ServiceListResponseDto:
       type: object
       properties:
@@ -5577,6 +5725,161 @@ components:
         - newClientsThisWeek
         - activeClientCount
       additionalProperties: false
+    CenterReportResponseDto:
+      type: object
+      properties:
+        period:
+          type: string
+          enum:
+            - week
+            - month
+            - quarter
+        fromDate:
+          type: string
+          format: date
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+        toDate:
+          type: string
+          format: date
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+        estimatedIncomeCents:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        previousEstimatedIncomeCents:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        averageOccupancyPercent:
+          type: integer
+          minimum: 0
+          maximum: 100
+          nullable: true
+        retentionThreeMonthsPercent:
+          type: integer
+          minimum: 0
+          maximum: 100
+          nullable: true
+        activeClientCount:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        inactiveClientCount:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        incomeByMonth:
+          type: array
+          items:
+            type: object
+            properties:
+              month:
+                type: string
+              incomeCents:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+            required:
+              - month
+              - incomeCents
+            additionalProperties: false
+        services:
+          type: array
+          items:
+            type: object
+            properties:
+              serviceId:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              name:
+                type: string
+              sessionCount:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+              occupancyPercent:
+                type: integer
+                minimum: 0
+                maximum: 100
+                nullable: true
+            required:
+              - serviceId
+              - name
+              - sessionCount
+              - occupancyPercent
+            additionalProperties: false
+        staff:
+          type: array
+          items:
+            type: object
+            properties:
+              membershipId:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              fullName:
+                type: string
+              sessionCount:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+              hours:
+                type: number
+              occupancyPercent:
+                type: integer
+                minimum: 0
+                maximum: 100
+                nullable: true
+            required:
+              - membershipId
+              - fullName
+              - sessionCount
+              - hours
+              - occupancyPercent
+            additionalProperties: false
+        retentionByJoinMonth:
+          type: array
+          items:
+            type: object
+            properties:
+              month:
+                type: string
+              joinedCount:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+              retainedAfterOneMonthPercent:
+                type: integer
+                minimum: 0
+                maximum: 100
+                nullable: true
+              retainedAfterThreeMonthsPercent:
+                type: integer
+                minimum: 0
+                maximum: 100
+                nullable: true
+            required:
+              - month
+              - joinedCount
+              - retainedAfterOneMonthPercent
+              - retainedAfterThreeMonthsPercent
+            additionalProperties: false
+      required:
+        - period
+        - fromDate
+        - toDate
+        - estimatedIncomeCents
+        - previousEstimatedIncomeCents
+        - averageOccupancyPercent
+        - retentionThreeMonthsPercent
+        - activeClientCount
+        - inactiveClientCount
+        - incomeByMonth
+        - services
+        - staff
+        - retentionByJoinMonth
+      additionalProperties: false
     RoomListResponseDto:
       type: object
       properties:
@@ -5728,6 +6031,88 @@ components:
         - totalClientCount
         - matchingCount
         - clients
+      additionalProperties: false
+    ImportClientsRequestDto:
+      type: object
+      properties:
+        rows:
+          minItems: 1
+          maxItems: 500
+          type: array
+          items:
+            type: object
+            properties:
+              fullName:
+                type: string
+                minLength: 1
+                maxLength: 120
+              email:
+                type: string
+                maxLength: 254
+                format: email
+                pattern: ^(?:[A-Za-z0-9_'+\-]+\.)*[A-Za-z0-9_'+\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$
+                default: null
+                nullable: true
+              phone:
+                type: string
+                maxLength: 30
+                default: null
+                nullable: true
+              level:
+                type: string
+                enum:
+                  - beginner
+                  - intermediate
+                  - advanced
+                  - null
+                default: null
+                nullable: true
+            required:
+              - fullName
+            additionalProperties: false
+      required:
+        - rows
+      additionalProperties: false
+    ImportClientsResponseDto:
+      type: object
+      properties:
+        createdCount:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        updatedCount:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        skipped:
+          type: array
+          items:
+            type: object
+            properties:
+              rowNumber:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+              email:
+                type: string
+                nullable: true
+              reason:
+                type: string
+                enum:
+                  - missing_email
+                  - duplicated_in_file
+                  - blocked
+                  - team_member
+                  - client_limit_reached
+            required:
+              - rowNumber
+              - email
+              - reason
+            additionalProperties: false
+      required:
+        - createdCount
+        - updatedCount
+        - skipped
       additionalProperties: false
     ClientResponseDto:
       type: object

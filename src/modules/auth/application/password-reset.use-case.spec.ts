@@ -22,14 +22,15 @@ const OLD_PASSWORD = 'old correct horse battery';
 const NEW_PASSWORD = 'brand new passphrase 2026';
 const BREACHED_PASSWORD = 'password123456';
 
-function buildScenario(options: { isVerified?: boolean } = {}) {
+function buildScenario(options: { isVerified?: boolean; isUnactivated?: boolean } = {}) {
   const users = new InMemoryUserAccountRepository();
   users.seedAccount({
     id: USER_ID,
     email: EMAIL,
     fullName: 'Ana Pérez',
-    passwordHash: `hashed:${OLD_PASSWORD}`,
-    emailVerifiedAt: options.isVerified === false ? null : new Date(),
+    passwordHash: options.isUnactivated === true ? '!' : `hashed:${OLD_PASSWORD}`,
+    emailVerifiedAt:
+      options.isVerified === false || options.isUnactivated === true ? null : new Date(),
     failedLoginCount: 4,
   });
   const codes = new InMemoryVerificationCodeRepository();
@@ -103,6 +104,25 @@ describe('ForgotPasswordUseCase', () => {
     await scenario.forgotPassword.execute({ email: EMAIL });
 
     expect(scenario.emails.sent).toHaveLength(0);
+  });
+
+  it('emails the code to an account a center created by importing, which has no password yet', async () => {
+    const scenario = buildScenario({ isUnactivated: true });
+
+    await scenario.forgotPassword.execute({ email: EMAIL });
+
+    expect(scenario.emails.lastCodeSentTo(EMAIL)).toMatch(/^\d{6}$/);
+  });
+
+  it('lets the owner of an imported account set a password with that code, and confirms the email', async () => {
+    const scenario = buildScenario({ isUnactivated: true });
+    const code = await requestResetCode(scenario);
+
+    await scenario.resetPassword.execute({ email: EMAIL, code, newPassword: NEW_PASSWORD });
+
+    const account = scenario.users.accounts.get(EMAIL);
+    expect(account?.passwordHash).toBe(`hashed:${NEW_PASSWORD}`);
+    expect(account?.emailVerifiedAt).toBeInstanceOf(Date);
   });
 
   it('does not send a second code while the first is recent', async () => {

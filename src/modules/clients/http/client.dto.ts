@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { createZodDto } from '../../../shared/http/create-zod-dto';
+import { MAX_IMPORT_ROWS } from '../domain/client-import-rules';
 import {
   CLIENT_LEVELS,
   CLIENT_STATUS_FILTERS,
@@ -98,5 +99,55 @@ export class CreateGroupRequestDto extends createZodDto(
     name: z.string().trim().min(MIN_GROUP_NAME_LENGTH).max(MAX_GROUP_NAME_LENGTH),
     level: z.enum(CLIENT_LEVELS).optional(),
     instructorMembershipId: z.uuid().optional(),
+  }),
+) {}
+
+const MAX_IMPORT_NAME_LENGTH = 120;
+const MAX_IMPORT_EMAIL_LENGTH = 254;
+const MAX_IMPORT_PHONE_LENGTH = 30;
+
+/** Una cadena vacía (celda en blanco del CSV) cuenta como "no viene". */
+const blankToNull = (value: unknown): unknown => (value === '' ? null : value);
+
+export class ImportClientsRequestDto extends createZodDto(
+  z.strictObject({
+    rows: z
+      .array(
+        z.strictObject({
+          fullName: z.string().trim().min(1).max(MAX_IMPORT_NAME_LENGTH),
+          email: z.preprocess(
+            blankToNull,
+            z.email().max(MAX_IMPORT_EMAIL_LENGTH).nullable().default(null),
+          ),
+          phone: z.preprocess(
+            blankToNull,
+            z.string().trim().max(MAX_IMPORT_PHONE_LENGTH).nullable().default(null),
+          ),
+          level: z.preprocess(blankToNull, z.enum(CLIENT_LEVELS).nullable().default(null)),
+        }),
+      )
+      .min(1)
+      .max(MAX_IMPORT_ROWS),
+  }),
+) {}
+
+export class ImportClientsResponseDto extends createZodDto(
+  z.strictObject({
+    createdCount: z.number().int(),
+    updatedCount: z.number().int(),
+    /** Filas que no se importaron, con su número de fila (la primera de datos es la 1). */
+    skipped: z.array(
+      z.strictObject({
+        rowNumber: z.number().int(),
+        email: z.string().nullable(),
+        reason: z.enum([
+          'missing_email',
+          'duplicated_in_file',
+          'blocked',
+          'team_member',
+          'client_limit_reached',
+        ]),
+      }),
+    ),
   }),
 ) {}

@@ -9,6 +9,7 @@ export const ACTIVITY_KINDS = [
   'room_created',
   'room_archived',
   'client_updated',
+  'clients_imported',
   'group_created',
   'group_archived',
   'team_member_updated',
