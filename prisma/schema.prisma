@@ -487,6 +487,8 @@ model Invitation {
   invitedByUserId String         @map("invited_by_user_id") @db.Uuid
   expiresAt       DateTime       @map("expires_at") @db.Timestamptz
   acceptedAt      DateTime?      @map("accepted_at") @db.Timestamptz
+  /// Quién la aceptó: si la misma cuenta repite la petición, recibe lo mismo en vez de un error.
+  acceptedByUserId String?       @map("accepted_by_user_id") @db.Uuid
   revokedAt       DateTime?      @map("revoked_at") @db.Timestamptz
   createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz
 

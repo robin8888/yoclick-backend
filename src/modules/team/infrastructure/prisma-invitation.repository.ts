@@ -30,6 +30,29 @@ function isUsable(invitation: InvitationRow | null, now: Date): invitation is In
   );
 }
 
+/** Ya la aceptó esta misma cuenta, y sigue sin anularse: repetir la petición (dos toques, un reintento) no es un error. */
+function isAcceptedBy(invitation: InvitationRow | null, userId: string): boolean {
+  return (
+    invitation !== null &&
+    invitation.acceptedAt !== null &&
+    invitation.revokedAt === null &&
+    invitation.acceptedByUserId === userId
+  );
+}
+
+/** Repetir una aceptación ya hecha devuelve la pertenencia que quedó; de otra cuenta, nada. */
+async function replayAcceptance(
+  client: TenantTransactionClient,
+  invitation: InvitationRow,
+  userId: string,
+): Promise<AcceptInvitationOutcome> {
+  if (!isAcceptedBy(invitation, userId)) return { kind: 'invalid' };
+  const membership = await client.membership.findUnique({
+    where: { centerId_userId: { centerId: invitation.centerId, userId } },
+  });
+  return membership?.status === 'active' ? { kind: 'accepted', membership } : { kind: 'invalid' };
+}
+
 /** Enviada por correo, solo la cuenta de ese correo; enviada por teléfono, quien tenga el código. */
 function isAddressedTo(invitation: InvitationRow, userEmail: string | null): boolean {
   return invitation.email === null || invitation.email === userEmail;
@@ -177,9 +200,9 @@ export class PrismaInvitationRepository implements InvitationRepository {
       (client) => client.invitation.findUnique({ where: { tokenHash } }),
     );
     const userEmail = await this.findUserEmail(userId);
-    if (!isUsable(invitation, now) || !isAddressedTo(invitation, userEmail)) {
-      return { kind: 'invalid' };
-    }
+    if (invitation === null) return { kind: 'invalid' };
+    const isAcceptable = isUsable(invitation, now) || isAcceptedBy(invitation, userId);
+    if (!isAcceptable || !isAddressedTo(invitation, userEmail)) return { kind: 'invalid' };
 
     const actor = {
       userId,
@@ -191,6 +214,9 @@ export class PrismaInvitationRepository implements InvitationRepository {
     return this.tenantPrismaService.runInTenantContext(actor, async (client) => {
       // Bloquear el centro serializa las aceptaciones: el tope de clientes no se salta con códigos simultáneos.
       await client.$queryRaw`select id from centers where id = ${invitation.centerId}::uuid for update`;
+      // Con el centro bloqueado se vuelve a leer: otra petición pudo aceptarla justo antes.
+      const latest = await client.invitation.findUniqueOrThrow({ where: { id: invitation.id } });
+      if (latest.acceptedAt !== null) return replayAcceptance(client, latest, userId);
       return this.acceptWithinCenter(client, { invitation, userId, now });
     });
   }
@@ -220,7 +246,7 @@ export class PrismaInvitationRepository implements InvitationRepository {
 
     const consumed = await client.invitation.updateMany({
       where: { id: invitation.id, acceptedAt: null, revokedAt: null, expiresAt: { gt: now } },
-      data: { acceptedAt: now },
+      data: { acceptedAt: now, acceptedByUserId: userId },
     });
     if (consumed.count !== 1) return { kind: 'invalid' };
 

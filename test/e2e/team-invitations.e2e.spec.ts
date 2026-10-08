@@ -373,8 +373,36 @@ describe('team and invitations', () => {
 
       expect(accepted.statusCode).toBe(200);
       expect(accepted.json()).toMatchObject({ centerId, role: 'staff', status: 'active' });
-      expect(reused.statusCode).toBe(404);
+      // Repetirlo con la misma cuenta (dos toques, un reintento) devuelve lo mismo, no un error.
+      expect(reused.statusCode).toBe(200);
+      expect(reused.json()).toEqual(accepted.json());
       expect(await membershipOf(userId)).toMatchObject({ role: 'staff', status: 'active' });
+    });
+
+    it('answers the same to two simultaneous acceptances of the same account', async () => {
+      const { userId } = await createInvitee('invitee');
+      const code = await inviteAndGetCode('invitee@example.test', 'staff');
+
+      const responses = await Promise.all([
+        call('POST', `/v1/join/invitations/${code}/accept`, userId),
+        call('POST', `/v1/join/invitations/${code}/accept`, userId),
+      ]);
+
+      expect(responses.map((response) => response.statusCode)).toEqual([200, 200]);
+    });
+
+    it('refuses a code that another account already used', async () => {
+      const { userId: first } = await createInvitee('first');
+      const { userId: second } = await createInvitee('second');
+      const { code } = (
+        await call('POST', invitations(), owner, { phone: '600111222', role: 'client' })
+      ).json<{ code: string }>();
+      await call('POST', `/v1/join/invitations/${code}/accept`, first);
+
+      const response = await call('POST', `/v1/join/invitations/${code}/accept`, second);
+
+      expect(response.statusCode).toBe(404);
+      expect(await membershipOf(second)).toBeNull();
     });
 
     it('does not accept the code for a different account, and answers like an unknown code', async () => {
@@ -408,7 +436,7 @@ describe('team and invitations', () => {
       });
     });
 
-    it('lets any account accept a phone invitation, once, with the invited role', async () => {
+    it('lets any account accept a phone invitation with the invited role, and repeating it is harmless', async () => {
       const { userId } = await createInvitee('whatever');
       const { code } = (
         await call('POST', invitations(), owner, { phone: '600111222', role: 'staff' })
@@ -419,7 +447,7 @@ describe('team and invitations', () => {
 
       expect(accepted.statusCode).toBe(200);
       expect(accepted.json()).toMatchObject({ centerId, role: 'staff', status: 'active' });
-      expect(reused.statusCode).toBe(404);
+      expect(reused.statusCode).toBe(200);
       expect(await membershipOf(userId)).toMatchObject({ role: 'staff', status: 'active' });
     });
 
