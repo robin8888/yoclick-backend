@@ -9,9 +9,11 @@ import {
   generateInvitationCode,
   hashInvitationCode,
   INVITATION_VALID_DAYS,
+  formatInvitationCode,
   maskEmailAddress,
   normalizeInvitationCode,
 } from '../domain/invitation-code';
+import { normalizePhoneNumber } from '../domain/phone-number';
 import { canInviteRole, type TeamMemberStatus, type TeamRoleName } from '../domain/team-rules';
 import { buildInvitationMessage } from './invitation-email-message';
 import {
@@ -21,17 +23,22 @@ import {
   type PendingInvitation,
 } from './ports/invitation.repository';
 
+/** A quién va el código: a un correo (lo envía la API) o a un teléfono (lo comparte la app por WhatsApp o SMS). */
 export interface InviteRequest {
   readonly actor: ActorContext;
-  readonly email: string;
+  readonly email?: string | undefined;
+  readonly phone?: string | undefined;
   readonly role: 'admin' | 'staff' | 'client';
 }
 
 export interface CreatedInvitation {
   readonly id: string;
-  readonly email: string;
+  readonly email: string | null;
+  readonly phone: string | null;
   readonly role: 'admin' | 'staff' | 'client';
   readonly expiresAt: Date;
+  /** El código tal como se lee y se teclea (`ABCD-EFGH-JKLM`). Solo se ve ahora: en la base queda su hash. */
+  readonly code: string;
 }
 
 @Injectable()
@@ -43,9 +50,13 @@ export class InviteToCenterUseCase {
 
   async execute(request: InviteRequest): Promise<CreatedInvitation> {
     const { actor, role } = request;
-    const email = request.email.toLowerCase();
+    const email = request.email?.toLowerCase() ?? null;
+    const phone = resolvePhone(request.phone);
+    if (email === null && phone === null) {
+      throw new DomainError('VALIDATION_FAILED', HTTP_STATUS.badRequest);
+    }
     if (!canInviteRole(actor.role, role)) throw new DomainError('FORBIDDEN', HTTP_STATUS.forbidden);
-    if (await this.invitations.hasMemberWithEmail(actor, email)) {
+    if (email !== null && (await this.invitations.hasMemberWithEmail(actor, email))) {
       throw new DomainError('ALREADY_MEMBER', HTTP_STATUS.conflict);
     }
 
@@ -54,6 +65,7 @@ export class InviteToCenterUseCase {
     const invitation = {
       id: generateUuidV7(),
       email,
+      phone,
       role,
       tokenHash: hashInvitationCode(code),
       invitedByUserId: actor.userId,
@@ -61,18 +73,42 @@ export class InviteToCenterUseCase {
     };
     await this.invitations.createReplacingPending(actor, invitation, now);
 
-    const centerName = (await this.invitations.findCenterName(actor)) ?? 'tu centro';
+    if (email !== null) await this.sendInvitationEmail({ actor, email, role, code });
+    return {
+      id: invitation.id,
+      email,
+      phone,
+      role,
+      expiresAt: invitation.expiresAt,
+      code: formatInvitationCode(code),
+    };
+  }
+
+  private async sendInvitationEmail(input: {
+    actor: ActorContext;
+    email: string;
+    role: InviteRequest['role'];
+    code: string;
+  }): Promise<void> {
+    const centerName = (await this.invitations.findCenterName(input.actor)) ?? 'tu centro';
     await this.emailSender.send(
       buildInvitationMessage({
-        to: email,
+        to: input.email,
         centerName,
-        role,
-        code,
+        role: input.role,
+        code: input.code,
         validForDays: INVITATION_VALID_DAYS,
       }),
     );
-    return { id: invitation.id, email, role, expiresAt: invitation.expiresAt };
   }
+}
+
+/** Un teléfono mal escrito es un error de datos, no algo que se pueda corregir en silencio. */
+function resolvePhone(rawPhone: string | undefined): string | null {
+  if (rawPhone === undefined) return null;
+  const phone = normalizePhoneNumber(rawPhone);
+  if (phone === null) throw new DomainError('VALIDATION_FAILED', HTTP_STATUS.badRequest);
+  return phone;
 }
 
 @Injectable()
@@ -96,7 +132,8 @@ export class RevokeInvitationUseCase {
 
 export interface PublicInvitationPreview {
   readonly role: InvitationPreview['role'];
-  readonly emailHint: string;
+  /** `null` si se invitó por teléfono: la persona se registra con el correo que quiera. */
+  readonly emailHint: string | null;
   readonly expiresAt: Date;
   readonly center: InvitationPreview['center'];
 }
@@ -114,7 +151,7 @@ export class GetInvitationPreviewUseCase {
     if (!preview) throw new DomainError('INVITATION_INVALID', HTTP_STATUS.notFound);
     return {
       role: preview.role,
-      emailHint: maskEmailAddress(preview.email),
+      emailHint: preview.email === null ? null : maskEmailAddress(preview.email),
       expiresAt: preview.expiresAt,
       center: preview.center,
     };

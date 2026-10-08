@@ -220,6 +220,72 @@ describe('team and invitations', () => {
       expect(stored.map((row) => row.token_hash).join()).not.toContain(code);
     });
 
+    it('returns the code of an invitation so the app can share it', async () => {
+      const response = await invite(owner, 'visible@example.test', 'client');
+
+      const { code } = response.json<{ code: string }>();
+
+      expect(code).toBe(lastInvitationCodeSentTo('visible@example.test'));
+    });
+
+    it('invites by phone: normalizes the number, returns the code and sends no email', async () => {
+      const response = await call('POST', invitations(), owner, {
+        phone: '600 111 222',
+        role: 'client',
+      });
+
+      expect(response.statusCode).toBe(201);
+      expect(response.json()).toMatchObject({
+        email: null,
+        phone: '+34600111222',
+        role: 'client',
+        code: expect.stringMatching(/^[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/) as string,
+      });
+      expect(emails.messagesTo('600111222@example.test')).toEqual([]);
+    });
+
+    it('replaces the pending invitation when the same phone is invited again', async () => {
+      const body = { phone: '+34600111222', role: 'client' };
+      const first = (await call('POST', invitations(), owner, body)).json<{ code: string }>();
+      const second = (await call('POST', invitations(), owner, body)).json<{ code: string }>();
+
+      const firstPreview = await application.inject({
+        method: 'GET',
+        url: `/v1/join/invitations/${first.code}`,
+      });
+      const secondPreview = await application.inject({
+        method: 'GET',
+        url: `/v1/join/invitations/${second.code}`,
+      });
+
+      expect(firstPreview.statusCode).toBe(404);
+      expect(secondPreview.statusCode).toBe(200);
+    });
+
+    it('needs exactly one of email or phone, and a real phone number', async () => {
+      const both = await call('POST', invitations(), owner, {
+        email: 'a@example.test',
+        phone: '600111222',
+        role: 'client',
+      });
+      const neither = await call('POST', invitations(), owner, { role: 'client' });
+      const badPhone = await call('POST', invitations(), owner, { phone: '12345', role: 'client' });
+
+      expect(both.statusCode).toBe(400);
+      expect(neither.statusCode).toBe(400);
+      expect(badPhone.statusCode).toBe(400);
+    });
+
+    it('lists phone invitations among the pending ones', async () => {
+      await call('POST', invitations(), owner, { phone: '600111222', role: 'staff' });
+
+      const pending = await call('GET', invitations(), owner);
+
+      expect(pending.json<{ invitations: object[] }>().invitations).toMatchObject([
+        { email: null, phone: '+34600111222', role: 'staff' },
+      ]);
+    });
+
     it('lets staff invite clients only, never team or admins', async () => {
       expect((await invite(staff, 'c1@example.test', 'client')).statusCode).toBe(201);
       expect((await invite(staff, 'c2@example.test', 'staff')).statusCode).toBe(403);
@@ -322,6 +388,39 @@ describe('team and invitations', () => {
       expect(stolen.json()).toMatchObject({ code: 'INVITATION_INVALID' });
       expect(unknown.json()).toMatchObject({ code: 'INVITATION_INVALID' });
       expect(await membershipOf(intruder)).toBeNull();
+    });
+
+    it('previews a phone invitation without any email hint', async () => {
+      const { code } = (
+        await call('POST', invitations(), owner, { phone: '600111222', role: 'client' })
+      ).json<{ code: string }>();
+
+      const response = await application.inject({
+        method: 'GET',
+        url: `/v1/join/invitations/${code}`,
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({
+        role: 'client',
+        emailHint: null,
+        center: { id: centerId },
+      });
+    });
+
+    it('lets any account accept a phone invitation, once, with the invited role', async () => {
+      const { userId } = await createInvitee('whatever');
+      const { code } = (
+        await call('POST', invitations(), owner, { phone: '600111222', role: 'staff' })
+      ).json<{ code: string }>();
+
+      const accepted = await call('POST', `/v1/join/invitations/${code}/accept`, userId);
+      const reused = await call('POST', `/v1/join/invitations/${code}/accept`, userId);
+
+      expect(accepted.statusCode).toBe(200);
+      expect(accepted.json()).toMatchObject({ centerId, role: 'staff', status: 'active' });
+      expect(reused.statusCode).toBe(404);
+      expect(await membershipOf(userId)).toMatchObject({ role: 'staff', status: 'active' });
     });
 
     it('rejects expired invitations', async () => {

@@ -128,7 +128,7 @@ export class TeamController {
   @ApiOperation({
     operationId: 'invitations_create',
     summary:
-      'Invita por correo a un cliente, a alguien del equipo o a otra administradora. El personal solo invita clientes. El código llega por correo, sin enlaces.',
+      'Invita a un cliente, a alguien del equipo o a otra administradora, por correo o por teléfono (uno de los dos). Con correo, la API lo envía (sin enlaces). Con teléfono, la app comparte el código por WhatsApp o SMS y vale con cualquier cuenta. El personal solo invita clientes. La respuesta trae el código una sola vez.',
   })
   @ApiCreatedResponse({ type: InvitationResponseDto })
   async create(
@@ -137,7 +137,12 @@ export class TeamController {
     @Body() body: InviteRequestDto,
   ): Promise<Record<string, unknown>> {
     assertRouteTargetsActorCenter(actor, params.centerId);
-    const invitation = await this.invite.execute({ actor, email: body.email, role: body.role });
+    const invitation = await this.invite.execute({
+      actor,
+      email: body.email,
+      phone: body.phone,
+      role: body.role,
+    });
     return { ...invitation, expiresAt: invitation.expiresAt.toISOString() };
   }
 

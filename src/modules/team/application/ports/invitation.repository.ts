@@ -3,7 +3,9 @@ import { type TeamMemberStatus, type TeamRoleName } from '../../domain/team-rule
 
 export interface NewInvitation {
   readonly id: string;
-  readonly email: string;
+  /** Uno de los dos, como mínimo: a quién se envió el código. */
+  readonly email: string | null;
+  readonly phone: string | null;
   readonly role: 'admin' | 'staff' | 'client';
   readonly tokenHash: string;
   readonly invitedByUserId: string;
@@ -12,7 +14,8 @@ export interface NewInvitation {
 
 export interface PendingInvitation {
   readonly id: string;
-  readonly email: string;
+  readonly email: string | null;
+  readonly phone: string | null;
   readonly role: TeamRoleName;
   readonly expiresAt: Date;
   readonly createdAt: Date;
@@ -21,7 +24,8 @@ export interface PendingInvitation {
 /** Lo que ve quien recibe el código antes de aceptar. */
 export interface InvitationPreview {
   readonly role: TeamRoleName;
-  readonly email: string;
+  /** `null` si se invitó por teléfono: entonces vale cualquier cuenta. */
+  readonly email: string | null;
   readonly expiresAt: Date;
   readonly center: {
     readonly id: string;
@@ -57,7 +61,7 @@ export interface InvitationRepository {
   findCenterName(actor: ActorContext): Promise<string | null>;
   /** ¿Esa dirección ya es miembro (activo o bloqueado) del centro? */
   hasMemberWithEmail(actor: ActorContext, email: string): Promise<boolean>;
-  /** Invitar de nuevo a la misma dirección anula la invitación pendiente anterior. */
+  /** Invitar de nuevo al mismo correo o teléfono anula la invitación pendiente anterior. */
   createReplacingPending(actor: ActorContext, invitation: NewInvitation, now: Date): Promise<void>;
   listPending(actor: ActorContext, now: Date): Promise<PendingInvitation[]>;
   revoke(actor: ActorContext, invitationId: string, now: Date): Promise<boolean>;

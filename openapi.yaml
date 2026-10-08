@@ -939,7 +939,7 @@ paths:
                 $ref: "#/components/schemas/ProblemDetailsDto"
       security:
         - bearer: []
-      summary: Invita por correo a un cliente, a alguien del equipo o a otra administradora. El personal solo invita clientes. El código llega por correo, sin enlaces.
+      summary: Invita a un cliente, a alguien del equipo o a otra administradora, por correo o por teléfono (uno de los dos). Con correo, la API lo envía (sin enlaces). Con teléfono, la app comparte el código por WhatsApp o SMS y vale con cualquier cuenta. El personal solo invita clientes. La respuesta trae el código una sola vez.
       tags:
         - team
   /v1/centers/{centerId}/invitations/{invitationId}:
@@ -5703,6 +5703,10 @@ components:
                 pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
               email:
                 type: string
+                nullable: true
+              phone:
+                type: string
+                nullable: true
               role:
                 type: string
                 enum:
@@ -5721,6 +5725,7 @@ components:
             required:
               - id
               - email
+              - phone
               - role
               - expiresAt
               - createdAt
@@ -5736,6 +5741,10 @@ components:
           maxLength: 254
           format: email
           pattern: ^(?:[A-Za-z0-9_'+\-]+\.)*[A-Za-z0-9_'+\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$
+        phone:
+          type: string
+          minLength: 1
+          maxLength: 24
         role:
           type: string
           enum:
@@ -5743,7 +5752,6 @@ components:
             - staff
             - client
       required:
-        - email
         - role
       additionalProperties: false
     InvitationResponseDto:
@@ -5755,6 +5763,10 @@ components:
           pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
         email:
           type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
         role:
           type: string
           enum:
@@ -5766,11 +5778,15 @@ components:
           type: string
           format: date-time
           pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+        code:
+          type: string
       required:
         - id
         - email
+        - phone
         - role
         - expiresAt
+        - code
       additionalProperties: false
     StaffAvailabilityResponseDto:
       type: object
@@ -6097,6 +6113,7 @@ components:
             - client
         emailHint:
           type: string
+          nullable: true
         expiresAt:
           type: string
           format: date-time

@@ -477,7 +477,10 @@ model MfaRecoveryCode {
 model Invitation {
   id              String         @id @db.Uuid
   centerId        String         @map("center_id") @db.Uuid
-  email           String
+  /// Correo al que se envió; nulo si se invitó por teléfono (entonces vale cualquier cuenta).
+  email           String?
+  /// Teléfono al que se compartió el código, normalizado (`+34600111222`).
+  phone           String?
   role            MembershipRole
   tokenHash       String         @unique @map("token_hash")
   invitedByUserId String         @map("invited_by_user_id") @db.Uuid
@@ -489,6 +492,7 @@ model Invitation {
   center Center @relation(fields: [centerId], references: [id])
 
   @@index([centerId, email])
+  @@index([centerId, phone])
   @@map("invitations")
 }
 

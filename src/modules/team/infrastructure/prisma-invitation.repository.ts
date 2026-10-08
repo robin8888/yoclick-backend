@@ -29,6 +29,11 @@ function isUsable(invitation: InvitationRow | null, now: Date): invitation is In
   );
 }
 
+/** Enviada por correo, solo la cuenta de ese correo; enviada por teléfono, quien tenga el código. */
+function isAddressedTo(invitation: InvitationRow, userEmail: string | null): boolean {
+  return invitation.email === null || invitation.email === userEmail;
+}
+
 @Injectable()
 export class PrismaInvitationRepository implements InvitationRepository {
   constructor(private readonly tenantPrismaService: TenantPrismaService) {}
@@ -56,7 +61,14 @@ export class PrismaInvitationRepository implements InvitationRepository {
   ): Promise<void> {
     await this.tenantPrismaService.runInTenantContext(actor, async (client) => {
       await client.invitation.updateMany({
-        where: { email: invitation.email, acceptedAt: null, revokedAt: null },
+        where: {
+          acceptedAt: null,
+          revokedAt: null,
+          OR: [
+            ...(invitation.email === null ? [] : [{ email: invitation.email }]),
+            ...(invitation.phone === null ? [] : [{ phone: invitation.phone }]),
+          ],
+        },
         data: { revokedAt: now },
       });
       await client.invitation.create({ data: { ...invitation, centerId: actor.centerId } });
@@ -67,7 +79,14 @@ export class PrismaInvitationRepository implements InvitationRepository {
     return this.tenantPrismaService.runInTenantContext(actor, (client) =>
       client.invitation.findMany({
         where: { acceptedAt: null, revokedAt: null, expiresAt: { gt: now } },
-        select: { id: true, email: true, role: true, expiresAt: true, createdAt: true },
+        select: {
+          id: true,
+          email: true,
+          phone: true,
+          role: true,
+          expiresAt: true,
+          createdAt: true,
+        },
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       }),
     );
@@ -127,7 +146,9 @@ export class PrismaInvitationRepository implements InvitationRepository {
       (client) => client.invitation.findUnique({ where: { tokenHash } }),
     );
     const userEmail = await this.findUserEmail(userId);
-    if (!isUsable(invitation, now) || invitation.email !== userEmail) return { kind: 'invalid' };
+    if (!isUsable(invitation, now) || !isAddressedTo(invitation, userEmail)) {
+      return { kind: 'invalid' };
+    }
 
     const actor = {
       userId,
