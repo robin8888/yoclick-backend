@@ -20,6 +20,7 @@ export const ACTIVITY_KINDS = [
   'booking_cancelled_by_team',
   'routine_created',
   'routine_assigned',
+  'routine_updated',
   'routine_archived',
   'privacy_request_resolved',
   'client_data_exported',

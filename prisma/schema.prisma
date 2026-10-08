@@ -111,6 +111,7 @@ enum NotificationKind {
   staff_review_received
   booking_rescheduled
   booking_rescheduled_by_team
+  routine_updated
 
   @@map("notification_kind")
 }

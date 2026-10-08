@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Put,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
@@ -27,6 +37,7 @@ import {
   ListMyRoutinesUseCase,
   ListRoutinesUseCase,
   UnassignRoutineUseCase,
+  UpdateRoutineUseCase,
 } from '../application/routine.use-cases';
 import {
   type ClientRoutineView,
@@ -44,6 +55,7 @@ import {
   RoutineDetailResponseDto,
   RoutineListResponseDto,
   RoutineRouteParamsDto,
+  UpdateRoutineRequestDto,
 } from './routine.dto';
 
 /** La clientela solo ve el vídeo de un ejercicio cuando está listo y aprobado. */
@@ -232,6 +244,45 @@ export class RoutinesController {
     assertRouteTargetsActorCenter(actor, params.centerId);
     await this.archiveRoutine.execute(actor, params.routineId);
     await this.activity.record(actor, { kind: 'routine_archived' });
+  }
+}
+
+/** El equipo corrige una rutina ya creada. */
+@ApiTags('routines')
+@ApiBearerAuth('bearer')
+@ApiHeader({ name: 'X-Center-Id', required: true })
+@ApiDefaultResponse({ type: ProblemDetailsDto, description: 'Error RFC 9457' })
+@Controller('centers/:centerId')
+export class RoutineEditingController {
+  constructor(
+    private readonly updateRoutine: UpdateRoutineUseCase,
+    private readonly activity: ActivityRecorder,
+    private readonly push: PushDispatcher,
+    private readonly presenter: VideoPresenter,
+  ) {}
+
+  @Put('routines/:routineId')
+  @Roles('owner', 'admin', 'staff')
+  @ApiOperation({
+    operationId: 'routines_update',
+    summary:
+      'Cambia el nombre, la nota y los ejercicios de una rutina (lo que no se envía se quita). Quien la tiene asignada recibe un aviso push. Las asignaciones no cambian.',
+  })
+  @ApiOkResponse({ type: RoutineDetailResponseDto })
+  async update(
+    @CurrentActor() actor: ActorContext,
+    @Param() params: RoutineRouteParamsDto,
+    @Body() body: UpdateRoutineRequestDto,
+  ): Promise<Record<string, unknown>> {
+    assertRouteTargetsActorCenter(actor, params.centerId);
+    const routine = await this.updateRoutine.execute(actor, params.routineId, {
+      name: body.name,
+      note: body.note,
+      items: body.items,
+    });
+    await this.activity.record(actor, { kind: 'routine_updated', subject: routine.name });
+    await this.push.flushCenter(actor);
+    return serializeDetail(routine, this.presenter);
   }
 }
 

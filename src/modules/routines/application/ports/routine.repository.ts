@@ -61,6 +61,17 @@ export type CreateRoutineOutcome =
   /** Algún vídeo de los ejercicios no existe en este centro. */
   | { readonly kind: 'unknown_video' };
 
+export interface RoutineChanges {
+  readonly name: string;
+  readonly note: string | null;
+  readonly items: readonly RoutineItemInput[];
+}
+
+export type UpdateRoutineOutcome =
+  | { readonly kind: 'updated'; readonly routine: RoutineDetail }
+  | { readonly kind: 'not_found' }
+  | { readonly kind: 'unknown_video' };
+
 export type AssignRoutineOutcome =
   | { readonly kind: 'assigned'; readonly assignmentId: string }
   | { readonly kind: 'not_found' }
@@ -73,6 +84,12 @@ export interface RoutineRepository {
   create(actor: ActorContext, routine: NewRoutine): Promise<CreateRoutineOutcome>;
   list(actor: ActorContext): Promise<RoutineSummary[]>;
   find(actor: ActorContext, routineId: string): Promise<RoutineDetail | null>;
+  /** Reemplaza el nombre, la nota y los ejercicios, y avisa a quien la tiene asignada. */
+  update(
+    actor: ActorContext,
+    routineId: string,
+    changes: RoutineChanges,
+  ): Promise<UpdateRoutineOutcome>;
   /** `false` si no existe o ya estaba archivada. */
   archive(actor: ActorContext, routineId: string): Promise<boolean>;
   assign(

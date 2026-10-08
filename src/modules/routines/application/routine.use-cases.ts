@@ -8,6 +8,7 @@ import { type AssignmentTarget, type RoutineItemInput } from '../domain/routine-
 import {
   ROUTINE_REPOSITORY,
   type ClientRoutineView,
+  type RoutineChanges,
   type RoutineDetail,
   type RoutineRepository,
   type RoutineSummary,
@@ -43,6 +44,21 @@ export class CreateRoutineUseCase {
       assignTo: request.assignTo,
     });
     if (outcome.kind !== 'created') throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
+    return outcome.routine;
+  }
+}
+
+@Injectable()
+export class UpdateRoutineUseCase {
+  constructor(@Inject(ROUTINE_REPOSITORY) private readonly routines: RoutineRepository) {}
+
+  async execute(
+    actor: ActorContext,
+    routineId: string,
+    changes: RoutineChanges,
+  ): Promise<RoutineDetail> {
+    const outcome = await this.routines.update(actor, routineId, changes);
+    if (outcome.kind !== 'updated') throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
     return outcome.routine;
   }
 }

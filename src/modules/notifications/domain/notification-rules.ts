@@ -15,6 +15,7 @@ export const NOTIFICATION_KINDS = [
   'staff_review_received',
   'booking_rescheduled',
   'booking_rescheduled_by_team',
+  'routine_updated',
 ] as const;
 export type NotificationKindName = (typeof NOTIFICATION_KINDS)[number];
 

@@ -35,7 +35,7 @@ describe('routines', () => {
 
   const url = (path: string): string => `/v1/centers/${center.centerId}${path}`;
   const call = (
-    method: 'GET' | 'POST' | 'DELETE' | 'PATCH',
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH',
     path: string,
     userId: string,
     body?: object,
@@ -232,6 +232,86 @@ describe('routines', () => {
 
       expect(removal.statusCode).toBe(204);
       expect(await myRoutines(ana.userId)).toEqual([]);
+    });
+  });
+
+  describe('editing', () => {
+    const CHANGED_ITEMS = [{ name: 'Peso muerto rumano', prescription: '3 × 8' }, { name: 'Remo' }];
+
+    it('replaces the name, the note and the exercises, keeping who has it', async () => {
+      const routine = await createRoutine({ assignTo: { clientMembershipId: ana.membershipId } });
+
+      const response = await call('PUT', `/routines/${routine.id}`, owner, {
+        name: 'Fuerza v2',
+        note: '',
+        items: CHANGED_ITEMS,
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json<RoutineBody>()).toMatchObject({
+        id: routine.id,
+        name: 'Fuerza v2',
+        note: null,
+        items: [{ name: 'Peso muerto rumano', prescription: '3 × 8' }, { name: 'Remo' }],
+        assignments: [{ kind: 'client' }],
+      });
+      expect(await myRoutines(ana.userId)).toMatchObject([
+        { name: 'Fuerza v2', items: [{ name: 'Peso muerto rumano' }, { name: 'Remo' }] },
+      ]);
+    });
+
+    it('tells whoever has the routine once, even through the group and directly', async () => {
+      const groupId = await createGroupWith([ana]);
+      const routine = await createRoutine({ assignTo: { groupId } });
+      await call('POST', `/routines/${routine.id}/assignments`, owner, {
+        clientMembershipId: ana.membershipId,
+      });
+
+      await call('PUT', `/routines/${routine.id}`, owner, {
+        name: 'Fuerza v2',
+        items: CHANGED_ITEMS,
+      });
+
+      const notices = await call('GET', '/notifications', ana.userId);
+      const kinds = notices
+        .json<{ notifications: { kind: string }[] }>()
+        .notifications.map(({ kind }) => kind);
+      expect(kinds.filter((kind) => kind === 'routine_updated')).toHaveLength(1);
+    });
+
+    it('does not tell anybody when the routine has nobody assigned', async () => {
+      const routine = await createRoutine();
+
+      const response = await call('PUT', `/routines/${routine.id}`, owner, {
+        name: 'Fuerza v2',
+        items: CHANGED_ITEMS,
+      });
+
+      expect(response.statusCode).toBe(200);
+      const notices = await call('GET', '/notifications', ana.userId);
+      expect(notices.json<{ notifications: object[] }>().notifications).toEqual([]);
+    });
+
+    it('lets an instructor edit, and refuses clients', async () => {
+      const routine = await createRoutine();
+      const body = { name: 'Fuerza v2', items: CHANGED_ITEMS };
+
+      expect((await call('PUT', `/routines/${routine.id}`, staff.userId, body)).statusCode).toBe(
+        200,
+      );
+      expect((await call('PUT', `/routines/${routine.id}`, ana.userId, body)).statusCode).toBe(403);
+    });
+
+    it('answers 404 for unknown or archived routines and 400 without exercises', async () => {
+      const routine = await createRoutine();
+      const body = { name: 'Fuerza v2', items: CHANGED_ITEMS };
+      await call('DELETE', `/routines/${routine.id}`, owner);
+
+      expect((await call('PUT', `/routines/${routine.id}`, owner, body)).statusCode).toBe(404);
+      expect((await call('PUT', `/routines/${randomUUID()}`, owner, body)).statusCode).toBe(404);
+      const other = await createRoutine();
+      const empty = await call('PUT', `/routines/${other.id}`, owner, { name: 'x', items: [] });
+      expect(empty.statusCode).toBe(400);
     });
   });
 

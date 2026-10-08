@@ -3068,6 +3068,52 @@ paths:
       summary: "Archiva una rutina: deja de verse para quien la tenía asignada."
       tags:
         - routines
+    put:
+      operationId: routines_update
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: routineId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRoutineRequestDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoutineDetailResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Cambia el nombre, la nota y los ejercicios de una rutina (lo que no se envía se quita). Quien la tiene asignada recibe un aviso push. Las asignaciones no cambian.
+      tags:
+        - routines
   /v1/centers/{centerId}/my-routines:
     get:
       operationId: routines_list_mine
@@ -8395,6 +8441,7 @@ components:
                   - staff_review_received
                   - booking_rescheduled
                   - booking_rescheduled_by_team
+                  - routine_updated
               data:
                 type: object
                 additionalProperties:
@@ -8788,6 +8835,52 @@ components:
               format: uuid
               pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
           additionalProperties: false
+      required:
+        - name
+        - items
+      additionalProperties: false
+    UpdateRoutineRequestDto:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        note:
+          type: string
+          maxLength: 500
+          default: null
+          nullable: true
+        items:
+          minItems: 1
+          maxItems: 30
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+                minLength: 1
+                maxLength: 120
+              category:
+                type: string
+                maxLength: 60
+                default: null
+                nullable: true
+              prescription:
+                type: string
+                maxLength: 120
+                default: null
+                nullable: true
+              videoId:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                default: null
+                nullable: true
+            required:
+              - name
+            additionalProperties: false
       required:
         - name
         - items

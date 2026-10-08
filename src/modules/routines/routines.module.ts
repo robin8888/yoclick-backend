@@ -4,6 +4,7 @@ import {
   ArchiveRoutineUseCase,
   AssignRoutineUseCase,
   CreateRoutineUseCase,
+  UpdateRoutineUseCase,
   GetExerciseLibraryUseCase,
   GetRoutineUseCase,
   ListMyRoutinesUseCase,
@@ -13,15 +14,22 @@ import {
 import {
   RoutineAssignmentsController,
   RoutineLibraryController,
+  RoutineEditingController,
   RoutinesController,
 } from './http/routines.controller';
 import { PrismaRoutineRepository } from './infrastructure/prisma-routine.repository';
 
 @Module({
-  controllers: [RoutineLibraryController, RoutinesController, RoutineAssignmentsController],
+  controllers: [
+    RoutineLibraryController,
+    RoutinesController,
+    RoutineEditingController,
+    RoutineAssignmentsController,
+  ],
   providers: [
     GetExerciseLibraryUseCase,
     CreateRoutineUseCase,
+    UpdateRoutineUseCase,
     ListRoutinesUseCase,
     GetRoutineUseCase,
     ArchiveRoutineUseCase,

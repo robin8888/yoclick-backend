@@ -11,10 +11,12 @@ import {
   type CreateRoutineOutcome,
   type NewRoutine,
   type RoutineAssignmentView,
+  type RoutineChanges,
   type RoutineDetail,
   type RoutineItemView,
   type RoutineRepository,
   type RoutineSummary,
+  type UpdateRoutineOutcome,
 } from '../application/ports/routine.repository';
 import { type RoutineNotificationData } from '../../notifications/domain/notification-rules';
 import { VIDEO_SELECT } from '../../videos/infrastructure/video-select';
@@ -155,13 +157,34 @@ async function findRecipientsOfTarget(
   return members.map(({ id }) => id).filter((id) => id !== actorMembershipId);
 }
 
-/** Deja el aviso de la rutina asignada; se escribe con la asignación y el envío al móvil ocurre después. */
-async function recordAssignmentNotices(
+interface RoutineNoticeRequest {
+  readonly routineName: string;
+  readonly targets: readonly AssignmentTarget[];
+  readonly kind: 'routine_assigned' | 'routine_updated';
+}
+
+/** Cada persona una sola vez, aunque la rutina le llegue directamente y por su grupo. */
+async function findDistinctRecipients(
+  client: TenantTransactionClient,
+  targets: readonly AssignmentTarget[],
+  actorMembershipId: string,
+): Promise<string[]> {
+  const recipients = new Set<string>();
+  for (const target of targets) {
+    for (const id of await findRecipientsOfTarget(client, target, actorMembershipId)) {
+      recipients.add(id);
+    }
+  }
+  return [...recipients];
+}
+
+/** Deja el aviso de la rutina; se escribe con el cambio y el envío al móvil ocurre después. */
+async function recordRoutineNotices(
   client: TenantTransactionClient,
   actor: ActorContext,
-  request: { routineName: string; target: AssignmentTarget },
+  request: RoutineNoticeRequest,
 ): Promise<void> {
-  const recipients = await findRecipientsOfTarget(client, request.target, actor.membershipId);
+  const recipients = await findDistinctRecipients(client, request.targets, actor.membershipId);
   if (recipients.length === 0) return;
   const actorMember = await client.membership.findUnique({
     where: { id: actor.membershipId },
@@ -176,9 +199,55 @@ async function recordAssignmentNotices(
       id: generateUuidV7(),
       centerId: actor.centerId,
       recipientMembershipId,
-      kind: 'routine_assigned' as const,
+      kind: request.kind,
       data: noticeData,
     })),
+  });
+}
+
+/** Los ejercicios se reescriben enteros: borrarlos antes libera las posiciones que vuelven a usarse. */
+async function replaceRoutineContent(
+  client: TenantTransactionClient,
+  routineId: string,
+  changes: RoutineChanges,
+): Promise<void> {
+  await client.routineItem.deleteMany({ where: { routineId } });
+  await client.routine.update({
+    where: { id: routineId },
+    data: {
+      name: changes.name,
+      note: changes.note,
+      items: {
+        create: changes.items.map((item, position) => ({
+          id: generateUuidV7(),
+          position,
+          ...item,
+        })),
+      },
+    },
+  });
+}
+
+/** Avisa a quien tiene la rutina asignada, directamente o por su grupo. */
+async function notifyRoutineUpdated(
+  client: TenantTransactionClient,
+  actor: ActorContext,
+  routine: { routineId: string; routineName: string },
+): Promise<void> {
+  const assignments = await client.routineAssignment.findMany({
+    where: { routineId: routine.routineId },
+    select: { clientMembershipId: true, groupId: true },
+  });
+  const targets = assignments.flatMap((assignment): AssignmentTarget[] => {
+    if (assignment.clientMembershipId !== null) {
+      return [{ kind: 'client', membershipId: assignment.clientMembershipId }];
+    }
+    return assignment.groupId === null ? [] : [{ kind: 'group', groupId: assignment.groupId }];
+  });
+  await recordRoutineNotices(client, actor, {
+    routineName: routine.routineName,
+    targets,
+    kind: 'routine_updated',
   });
 }
 
@@ -204,9 +273,10 @@ export class PrismaRoutineRepository implements RoutineRepository {
       if (!(await allVideosExist(client, routine.items))) return { kind: 'unknown_video' } as const;
       await client.routine.create({ data: buildCreateData(actor, routine) });
       if (routine.assignTo) {
-        await recordAssignmentNotices(client, actor, {
+        await recordRoutineNotices(client, actor, {
           routineName: routine.name,
-          target: routine.assignTo,
+          targets: [routine.assignTo],
+          kind: 'routine_assigned',
         });
       }
       const saved = await client.routine.findUniqueOrThrow({
@@ -247,6 +317,28 @@ export class PrismaRoutineRepository implements RoutineRepository {
     return row ? toDetail(row) : null;
   }
 
+  async update(
+    actor: ActorContext,
+    routineId: string,
+    changes: RoutineChanges,
+  ): Promise<UpdateRoutineOutcome> {
+    return this.tenantPrismaService.runInTenantContext(actor, async (client) => {
+      const current = await client.routine.findFirst({
+        where: { id: routineId, archivedAt: null },
+        select: { id: true },
+      });
+      if (!current) return { kind: 'not_found' } as const;
+      if (!(await allVideosExist(client, changes.items))) return { kind: 'unknown_video' } as const;
+      await replaceRoutineContent(client, routineId, changes);
+      await notifyRoutineUpdated(client, actor, { routineId, routineName: changes.name });
+      const saved = await client.routine.findUniqueOrThrow({
+        where: { id: routineId },
+        include: DETAIL_INCLUDE,
+      });
+      return { kind: 'updated', routine: toDetail(saved) } as const;
+    });
+  }
+
   async archive(actor: ActorContext, routineId: string): Promise<boolean> {
     const result = await this.tenantPrismaService.runInTenantContext(actor, (client) =>
       client.routine.updateMany({
@@ -284,9 +376,10 @@ export class PrismaRoutineRepository implements RoutineRepository {
           ...columns,
         },
       });
-      await recordAssignmentNotices(client, actor, {
+      await recordRoutineNotices(client, actor, {
         routineName: routine.name,
-        target: request.target,
+        targets: [request.target],
+        kind: 'routine_assigned',
       });
       return { kind: 'assigned', assignmentId: request.assignmentId } as const;
     });

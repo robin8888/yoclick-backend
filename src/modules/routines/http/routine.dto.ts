@@ -55,6 +55,15 @@ export class CreateRoutineRequestDto extends createZodDto(
   }),
 ) {}
 
+/** Reemplaza el contenido de la rutina: lo que no se envía se quita. */
+export class UpdateRoutineRequestDto extends createZodDto(
+  z.strictObject({
+    name: z.string().trim().min(1).max(MAX_ROUTINE_NAME_LENGTH),
+    note: optionalText(MAX_ROUTINE_NOTE_LENGTH),
+    items: z.array(itemSchema).min(1).max(MAX_ROUTINE_ITEMS),
+  }),
+) {}
+
 export class AssignRoutineRequestDto extends createZodDto(targetSchema) {}
 
 const exerciseShape = {
