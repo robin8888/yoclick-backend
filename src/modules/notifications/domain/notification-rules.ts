@@ -16,6 +16,7 @@ export const NOTIFICATION_KINDS = [
   'booking_rescheduled',
   'booking_rescheduled_by_team',
   'routine_updated',
+  'member_joined',
 ] as const;
 export type NotificationKindName = (typeof NOTIFICATION_KINDS)[number];
 
@@ -102,6 +103,12 @@ export type AbsenceNotificationData = {
   readonly reason: string;
   /** Citas que ya había en esos días, como texto: los datos del aviso son siempre texto. */
   readonly affectedBookingCount: string;
+};
+
+/** Los datos del aviso de una persona que se ha dado de alta: quién y con qué papel. */
+export type MemberJoinedNotificationData = {
+  readonly personName: string;
+  readonly role: 'client' | 'staff' | 'admin';
 };
 
 /** Los datos del aviso de una rutina asignada. */

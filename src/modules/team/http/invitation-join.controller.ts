@@ -12,6 +12,7 @@ import { Public } from '../../../shared/auth/decorators/public.decorator';
 import { UserScoped } from '../../../shared/auth/decorators/user-scoped.decorator';
 import { ProblemDetailsDto } from '../../../shared/errors/problem-details.dto';
 import { RATE_LIMITS } from '../../../shared/rate-limit/rate-limit-policies';
+import { PushDispatcher } from '../../push/application/push-dispatcher';
 import {
   AcceptInvitationUseCase,
   GetInvitationPreviewUseCase,
@@ -30,6 +31,7 @@ export class InvitationJoinController {
   constructor(
     private readonly getPreview: GetInvitationPreviewUseCase,
     private readonly acceptInvitation: AcceptInvitationUseCase,
+    private readonly push: PushDispatcher,
   ) {}
 
   @Get(':code')
@@ -61,6 +63,15 @@ export class InvitationJoinController {
     @CurrentUserId() userId: string,
     @Param() params: InvitationCodeParamsDto,
   ): Promise<Record<string, unknown>> {
-    return { ...(await this.acceptInvitation.execute(userId, params.code)) };
+    const accepted = await this.acceptInvitation.execute(userId, params.code);
+    // Tras confirmarse el alta: la propiedad y la administración se enteran por push.
+    await this.push.flushCenter({
+      userId,
+      centerId: accepted.centerId,
+      membershipId: accepted.membershipId,
+      role: accepted.role,
+      permissions: [],
+    });
+    return { ...accepted };
   }
 }

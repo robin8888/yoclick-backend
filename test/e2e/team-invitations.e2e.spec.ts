@@ -423,6 +423,54 @@ describe('team and invitations', () => {
       expect(await membershipOf(userId)).toMatchObject({ role: 'staff', status: 'active' });
     });
 
+    async function memberJoinedNotices() {
+      return tenantPrismaService.runInTenantContext(
+        {
+          userId: owner,
+          centerId,
+          membershipId: ownerMembershipId,
+          role: 'owner',
+          permissions: [],
+        },
+        (client) =>
+          client.notification.findMany({
+            where: { kind: 'member_joined' },
+            select: { recipientMembershipId: true, data: true },
+          }),
+      );
+    }
+
+    it('tells the owner and the admin that somebody joined, but not the person who joined', async () => {
+      const { userId } = await createInvitee('whatever');
+      const { code } = (
+        await call('POST', invitations(), owner, { phone: '600111222', role: 'staff' })
+      ).json<{ code: string }>();
+
+      await call('POST', `/v1/join/invitations/${code}/accept`, userId);
+
+      const notices = await memberJoinedNotices();
+      const recipients = notices.map((notice) => notice.recipientMembershipId);
+      // Propiedad y las dos administraciones del centro de prueba; la persona que entra no.
+      expect(recipients).toHaveLength(3);
+      expect(recipients).toEqual(expect.arrayContaining([ownerMembershipId, adminMembershipId]));
+      expect(notices[0]?.data).toEqual({ personName: 'whatever', role: 'staff' });
+    });
+
+    it('does not tell anybody again when somebody who is already inside accepts another code', async () => {
+      const { userId } = await createInvitee('whatever');
+      const first = (
+        await call('POST', invitations(), owner, { phone: '600111222', role: 'staff' })
+      ).json<{ code: string }>();
+      await call('POST', `/v1/join/invitations/${first.code}/accept`, userId);
+      const second = (
+        await call('POST', invitations(), owner, { phone: '600333444', role: 'staff' })
+      ).json<{ code: string }>();
+
+      await call('POST', `/v1/join/invitations/${second.code}/accept`, userId);
+
+      expect(await memberJoinedNotices()).toHaveLength(3);
+    });
+
     it('rejects expired invitations', async () => {
       const { userId } = await createInvitee('invitee');
       const code = await inviteAndGetCode('invitee@example.test', 'client');

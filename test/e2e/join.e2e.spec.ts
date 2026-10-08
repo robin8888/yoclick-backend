@@ -251,6 +251,40 @@ describe('joining a center: lookup, search, branding and joining', () => {
       expect(await countMemberships(centerId, person)).toBe(0);
     });
 
+    it('tells the owner when somebody joins, once, and nobody else', async () => {
+      const centerId = await fixtures.createCenter('studio-norte', 'NORTE7');
+      const owner = await fixtures.createUser('owner');
+      const ownerMembershipId = await fixtures.createMembership({
+        centerId,
+        userId: owner,
+        role: 'owner',
+      });
+      await request('POST', `/v1/join/${centerId}`, person, { joinCode: 'NORTE7' });
+      await request('POST', `/v1/join/${centerId}`, person, { joinCode: 'NORTE7' });
+
+      const notices = await tenantPrismaService.runInTenantContext(
+        {
+          userId: owner,
+          centerId,
+          membershipId: ownerMembershipId,
+          role: 'owner',
+          permissions: [],
+        },
+        (client) =>
+          client.notification.findMany({
+            select: { recipientMembershipId: true, kind: true, data: true },
+          }),
+      );
+
+      expect(notices).toEqual([
+        {
+          recipientMembershipId: ownerMembershipId,
+          kind: 'member_joined',
+          data: { personName: 'person', role: 'client' },
+        },
+      ]);
+    });
+
     it('lets anyone join a listed center without a code', async () => {
       const centerId = await fixtures.createCenter('barna-box', 'BARNA1', { isListed: true });
 

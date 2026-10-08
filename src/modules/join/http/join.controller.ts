@@ -12,6 +12,7 @@ import { Public } from '../../../shared/auth/decorators/public.decorator';
 import { UserScoped } from '../../../shared/auth/decorators/user-scoped.decorator';
 import { ProblemDetailsDto } from '../../../shared/errors/problem-details.dto';
 import { RATE_LIMITS } from '../../../shared/rate-limit/rate-limit-policies';
+import { PushDispatcher } from '../../push/application/push-dispatcher';
 import { FindCenterByJoinCodeUseCase } from '../application/find-center-by-join-code.use-case';
 import { JoinCenterUseCase } from '../application/join-center.use-case';
 import { SearchCentersUseCase } from '../application/search-centers.use-case';
@@ -33,6 +34,7 @@ export class JoinController {
     private readonly findCenterByJoinCode: FindCenterByJoinCodeUseCase,
     private readonly searchCenters: SearchCentersUseCase,
     private readonly joinCenter: JoinCenterUseCase,
+    private readonly push: PushDispatcher,
   ) {}
 
   @Get('code/:code')
@@ -80,13 +82,22 @@ export class JoinController {
     @Param() params: CenterIdParamsDto,
     @Body() body: JoinCenterRequestDto,
   ): Promise<Record<string, unknown>> {
-    return {
-      ...(await this.joinCenter.execute({
+    const joined = await this.joinCenter.execute({
+      userId,
+      centerId: params.centerId,
+      joinCode: body.joinCode,
+      source: body.source,
+    });
+    // Tras confirmarse el alta: la propiedad y la administración se enteran por push.
+    if (joined.isNewMembership) {
+      await this.push.flushCenter({
         userId,
-        centerId: params.centerId,
-        joinCode: body.joinCode,
-        source: body.source,
-      })),
-    };
+        centerId: joined.centerId,
+        membershipId: joined.membershipId,
+        role: 'client',
+        permissions: [],
+      });
+    }
+    return { ...joined };
   }
 }

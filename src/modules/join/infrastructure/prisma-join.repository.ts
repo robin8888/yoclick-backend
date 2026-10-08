@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { v7 as generateUuidV7 } from 'uuid';
 import { buildCenterLogoUrl } from '../../../shared/media/center-logo-url';
+import { recordMemberJoinedNotice } from '../../notifications/infrastructure/member-joined.recorder';
 import {
   TenantPrismaService,
   type TenantTransactionClient,
@@ -50,6 +51,15 @@ interface AppliedDecision {
   decision: JoinDecision;
   command: JoinCommand;
   existing: Awaited<ReturnType<TenantTransactionClient['membership']['findUnique']>>;
+}
+
+/** Quien se une con el código o el QR siempre entra como cliente: la administración se entera. */
+async function noticeNewClient(
+  client: TenantTransactionClient,
+  centerId: string,
+  membershipId: string,
+): Promise<void> {
+  await recordMemberJoinedNotice(client, { centerId, membershipId, role: 'client' });
 }
 
 @Injectable()
@@ -144,6 +154,7 @@ export class PrismaJoinRepository implements JoinRepository {
             joinSource: source,
           },
         });
+        await noticeNewClient(client, centerId, created.id);
         return { decision, membership: created };
       }
       case 'reactivate_membership': {
@@ -152,6 +163,7 @@ export class PrismaJoinRepository implements JoinRepository {
           where: { centerId_userId: { centerId, userId } },
           data: { status: 'active', role: 'client', joinSource: source },
         });
+        await noticeNewClient(client, centerId, reactivated.id);
         return { decision, membership: reactivated };
       }
       case 'already_member':

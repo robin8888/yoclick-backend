@@ -8547,6 +8547,7 @@ components:
                   - booking_rescheduled
                   - booking_rescheduled_by_team
                   - routine_updated
+                  - member_joined
               data:
                 type: object
                 additionalProperties:

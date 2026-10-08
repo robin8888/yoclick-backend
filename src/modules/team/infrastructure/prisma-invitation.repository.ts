@@ -14,6 +14,7 @@ import {
   type NewInvitation,
   type PendingInvitation,
 } from '../application/ports/invitation.repository';
+import { recordMemberJoinedNotice } from '../../notifications/infrastructure/member-joined.recorder';
 import { higherRole } from '../domain/team-rules';
 
 type InvitationRow = NonNullable<
@@ -32,6 +33,36 @@ function isUsable(invitation: InvitationRow | null, now: Date): invitation is In
 /** Enviada por correo, solo la cuenta de ese correo; enviada por teléfono, quien tenga el código. */
 function isAddressedTo(invitation: InvitationRow, userEmail: string | null): boolean {
   return invitation.email === null || invitation.email === userEmail;
+}
+
+type ExistingMembership = Awaited<ReturnType<TenantTransactionClient['membership']['findUnique']>>;
+
+/** Crea la pertenencia o reactiva la que había: quien sigue dentro nunca baja de rol. */
+async function upsertInvitedMembership(
+  client: TenantTransactionClient,
+  context: { invitation: InvitationRow; userId: string; existing: ExistingMembership },
+) {
+  const { invitation, userId, existing } = context;
+  if (!existing) {
+    return client.membership.create({
+      data: {
+        id: generateUuidV7(),
+        centerId: invitation.centerId,
+        userId,
+        role: invitation.role,
+        status: 'active',
+      },
+    });
+  }
+  return client.membership.update({
+    where: { id: existing.id },
+    data: {
+      status: 'active',
+      // Quien volvió tras irse parte del rol de la invitación; quien sigue dentro nunca baja.
+      role:
+        existing.status === 'left' ? invitation.role : higherRole(existing.role, invitation.role),
+    },
+  });
 }
 
 @Injectable()
@@ -193,21 +224,15 @@ export class PrismaInvitationRepository implements InvitationRepository {
     });
     if (consumed.count !== 1) return { kind: 'invalid' };
 
-    const membership = existing
-      ? await client.membership.update({
-          where: { id: existing.id },
-          data: {
-            status: 'active',
-            // Quien volvió tras irse parte del rol de la invitación; quien sigue dentro nunca baja.
-            role:
-              existing.status === 'left'
-                ? invitation.role
-                : higherRole(existing.role, invitation.role),
-          },
-        })
-      : await client.membership.create({
-          data: { id: generateUuidV7(), centerId, userId, role: invitation.role, status: 'active' },
-        });
+    const membership = await upsertInvitedMembership(client, { invitation, userId, existing });
+    // Quien ya estaba dentro y solo vuelve a aceptar no es un alta nueva.
+    if (existing?.status !== 'active') {
+      await recordMemberJoinedNotice(client, {
+        centerId,
+        membershipId: membership.id,
+        role: membership.role,
+      });
+    }
     return { kind: 'accepted', membership };
   }
 
