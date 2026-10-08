@@ -244,6 +244,16 @@ describe('team and invitations', () => {
       expect(emails.messagesTo('600111222@example.test')).toEqual([]);
     });
 
+    it('accepts a Spanish mobile number typed without prefix, as the app sends it', async () => {
+      const response = await call('POST', invitations(), owner, {
+        phone: '+34699189483',
+        role: 'staff',
+      });
+
+      expect(response.statusCode).toBe(201);
+      expect(response.json()).toMatchObject({ phone: '+34699189483', email: null });
+    });
+
     it('replaces the pending invitation when the same phone is invited again', async () => {
       const body = { phone: '+34600111222', role: 'client' };
       const first = (await call('POST', invitations(), owner, body)).json<{ code: string }>();

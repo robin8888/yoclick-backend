@@ -3,6 +3,7 @@ import { maskPhoneNumber, normalizePhoneNumber } from './phone-number';
 describe('normalizePhoneNumber', () => {
   it.each([
     ['600 111 222', '+34600111222'],
+    ['699189483', '+34699189483'],
     ['600-111-222', '+34600111222'],
     ['+34 600 111 222', '+34600111222'],
     ['0034 600 111 222', '+34600111222'],
