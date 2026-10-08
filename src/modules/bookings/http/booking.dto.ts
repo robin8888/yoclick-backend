@@ -20,6 +20,13 @@ export class CreateBookingRequestDto extends createZodDto(
   }),
 ) {}
 
+export class RescheduleBookingRequestDto extends createZodDto(
+  z.strictObject({
+    /** UTC con `Z`. Debe coincidir exactamente con un hueco de `GET /availability` del mismo servicio. */
+    startsAt: z.iso.datetime(),
+  }),
+) {}
+
 /** Una cita que el equipo crea para un cliente desde la agenda. */
 export class CreateAgendaBookingRequestDto extends createZodDto(
   z.strictObject({

@@ -54,6 +54,10 @@ export const ERROR_CATALOG = {
   OUTSIDE_BOOKING_WINDOW: { title: 'Ese día u hora todavía no se puede reservar' },
   ALREADY_BOOKED: { title: 'Ya tienes otra cita a esa hora' },
   BOOKING_NOT_CANCELLABLE: { title: 'Esta reserva ya no se puede cancelar' },
+  BOOKING_NOT_RESCHEDULABLE: { title: 'Esta reserva ya no se puede cambiar de hora' },
+  RESCHEDULE_TOO_LATE: {
+    title: 'Ya no queda antelación para cambiar la hora. Habla con el centro',
+  },
   BOOKING_NOT_STARTABLE: {
     title: 'Esta clase no se puede iniciar ahora: solo desde 15 minutos antes hasta que termina',
   },

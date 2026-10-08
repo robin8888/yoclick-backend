@@ -125,12 +125,22 @@ async function notifyBookingCreated(
   });
 }
 
+export type SessionReservation =
+  | {
+      readonly kind: 'reserved';
+      readonly sessionId: string;
+      readonly staffMembershipId: string;
+      readonly service: SchedulableService;
+      readonly endsAt: Date;
+    }
+  | Exclude<CreateBookingOutcome, { readonly kind: 'created' }>;
+
 /**
  * Prueba con cada persona libre a esa hora, la preferida primero. Si otra petición se lleva a la
  * primera entre el cálculo y la inserción, se intenta con la siguiente; si no queda nadie, el hueco
  * ya no existe.
  */
-async function insertSessionAndBooking(
+async function insertFirstFreeSession(
   client: TenantTransactionClient,
   input: {
     actor: ActorContext;
@@ -139,7 +149,7 @@ async function insertSessionAndBooking(
     endsAt: Date;
     freeStaff: readonly StaffCandidate[];
   },
-): Promise<CreateBookingOutcome> {
+): Promise<SessionReservation> {
   const { actor, command } = input;
   for (const staffMember of input.freeStaff) {
     const session = {
@@ -151,14 +161,13 @@ async function insertSessionAndBooking(
       endsAt: input.endsAt,
     };
     if (!(await tryInsertSession(client, session))) continue;
-    const booking = await insertBooking(client, { actor, command, sessionId: session.id });
-    await notifyBookingCreated(client, {
-      actor,
-      command,
+    return {
+      kind: 'reserved',
+      sessionId: session.id,
+      staffMembershipId: staffMember.membershipId,
       service: input.service,
-      booking: { id: booking.id, staffMembershipId: staffMember.membershipId },
-    });
-    return { kind: 'created', booking: toBookingView(booking) };
+      endsAt: input.endsAt,
+    };
   }
   return { kind: 'slot_unavailable' };
 }
@@ -170,11 +179,15 @@ function buildSchedulingInput(facts: LoadedFacts, command: CreateBookingCommand)
   return { ...facts, ...facts.service, stepMinutes: command.slotStepMinutes, now: command.now };
 }
 
-export async function createBookingInTransaction(
+/**
+ * Busca el hueco y crea la sesión (todavía sin reserva), comprobando que el cliente no tiene otra
+ * cita a esa hora. Sirve tanto para reservar como para cambiar de hora una reserva existente.
+ */
+export async function reserveSessionInTransaction(
   client: TenantTransactionClient,
   actor: ActorContext,
   command: CreateBookingCommand,
-): Promise<CreateBookingOutcome> {
+): Promise<SessionReservation> {
   const clientMembershipId = command.clientMembershipId ?? actor.membershipId;
   await lockClientBookings(client, clientMembershipId);
   if (!(await isActiveClient(client, clientMembershipId))) return { kind: 'client_not_found' };
@@ -201,11 +214,32 @@ export async function createBookingInTransaction(
   if (isClientBusy) return { kind: 'already_booked' };
   if (decision.kind === 'slot_unavailable') return decision;
 
-  return insertSessionAndBooking(client, {
+  return insertFirstFreeSession(client, {
     actor,
     command,
     service: facts.service,
     endsAt,
     freeStaff: decision.slot.freeStaff,
   });
+}
+
+export async function createBookingInTransaction(
+  client: TenantTransactionClient,
+  actor: ActorContext,
+  command: CreateBookingCommand,
+): Promise<CreateBookingOutcome> {
+  const reservation = await reserveSessionInTransaction(client, actor, command);
+  if (reservation.kind !== 'reserved') return reservation;
+  const booking = await insertBooking(client, {
+    actor,
+    command,
+    sessionId: reservation.sessionId,
+  });
+  await notifyBookingCreated(client, {
+    actor,
+    command,
+    service: reservation.service,
+    booking: { id: booking.id, staffMembershipId: reservation.staffMembershipId },
+  });
+  return { kind: 'created', booking: toBookingView(booking) };
 }

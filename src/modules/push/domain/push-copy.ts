@@ -14,6 +14,11 @@ const COPY_BY_KIND: Readonly<Record<string, PushCopy>> = {
   booking_cancelled: { title: 'Cita cancelada', body: OPEN_APP_BODY },
   booking_created_by_team: { title: 'Tienes una cita nueva', body: OPEN_APP_BODY },
   booking_cancelled_by_team: { title: 'Han cancelado una cita tuya', body: OPEN_APP_BODY },
+  booking_rescheduled: { title: 'Cita cambiada de hora', body: OPEN_APP_BODY },
+  booking_rescheduled_by_team: {
+    title: 'Han cambiado la hora de una cita tuya',
+    body: OPEN_APP_BODY,
+  },
   absence_added: { title: 'Ausencia en el equipo', body: OPEN_APP_BODY },
   booking_affected_by_absence: { title: 'Tu cita puede cambiar', body: OPEN_APP_BODY },
   routine_assigned: { title: 'Tienes una rutina nueva', body: OPEN_APP_BODY },

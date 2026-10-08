@@ -109,6 +109,8 @@ enum NotificationKind {
   staff_profile_submitted
   staff_profile_reviewed
   staff_review_received
+  booking_rescheduled
+  booking_rescheduled_by_team
 
   @@map("notification_kind")
 }

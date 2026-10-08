@@ -42,6 +42,31 @@ export type CreateBookingOutcome =
   | { readonly kind: 'slot_unavailable' }
   | { readonly kind: 'already_booked' };
 
+export interface RescheduleBookingCommand {
+  readonly bookingId: string;
+  readonly startsAt: Date;
+  readonly now: Date;
+}
+
+export type RescheduleOutcome =
+  | {
+      readonly kind: 'rescheduled';
+      readonly booking: BookingView;
+      /** `false` si pidió la hora que ya tenía: no se avisa a nadie. */
+      readonly hasChangedTime: boolean;
+    }
+  /** No existe, o es de otra persona. */
+  | { readonly kind: 'not_found' }
+  /** Ya cancelada, empezada, atendida o pasada. */
+  | { readonly kind: 'not_reschedulable' }
+  /** Queda menos antelación de la que exige la política de cancelación. */
+  | { readonly kind: 'too_late' }
+  | { readonly kind: 'outside_window' }
+  | { readonly kind: 'slot_unavailable' }
+  | { readonly kind: 'already_booked' }
+  | { readonly kind: 'service_not_found' }
+  | { readonly kind: 'client_not_found' };
+
 export type BookingListScope = 'upcoming' | 'past';
 
 export interface CancellationFacts {
@@ -77,6 +102,11 @@ export interface BookingRepository {
    * hueco de la misma persona del equipo, por muchas peticiones que lleguen a la vez.
    */
   createBooking(actor: ActorContext, command: CreateBookingCommand): Promise<CreateBookingOutcome>;
+  /** Mueve una reserva del propio cliente a otra hora en una sola transacción. */
+  rescheduleBooking(
+    actor: ActorContext,
+    command: RescheduleBookingCommand,
+  ): Promise<RescheduleOutcome>;
   listClientBookings(
     actor: ActorContext,
     query: { scope: BookingListScope; limit: number; now: Date },

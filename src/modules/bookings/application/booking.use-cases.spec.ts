@@ -4,12 +4,14 @@ import {
   CancelBookingUseCase,
   CreateBookingUseCase,
   GetDayAgendaUseCase,
+  RescheduleBookingUseCase,
 } from './booking.use-cases';
 import {
   type BookingRepository,
   type BookingView,
   type CancellationFacts,
   type CreateBookingOutcome,
+  type RescheduleOutcome,
 } from './ports/booking.repository';
 
 const NOW = new Date('2026-10-05T10:00:00Z');
@@ -42,6 +44,7 @@ function buildBooking(overrides: Partial<BookingView> = {}): BookingView {
 function buildRepository(overrides: Partial<BookingRepository> = {}): BookingRepository {
   return {
     createBooking: jest.fn(),
+    rescheduleBooking: jest.fn(),
     listClientBookings: jest.fn(),
     findCancellationFacts: jest.fn(),
     markCancelled: jest.fn(),
@@ -103,6 +106,44 @@ describe('CreateBookingUseCase', () => {
     const repository = buildRepository({ createBooking: jest.fn().mockResolvedValue(outcome) });
 
     const error = await errorOf(new CreateBookingUseCase(repository).execute(CLIENT, command));
+
+    expect(error).toMatchObject({ code, httpStatus: status });
+  });
+});
+
+describe('RescheduleBookingUseCase', () => {
+  const command = {
+    bookingId: 'booking-1',
+    startsAt: new Date(NOW.getTime() + 72 * HOUR_MS),
+    now: NOW,
+  };
+
+  it('returns the moved booking', async () => {
+    const booking = buildBooking({ startsAt: command.startsAt });
+    const repository = buildRepository({
+      rescheduleBooking: jest
+        .fn()
+        .mockResolvedValue({ kind: 'rescheduled', booking, hasChangedTime: true }),
+    });
+
+    const outcome = await new RescheduleBookingUseCase(repository).execute(CLIENT, command);
+
+    expect(outcome.booking).toBe(booking);
+  });
+
+  it.each([
+    { kind: 'not_found', code: 'NOT_FOUND', status: 404 },
+    { kind: 'not_reschedulable', code: 'BOOKING_NOT_RESCHEDULABLE', status: 409 },
+    { kind: 'too_late', code: 'RESCHEDULE_TOO_LATE', status: 409 },
+    { kind: 'outside_window', code: 'OUTSIDE_BOOKING_WINDOW', status: 409 },
+    { kind: 'slot_unavailable', code: 'SLOT_UNAVAILABLE', status: 409 },
+    { kind: 'already_booked', code: 'ALREADY_BOOKED', status: 409 },
+    { kind: 'service_not_found', code: 'NOT_FOUND', status: 404 },
+  ] as const)('maps "$kind" to $status $code', async ({ kind, code, status }) => {
+    const outcome: RescheduleOutcome = { kind };
+    const repository = buildRepository({ rescheduleBooking: jest.fn().mockResolvedValue(outcome) });
+
+    const error = await errorOf(new RescheduleBookingUseCase(repository).execute(CLIENT, command));
 
     expect(error).toMatchObject({ code, httpStatus: status });
   });

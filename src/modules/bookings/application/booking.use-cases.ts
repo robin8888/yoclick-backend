@@ -15,6 +15,8 @@ import {
   type CreateBookingCommand,
   type CreateBookingOutcome,
   type DayAgenda,
+  type RescheduleBookingCommand,
+  type RescheduleOutcome,
 } from './ports/booking.repository';
 
 const REFUSALS_BY_OUTCOME: Readonly<
@@ -39,6 +41,36 @@ export class CreateBookingUseCase {
     const outcome = await this.bookings.createBooking(actor, command);
     if (outcome.kind === 'created') return outcome.booking;
     throw new DomainError(...REFUSALS_BY_OUTCOME[outcome.kind]);
+  }
+}
+
+const REFUSALS_BY_RESCHEDULE_OUTCOME: Readonly<
+  Record<
+    Exclude<RescheduleOutcome['kind'], 'rescheduled'>,
+    ConstructorParameters<typeof DomainError>
+  >
+> = {
+  ...REFUSALS_BY_OUTCOME,
+  not_found: ['NOT_FOUND', HTTP_STATUS.notFound],
+  not_reschedulable: ['BOOKING_NOT_RESCHEDULABLE', HTTP_STATUS.conflict],
+  too_late: ['RESCHEDULE_TOO_LATE', HTTP_STATUS.conflict],
+};
+
+/**
+ * Cambia de hora una reserva propia con el mismo servicio. Pide la misma antelación que cancelar:
+ * pasado ese plazo hay que hablar con el centro. La hora nueva se vuelve a comprobar en el servidor.
+ */
+@Injectable()
+export class RescheduleBookingUseCase {
+  constructor(@Inject(BOOKING_REPOSITORY) private readonly bookings: BookingRepository) {}
+
+  async execute(
+    actor: ActorContext,
+    command: RescheduleBookingCommand,
+  ): Promise<Extract<RescheduleOutcome, { kind: 'rescheduled' }>> {
+    const outcome = await this.bookings.rescheduleBooking(actor, command);
+    if (outcome.kind === 'rescheduled') return outcome;
+    throw new DomainError(...REFUSALS_BY_RESCHEDULE_OUTCOME[outcome.kind]);
   }
 }
 

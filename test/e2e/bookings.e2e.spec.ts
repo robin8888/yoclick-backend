@@ -584,6 +584,135 @@ describe('availability and bookings', () => {
     return bookingId;
   }
 
+  describe('POST /bookings/:bookingId/reschedule', () => {
+    async function farSlots(person: Person): Promise<[TestSlot, TestSlot]> {
+      const [first, second] = (await slotsFor(person)).filter(
+        (slot) => Date.parse(slot.startsAt) - Date.now() > 72 * MILLISECONDS_PER_HOUR,
+      );
+      return [first as TestSlot, second as TestSlot];
+    }
+
+    function reschedule(person: Person, bookingId: string, startsAt: string) {
+      return world.call('POST', bookingsUrl(`/${bookingId}/reschedule`), person.userId, {
+        centerId,
+        body: { startsAt },
+      });
+    }
+
+    it('moves the same booking to the new hour and frees the old slot', async () => {
+      const [current, target] = await farSlots(ana);
+      const booked = (await bookSlot(ana, current)).json<BookingBody>();
+
+      const response = await reschedule(ana, booked.id, target.startsAt);
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json<BookingBody>()).toMatchObject({
+        id: booked.id,
+        status: 'confirmed',
+        startsAt: target.startsAt,
+        endsAt: target.endsAt,
+      });
+      const upcoming = await listMine(ana, 'upcoming');
+      expect(upcoming.map(({ id, startsAt }) => ({ id, startsAt }))).toEqual([
+        { id: booked.id, startsAt: target.startsAt },
+      ]);
+      expect((await listMine(ana, 'past')).filter(({ status }) => status === 'cancelled')).toEqual(
+        [],
+      );
+      expect((await bookSlot(bea, current)).statusCode).toBe(201);
+    });
+
+    it('answers 200 with the same booking when asking for the hour it already has', async () => {
+      const [current] = await farSlots(ana);
+      const booked = (await bookSlot(ana, current)).json<BookingBody>();
+
+      const response = await reschedule(ana, booked.id, current.startsAt);
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json<BookingBody>()).toMatchObject({
+        id: booked.id,
+        startsAt: current.startsAt,
+      });
+    });
+
+    it('keeps the original hour when the new slot is taken (409 SLOT_UNAVAILABLE)', async () => {
+      const [current, target] = await farSlots(ana);
+      const booked = (await bookSlot(ana, current)).json<BookingBody>();
+      await bookSlot(bea, target);
+
+      const response = await reschedule(ana, booked.id, target.startsAt);
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toMatchObject({ code: 'SLOT_UNAVAILABLE' });
+      expect((await listMine(ana, 'upcoming')).map(({ startsAt }) => startsAt)).toEqual([
+        current.startsAt,
+      ]);
+      expect((await bookSlot(bea, current)).statusCode).toBe(409);
+    });
+
+    it('answers 409 RESCHEDULE_TOO_LATE when less notice than the policy remains', async () => {
+      const soon = firstSlotAtLeast(await slotsFor(ana), 2, 20);
+      const [, target] = await farSlots(ana);
+      const booked = (await bookSlot(ana, soon)).json<BookingBody>();
+
+      const response = await reschedule(ana, booked.id, target.startsAt);
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toMatchObject({ code: 'RESCHEDULE_TOO_LATE' });
+    });
+
+    it('answers 409 BOOKING_NOT_RESCHEDULABLE for a cancelled booking', async () => {
+      const [current, target] = await farSlots(ana);
+      const booked = (await bookSlot(ana, current)).json<BookingBody>();
+      await world.call('POST', bookingsUrl(`/${booked.id}/cancel`), ana.userId, { centerId });
+
+      const response = await reschedule(ana, booked.id, target.startsAt);
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toMatchObject({ code: 'BOOKING_NOT_RESCHEDULABLE' });
+    });
+
+    it('tells the owner that the client moved the appointment', async () => {
+      const [current, target] = await farSlots(ana);
+      const booked = (await bookSlot(ana, current)).json<BookingBody>();
+      await reschedule(ana, booked.id, target.startsAt);
+
+      const response = await world.call(
+        'GET',
+        `/v1/centers/${centerId}/notifications`,
+        ownerUserId,
+        { centerId },
+      );
+
+      expect(
+        response
+          .json<{ notifications: { kind: string }[] }>()
+          .notifications.map(({ kind }) => kind),
+      ).toContain('booking_rescheduled');
+    });
+
+    it('answers 404 to another client and for unknown bookings, 403 to the team (BOLA)', async () => {
+      const [current, target] = await farSlots(ana);
+      const booked = (await bookSlot(ana, current)).json<BookingBody>();
+
+      const byOtherClient = await reschedule(bea, booked.id, target.startsAt);
+      const unknown = await reschedule(ana, randomUUID(), target.startsAt);
+      const byStaff = await world.call(
+        'POST',
+        bookingsUrl(`/${booked.id}/reschedule`),
+        staff.userId,
+        {
+          centerId,
+          body: { startsAt: target.startsAt },
+        },
+      );
+
+      expect(byOtherClient.statusCode).toBe(404);
+      expect(unknown.statusCode).toBe(404);
+      expect(byStaff.statusCode).toBe(403);
+    });
+  });
+
   describe('POST /bookings/:bookingId/cancel', () => {
     it('cancels within the policy when at least 24 hours remain, and frees the slot', async () => {
       const slot = firstSlotAtLeast(await slotsFor(ana), 72);

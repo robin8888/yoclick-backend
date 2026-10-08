@@ -1820,6 +1820,53 @@ paths:
       summary: Cancela una reserva propia. Se puede cancelar fuera de plazo (withinPolicy=false). Cancelar una ya cancelada devuelve el mismo resultado; una que ya empezó, 409 BOOKING_NOT_CANCELLABLE.
       tags:
         - bookings
+  /v1/centers/{centerId}/bookings/{bookingId}/reschedule:
+    post:
+      operationId: bookings_reschedule
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: bookingId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RescheduleBookingRequestDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: "Cambia de hora una reserva propia (mismo servicio y, si sigue libre, misma persona). La hora debe coincidir con un hueco de /availability. Pide la misma antelación que cancelar: 409 RESCHEDULE_TOO_LATE si ya no queda. 409 BOOKING_NOT_RESCHEDULABLE si está cancelada, empezada o pasada; SLOT_UNAVAILABLE, OUTSIDE_BOOKING_WINDOW y ALREADY_BOOKED como al reservar. Pedir la hora que ya tiene devuelve la reserva sin cambios."
+      tags:
+        - bookings
   /v1/centers/{centerId}/bookings/{bookingId}/start:
     post:
       operationId: bookings_start
@@ -7169,6 +7216,16 @@ components:
         - booking
         - withinPolicy
       additionalProperties: false
+    RescheduleBookingRequestDto:
+      type: object
+      properties:
+        startsAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+      required:
+        - startsAt
+      additionalProperties: false
     EndSessionRequestDto:
       type: object
       properties:
@@ -8336,6 +8393,8 @@ components:
                   - staff_profile_submitted
                   - staff_profile_reviewed
                   - staff_review_received
+                  - booking_rescheduled
+                  - booking_rescheduled_by_team
               data:
                 type: object
                 additionalProperties:

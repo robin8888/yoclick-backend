@@ -6,7 +6,9 @@ import {
   CreateBookingUseCase,
   GetDayAgendaUseCase,
   ListMyBookingsUseCase,
+  RescheduleBookingUseCase,
 } from './application/booking.use-cases';
+import { BookingReschedulingController } from './http/booking-rescheduling.controller';
 import { CheckInClientUseCase, IssueCheckInCodeUseCase } from './application/check-in.use-cases';
 import { CHECK_IN_REPOSITORY } from './application/ports/check-in.repository';
 import { BOOKING_REPOSITORY } from './application/ports/booking.repository';
@@ -29,6 +31,7 @@ import { PrismaSessionRecordRepository } from './infrastructure/prisma-session-r
   imports: [IdempotencyModule],
   controllers: [
     BookingsController,
+    BookingReschedulingController,
     BookingSessionsController,
     AgendaController,
     SessionRecordsController,
@@ -38,6 +41,7 @@ import { PrismaSessionRecordRepository } from './infrastructure/prisma-session-r
     CreateBookingUseCase,
     ListMyBookingsUseCase,
     CancelBookingUseCase,
+    RescheduleBookingUseCase,
     CancelBookingByTeamUseCase,
     GetDayAgendaUseCase,
     StartSessionUseCase,

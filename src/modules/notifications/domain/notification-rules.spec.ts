@@ -56,6 +56,33 @@ describe('planBookingNotices', () => {
     ]);
   });
 
+  it('tells the team, not the client, when the client moves their own appointment', () => {
+    const notices = planBookingNotices({
+      ...base,
+      change: 'rescheduled',
+      actorMembershipId: 'client',
+    });
+
+    expect(notices.map(({ kind }) => kind)).toEqual([
+      'booking_rescheduled',
+      'booking_rescheduled',
+      'booking_rescheduled',
+    ]);
+  });
+
+  it('tells the client when the team moves their appointment', () => {
+    const notices = planBookingNotices({
+      ...base,
+      change: 'rescheduled',
+      actorMembershipId: 'owner',
+    });
+
+    expect(notices[0]).toEqual({
+      recipientMembershipId: 'client',
+      kind: 'booking_rescheduled_by_team',
+    });
+  });
+
   it('does not tell the instructor about what they did themselves', () => {
     const notices = planBookingNotices({ ...base, change: 'created', actorMembershipId: 'staff' });
 

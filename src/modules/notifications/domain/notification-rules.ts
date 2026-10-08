@@ -13,6 +13,8 @@ export const NOTIFICATION_KINDS = [
   'staff_profile_submitted',
   'staff_profile_reviewed',
   'staff_review_received',
+  'booking_rescheduled',
+  'booking_rescheduled_by_team',
 ] as const;
 export type NotificationKindName = (typeof NOTIFICATION_KINDS)[number];
 
@@ -45,7 +47,19 @@ export function selectNotificationRecipients(input: {
   return [...everyone];
 }
 
-export type BookingChange = 'created' | 'cancelled';
+export type BookingChange = 'created' | 'cancelled' | 'rescheduled';
+
+const TEAM_KIND_BY_CHANGE: Readonly<Record<BookingChange, NotificationKindName>> = {
+  created: 'booking_created',
+  cancelled: 'booking_cancelled',
+  rescheduled: 'booking_rescheduled',
+};
+
+const CLIENT_KIND_BY_CHANGE: Readonly<Record<BookingChange, NotificationKindName>> = {
+  created: 'booking_created_by_team',
+  cancelled: 'booking_cancelled_by_team',
+  rescheduled: 'booking_rescheduled_by_team',
+};
 
 export interface BookingNoticePlan {
   readonly recipientMembershipId: string;
@@ -65,10 +79,8 @@ export function planBookingNotices(input: {
   readonly administratorMembershipIds: readonly string[];
   readonly actorMembershipId: string;
 }): BookingNoticePlan[] {
-  const teamKind: NotificationKindName =
-    input.change === 'created' ? 'booking_created' : 'booking_cancelled';
-  const clientKind =
-    input.change === 'created' ? 'booking_created_by_team' : 'booking_cancelled_by_team';
+  const teamKind = TEAM_KIND_BY_CHANGE[input.change];
+  const clientKind = CLIENT_KIND_BY_CHANGE[input.change];
   const teamNotices = selectNotificationRecipients(input).map((recipientMembershipId) => ({
     recipientMembershipId,
     kind: teamKind,
