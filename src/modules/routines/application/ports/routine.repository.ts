@@ -44,6 +44,37 @@ export interface NewRoutine {
   readonly assignTo: AssignmentTarget | null;
 }
 
+/** Lo que lleva una persona hecho de una rutina. */
+export interface RoutineCompletionSummary {
+  readonly completionCount: number;
+  readonly lastCompletedAt: Date | null;
+  /** Ya la registró hoy (día local del centro): la app no la ofrece otra vez. */
+  readonly isCompletedToday: boolean;
+}
+
+export interface RoutineCompletionView {
+  readonly completedAt: Date;
+  readonly completedItemCount: number;
+  readonly totalItemCount: number;
+}
+
+export type RecordCompletionOutcome =
+  | {
+      readonly kind: 'recorded' | 'already_recorded';
+      readonly completion: RoutineCompletionView;
+    }
+  /** No existe, está archivada o no es de esta persona. */
+  | { readonly kind: 'not_found' }
+  /** Marcó 0 ejercicios o más de los que tiene la rutina. */
+  | { readonly kind: 'invalid_count' };
+
+export interface RoutineProgressPerson {
+  readonly membershipId: string;
+  readonly fullName: string;
+  readonly completionCount: number;
+  readonly lastCompletedAt: Date | null;
+}
+
 /** Lo que ve quien recibe una rutina. */
 export interface ClientRoutineView {
   readonly id: string;
@@ -52,6 +83,7 @@ export interface ClientRoutineView {
   readonly items: readonly RoutineItemView[];
   /** La asignación más reciente que le llega (directa o por su grupo). */
   readonly assignedAt: Date;
+  readonly progress: RoutineCompletionSummary;
 }
 
 export type CreateRoutineOutcome =
@@ -90,6 +122,13 @@ export interface RoutineRepository {
     routineId: string,
     changes: RoutineChanges,
   ): Promise<UpdateRoutineOutcome>;
+  /** Registra «hoy hice esta rutina»; repetirlo el mismo día no duplica. */
+  recordCompletion(
+    actor: ActorContext,
+    request: { routineId: string; completedItemCount: number; now: Date },
+  ): Promise<RecordCompletionOutcome>;
+  /** Cuántas veces la ha hecho cada persona que la tiene; `null` si no existe o está archivada. */
+  listProgress(actor: ActorContext, routineId: string): Promise<RoutineProgressPerson[] | null>;
   /** `false` si no existe o ya estaba archivada. */
   archive(actor: ActorContext, routineId: string): Promise<boolean>;
   assign(

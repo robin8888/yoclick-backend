@@ -282,6 +282,7 @@ model Center {
   staffAvailabilities StaffAvailability[]
   routines            Routine[]
   routineAssignments  RoutineAssignment[]
+  routineCompletions  RoutineCompletion[]
   staffAbsences       StaffAbsence[]
   clientGroups        ClientGroup[]
   notifications       Notification[]
@@ -350,6 +351,7 @@ model Membership {
   availability        StaffAvailability?
   authoredRoutines    Routine[]           @relation("RoutineAuthor")
   receivedRoutines    RoutineAssignment[] @relation("RoutineClient")
+  routineCompletions  RoutineCompletion[] @relation("RoutineDoneBy")
   assignedRoutines    RoutineAssignment[] @relation("RoutineAssigner")
   absences            StaffAbsence[]
   startedBookings     Booking[]           @relation("BookingStartedBy")
@@ -614,6 +616,7 @@ model Routine {
   createdBy   Membership          @relation("RoutineAuthor", fields: [createdByMembershipId], references: [id])
   items       RoutineItem[]
   assignments RoutineAssignment[]
+  completions RoutineCompletion[]
 
   @@index([centerId])
   @@map("routines")
@@ -658,6 +661,29 @@ model RoutineAssignment {
   @@index([clientMembershipId])
   @@index([groupId])
   @@map("routine_assignments")
+}
+
+/// «Hoy hice esta rutina»: una vez por rutina, persona y día local del centro.
+model RoutineCompletion {
+  id                 String   @id @db.Uuid
+  centerId           String   @map("center_id") @db.Uuid
+  routineId          String   @map("routine_id") @db.Uuid
+  clientMembershipId String   @map("client_membership_id") @db.Uuid
+  completedAt        DateTime @default(now()) @map("completed_at") @db.Timestamptz
+  /// Día local del centro (`YYYY-MM-DD`): lo que impide registrar dos veces el mismo día.
+  completedOn        String   @map("completed_on")
+  /// Cuántos ejercicios marcó como hechos, de cuántos tenía la rutina en ese momento.
+  completedItemCount Int      @map("completed_item_count")
+  totalItemCount     Int      @map("total_item_count")
+
+  center  Center     @relation(fields: [centerId], references: [id])
+  routine Routine    @relation(fields: [routineId], references: [id], onDelete: Cascade)
+  client  Membership @relation("RoutineDoneBy", fields: [clientMembershipId], references: [id])
+
+  @@unique([routineId, clientMembershipId, completedOn])
+  @@index([centerId, routineId])
+  @@index([clientMembershipId])
+  @@map("routine_completions")
 }
 
 /// Sala o recurso del centro (Sala 1, Tatami, Zona de peso libre). Se archiva, no se borra.

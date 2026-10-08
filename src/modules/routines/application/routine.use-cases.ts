@@ -8,8 +8,10 @@ import { type AssignmentTarget, type RoutineItemInput } from '../domain/routine-
 import {
   ROUTINE_REPOSITORY,
   type ClientRoutineView,
+  type RecordCompletionOutcome,
   type RoutineChanges,
   type RoutineDetail,
+  type RoutineProgressPerson,
   type RoutineRepository,
   type RoutineSummary,
 } from './ports/routine.repository';
@@ -130,6 +132,44 @@ export class UnassignRoutineUseCase {
     if (!(await this.routines.unassign(actor, routineId, assignmentId))) {
       throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
     }
+  }
+}
+
+const COMPLETION_REFUSALS = {
+  not_found: ['NOT_FOUND', HTTP_STATUS.notFound],
+  invalid_count: ['VALIDATION_FAILED', HTTP_STATUS.badRequest],
+} as const;
+
+type RecordedCompletion = Extract<RecordCompletionOutcome, { completion: unknown }>;
+
+/** «Hoy hice esta rutina»: solo quien la tiene asignada, y una vez por día. */
+@Injectable()
+export class RecordRoutineCompletionUseCase {
+  constructor(@Inject(ROUTINE_REPOSITORY) private readonly routines: RoutineRepository) {}
+
+  async execute(request: {
+    actor: ActorContext;
+    routineId: string;
+    completedItemCount: number;
+    now: Date;
+  }): Promise<RecordedCompletion> {
+    const outcome = await this.routines.recordCompletion(request.actor, request);
+    if (outcome.kind === 'not_found' || outcome.kind === 'invalid_count') {
+      const [code, httpStatus] = COMPLETION_REFUSALS[outcome.kind];
+      throw new DomainError(code, httpStatus);
+    }
+    return outcome;
+  }
+}
+
+@Injectable()
+export class GetRoutineProgressUseCase {
+  constructor(@Inject(ROUTINE_REPOSITORY) private readonly routines: RoutineRepository) {}
+
+  async execute(actor: ActorContext, routineId: string): Promise<RoutineProgressPerson[]> {
+    const people = await this.routines.listProgress(actor, routineId);
+    if (!people) throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
+    return people;
   }
 }
 

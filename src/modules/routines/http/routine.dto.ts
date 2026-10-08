@@ -64,6 +64,11 @@ export class UpdateRoutineRequestDto extends createZodDto(
   }),
 ) {}
 
+/** Cuántos ejercicios marcó como hechos al registrar la rutina (al menos uno). */
+export class RecordCompletionRequestDto extends createZodDto(
+  z.strictObject({ completedItemCount: z.number().int().min(1).max(MAX_ROUTINE_ITEMS) }),
+) {}
+
 export class AssignRoutineRequestDto extends createZodDto(targetSchema) {}
 
 const exerciseShape = {
@@ -114,6 +119,37 @@ export class ExerciseLibraryResponseDto extends createZodDto(
   }),
 ) {}
 
+const progressShape = {
+  /** Cuántas veces la ha registrado. */
+  completionCount: z.number().int(),
+  lastCompletedAt: z.iso.datetime().nullable(),
+  /** Ya la registró hoy (día local del centro). */
+  isCompletedToday: z.boolean(),
+};
+
+export class RoutineCompletionResponseDto extends createZodDto(
+  z.strictObject({
+    completedAt: z.iso.datetime(),
+    completedItemCount: z.number().int(),
+    totalItemCount: z.number().int(),
+    /** `false` si ya la había registrado hoy: se devuelve lo que ya estaba. */
+    isNew: z.boolean(),
+  }),
+) {}
+
+export class RoutineProgressResponseDto extends createZodDto(
+  z.strictObject({
+    people: z.array(
+      z.strictObject({
+        membershipId: z.uuid(),
+        fullName: z.string(),
+        completionCount: z.number().int(),
+        lastCompletedAt: z.iso.datetime().nullable(),
+      }),
+    ),
+  }),
+) {}
+
 export class MyRoutinesResponseDto extends createZodDto(
   z.strictObject({
     routines: z.array(
@@ -124,6 +160,7 @@ export class MyRoutinesResponseDto extends createZodDto(
         items: z.array(z.strictObject(exerciseShape)),
         /** Cuándo le llegó (la asignación más reciente, directa o por su grupo). */
         assignedAt: z.iso.datetime(),
+        progress: z.strictObject(progressShape),
       }),
     ),
   }),

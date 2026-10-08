@@ -6,11 +6,14 @@ import {
   CreateRoutineUseCase,
   UpdateRoutineUseCase,
   GetExerciseLibraryUseCase,
+  GetRoutineProgressUseCase,
   GetRoutineUseCase,
   ListMyRoutinesUseCase,
   ListRoutinesUseCase,
+  RecordRoutineCompletionUseCase,
   UnassignRoutineUseCase,
 } from './application/routine.use-cases';
+import { RoutineProgressController } from './http/routine-progress.controller';
 import {
   RoutineAssignmentsController,
   RoutineLibraryController,
@@ -24,12 +27,15 @@ import { PrismaRoutineRepository } from './infrastructure/prisma-routine.reposit
     RoutineLibraryController,
     RoutinesController,
     RoutineEditingController,
+    RoutineProgressController,
     RoutineAssignmentsController,
   ],
   providers: [
     GetExerciseLibraryUseCase,
     CreateRoutineUseCase,
     UpdateRoutineUseCase,
+    RecordRoutineCompletionUseCase,
+    GetRoutineProgressUseCase,
     ListRoutinesUseCase,
     GetRoutineUseCase,
     ArchiveRoutineUseCase,

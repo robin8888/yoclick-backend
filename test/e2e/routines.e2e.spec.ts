@@ -315,6 +315,86 @@ describe('routines', () => {
     });
   });
 
+  describe('progress', () => {
+    const complete = (userId: string, routineId: string, completedItemCount: number) =>
+      call('POST', `/routines/${routineId}/completions`, userId, { completedItemCount });
+
+    async function progressOf(routineId: string, userId = owner) {
+      const response = await call('GET', `/routines/${routineId}/progress`, userId);
+      return response.json<{
+        people: { membershipId: string; fullName: string; completionCount: number }[];
+      }>().people;
+    }
+
+    it('records "today I did it" and shows it in the routines of the client', async () => {
+      const routine = await createRoutine({ assignTo: { clientMembershipId: ana.membershipId } });
+
+      const response = await complete(ana.userId, routine.id, 2);
+
+      expect(response.statusCode).toBe(201);
+      expect(response.json()).toMatchObject({
+        completedItemCount: 2,
+        totalItemCount: 3,
+        isNew: true,
+      });
+      const mine = await call('GET', '/my-routines', ana.userId);
+      expect(mine.json<{ routines: object[] }>().routines).toMatchObject([
+        { progress: { completionCount: 1, isCompletedToday: true } },
+      ]);
+    });
+
+    it('does not duplicate when it is sent twice the same day', async () => {
+      const routine = await createRoutine({ assignTo: { clientMembershipId: ana.membershipId } });
+      await complete(ana.userId, routine.id, 2);
+
+      const second = await complete(ana.userId, routine.id, 3);
+
+      expect(second.statusCode).toBe(201);
+      expect(second.json()).toMatchObject({ completedItemCount: 2, isNew: false });
+      expect((await progressOf(routine.id))[0]).toMatchObject({ completionCount: 1 });
+    });
+
+    it('refuses to mark no exercises or more than the routine has (400)', async () => {
+      const routine = await createRoutine({ assignTo: { clientMembershipId: ana.membershipId } });
+
+      expect((await complete(ana.userId, routine.id, 0)).statusCode).toBe(400);
+      expect((await complete(ana.userId, routine.id, 4)).statusCode).toBe(400);
+    });
+
+    it('answers 404 to somebody who does not have the routine or when it is archived', async () => {
+      const routine = await createRoutine({ assignTo: { clientMembershipId: ana.membershipId } });
+
+      expect((await complete(bruno.userId, routine.id, 1)).statusCode).toBe(404);
+      await call('DELETE', `/routines/${routine.id}`, owner);
+      expect((await complete(ana.userId, routine.id, 1)).statusCode).toBe(404);
+    });
+
+    it('lets the team see how many times each person did it, including the group', async () => {
+      const groupId = await createGroupWith([ana]);
+      const routine = await createRoutine({ assignTo: { groupId } });
+      await call('POST', `/routines/${routine.id}/assignments`, owner, {
+        clientMembershipId: bruno.membershipId,
+      });
+      await complete(ana.userId, routine.id, 3);
+
+      const people = await progressOf(routine.id, staff.userId);
+
+      expect(people).toMatchObject([
+        { fullName: 'ana', completionCount: 1 },
+        { fullName: 'bruno', completionCount: 0 },
+      ]);
+    });
+
+    it('keeps clients out of the progress of the team and answers 404 for unknown routines', async () => {
+      const routine = await createRoutine({ assignTo: { clientMembershipId: ana.membershipId } });
+
+      expect((await call('GET', `/routines/${routine.id}/progress`, ana.userId)).statusCode).toBe(
+        403,
+      );
+      expect((await call('GET', `/routines/${randomUUID()}/progress`, owner)).statusCode).toBe(404);
+    });
+  });
+
   describe('archiving and access', () => {
     it('hides an archived routine from the list and from whoever had it', async () => {
       const routine = await createRoutine({ assignTo: { clientMembershipId: ana.membershipId } });

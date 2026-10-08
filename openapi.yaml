@@ -3148,6 +3148,94 @@ paths:
       summary: Las rutinas que me han asignado, directamente o por mi grupo, con sus ejercicios.
       tags:
         - routines
+  /v1/centers/{centerId}/routines/{routineId}/completions:
+    post:
+      operationId: routines_record_completion
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: routineId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecordCompletionRequestDto"
+      responses:
+        "201":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoutineCompletionResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: "Registra «hoy hice esta rutina» con cuántos ejercicios marcó. Solo si la tiene asignada (directamente o por su grupo). Una vez por día local del centro: repetirlo devuelve lo ya registrado (isNew=false). 400 si marca 0 o más ejercicios de los que tiene."
+      tags:
+        - routines
+  /v1/centers/{centerId}/routines/{routineId}/progress:
+    get:
+      operationId: routines_get_progress
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: routineId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoutineProgressResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Cuántas veces ha registrado la rutina cada persona que la tiene (directamente o por su grupo), por nombre.
+      tags:
+        - routines
   /v1/centers/{centerId}/routines/{routineId}/assignments:
     post:
       operationId: routines_assign
@@ -8771,12 +8859,32 @@ components:
                 type: string
                 format: date-time
                 pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+              progress:
+                type: object
+                properties:
+                  completionCount:
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                  lastCompletedAt:
+                    type: string
+                    format: date-time
+                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                    nullable: true
+                  isCompletedToday:
+                    type: boolean
+                required:
+                  - completionCount
+                  - lastCompletedAt
+                  - isCompletedToday
+                additionalProperties: false
             required:
               - id
               - name
               - note
               - items
               - assignedAt
+              - progress
             additionalProperties: false
       required:
         - routines
@@ -8884,6 +8992,71 @@ components:
       required:
         - name
         - items
+      additionalProperties: false
+    RecordCompletionRequestDto:
+      type: object
+      properties:
+        completedItemCount:
+          type: integer
+          minimum: 1
+          maximum: 30
+      required:
+        - completedItemCount
+      additionalProperties: false
+    RoutineCompletionResponseDto:
+      type: object
+      properties:
+        completedAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+        completedItemCount:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        totalItemCount:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        isNew:
+          type: boolean
+      required:
+        - completedAt
+        - completedItemCount
+        - totalItemCount
+        - isNew
+      additionalProperties: false
+    RoutineProgressResponseDto:
+      type: object
+      properties:
+        people:
+          type: array
+          items:
+            type: object
+            properties:
+              membershipId:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              fullName:
+                type: string
+              completionCount:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+              lastCompletedAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                nullable: true
+            required:
+              - membershipId
+              - fullName
+              - completionCount
+              - lastCompletedAt
+            additionalProperties: false
+      required:
+        - people
       additionalProperties: false
     AssignRoutineRequestDto:
       type: object

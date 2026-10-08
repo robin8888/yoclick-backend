@@ -10,8 +10,10 @@ import {
   type ClientRoutineView,
   type CreateRoutineOutcome,
   type NewRoutine,
+  type RecordCompletionOutcome,
   type RoutineAssignmentView,
   type RoutineChanges,
+  type RoutineProgressPerson,
   type RoutineDetail,
   type RoutineItemView,
   type RoutineRepository,
@@ -21,6 +23,13 @@ import {
 import { type RoutineNotificationData } from '../../notifications/domain/notification-rules';
 import { VIDEO_SELECT } from '../../videos/infrastructure/video-select';
 import { type AssignmentTarget } from '../domain/routine-rules';
+import {
+  listProgressInTransaction,
+  recordCompletionInTransaction,
+  summarizeCompletions,
+} from './routine-completions';
+
+const NO_PROGRESS = { completionCount: 0, lastCompletedAt: null, isCompletedToday: false } as const;
 
 const ITEM_ORDER = { orderBy: { position: 'asc' } } as const;
 const ITEM_SELECT = {
@@ -339,6 +348,24 @@ export class PrismaRoutineRepository implements RoutineRepository {
     });
   }
 
+  async recordCompletion(
+    actor: ActorContext,
+    request: { routineId: string; completedItemCount: number; now: Date },
+  ): Promise<RecordCompletionOutcome> {
+    return this.tenantPrismaService.runInTenantContext(actor, (client) =>
+      recordCompletionInTransaction(client, actor, request),
+    );
+  }
+
+  async listProgress(
+    actor: ActorContext,
+    routineId: string,
+  ): Promise<RoutineProgressPerson[] | null> {
+    return this.tenantPrismaService.runInTenantContext(actor, (client) =>
+      listProgressInTransaction(client, routineId),
+    );
+  }
+
   async archive(actor: ActorContext, routineId: string): Promise<boolean> {
     const result = await this.tenantPrismaService.runInTenantContext(actor, (client) =>
       client.routine.updateMany({
@@ -419,11 +446,16 @@ export class PrismaRoutineRepository implements RoutineRepository {
           },
         },
       });
+      const progress = await summarizeCompletions(
+        client,
+        actor,
+        assignments.map(({ routine }) => routine.id),
+      );
       const seen = new Set<string>();
       return assignments.flatMap(({ assignedAt, routine }) => {
         if (seen.has(routine.id)) return [];
         seen.add(routine.id);
-        return [{ ...routine, assignedAt }];
+        return [{ ...routine, assignedAt, progress: progress.get(routine.id) ?? NO_PROGRESS }];
       });
     });
   }

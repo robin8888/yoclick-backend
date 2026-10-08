@@ -98,6 +98,10 @@ function serializeMine(
     ...routine,
     items: presentItems(routine.items, presenter, { isClient: true }),
     assignedAt: routine.assignedAt.toISOString(),
+    progress: {
+      ...routine.progress,
+      lastCompletedAt: routine.progress.lastCompletedAt?.toISOString() ?? null,
+    },
   };
 }
 
