@@ -9,6 +9,14 @@ const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 const MAX_MESSAGES_PER_REQUEST = 100;
 const REQUEST_TIMEOUT_MS = 10_000;
 
+/**
+ * El canal de Android al que van los avisos. Tiene que llamarse igual que el que crea la app
+ * (`usePushRegistration`, en yoclick-front): en Android 8 o posterior el canal decide si el aviso
+ * suena y si se asoma sobre lo que se esté mirando. Sin nombrarlo, cae en un canal sin prioridad:
+ * llega, pero en silencio. Si un nombre cambia y el otro no, no da error: el aviso se pierde.
+ */
+const ANDROID_CHANNEL_ID = 'avisos';
+
 interface ExpoTicket {
   readonly status: 'ok' | 'error';
   readonly details?: { readonly error?: string };
@@ -51,7 +59,14 @@ export class ExpoPushSender implements PushSender {
         Accept: 'application/json',
         ...(this.accessToken && { Authorization: `Bearer ${this.accessToken}` }),
       },
-      body: JSON.stringify(batch.map((message) => ({ ...message, sound: 'default' }))),
+      body: JSON.stringify(
+        batch.map((message) => ({
+          ...message,
+          sound: 'default',
+          priority: 'high',
+          channelId: ANDROID_CHANNEL_ID,
+        })),
+      ),
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
     if (!response.ok) throw new Error(`Expo push service answered ${String(response.status)}`);
