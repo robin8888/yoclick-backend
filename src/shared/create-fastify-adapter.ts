@@ -1,6 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { FastifyAdapter } from '@nestjs/platform-fastify';
 import { MAX_DOCUMENT_SIZE_BYTES, PDF_CONTENT_TYPE } from '../modules/content/domain/content-rules';
+import {
+  MAX_PHOTO_REQUEST_BODY_BYTES,
+  PHOTO_CONTENT_TYPES,
+  PHOTO_PARSER_CONTENT_TYPE,
+} from '../modules/photos/domain/photo-rules';
 
 /** SEC-50: cuerpos JSON de hasta 1 MB. */
 export const MAX_REQUEST_BODY_BYTES = 1_048_576;
@@ -57,6 +62,37 @@ function acceptPdfBodies(adapter: FastifyAdapter): void {
   );
 }
 
+const PHOTO_UPLOAD_PATHS = [
+  { method: 'PUT', path: /^\/v1\/me\/photo(?:\?.*)?$/ },
+  { method: 'POST', path: /^\/v1\/centers\/[^/?]+\/team-profiles\/me\/photos(?:\?.*)?$/ },
+  { method: 'POST', path: /^\/v1\/centers\/[^/?]+\/content\/images(?:\?.*)?$/ },
+] as const;
+
+/** Como con el PDF: el tipo que mande el móvil no decide nada, la foto se reconoce por sus primeros bytes. */
+function treatPhotoUploadsAsImages(adapter: FastifyAdapter): void {
+  adapter.getInstance().addHook('onRequest', (request, _reply, done) => {
+    const isPhotoUpload = PHOTO_UPLOAD_PATHS.some(
+      ({ method, path }) => request.method === method && path.test(request.url),
+    );
+    if (isPhotoUpload) request.headers['content-type'] = PHOTO_PARSER_CONTENT_TYPE;
+    done();
+  });
+}
+
+/** Una foto llega como el cuerpo entero de la petición, en bytes. */
+function acceptImageBodies(adapter: FastifyAdapter): void {
+  for (const contentType of PHOTO_CONTENT_TYPES) {
+    adapter.useBodyParser(
+      contentType,
+      false,
+      { bodyLimit: MAX_PHOTO_REQUEST_BODY_BYTES },
+      (_request, body, done) => {
+        done(null, body);
+      },
+    );
+  }
+}
+
 /**
  * Adaptador común a producción y a los tests e2e. El identificador de petición (`traceId`) lo genera
  * el servidor: no se confía en una cabecera del cliente, que podría falsificarlo o usarlo para
@@ -70,5 +106,7 @@ export function createFastifyAdapter(): FastifyAdapter {
   allowEmptyJsonBodies(adapter);
   acceptPdfBodies(adapter);
   treatDocumentUploadsAsPdf(adapter);
+  acceptImageBodies(adapter);
+  treatPhotoUploadsAsImages(adapter);
   return adapter;
 }

@@ -4,9 +4,11 @@ import { DomainError } from '../../../shared/errors/domain-error';
 import { type ErrorCode } from '../../../shared/errors/error-catalog.es';
 import { HTTP_STATUS } from '../../../shared/errors/http-status';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
+import { decidePhotoUpload } from '../../photos/domain/photo-rules';
 import { VIDEO_HOSTING, type VideoHosting } from '../../videos/application/ports/video-hosting';
 import {
   buildDocumentKey,
+  buildImageKey,
   countPdfPages,
   decideDocumentUpload,
   isPdfFile,
@@ -60,24 +62,30 @@ export interface AddDocumentRequest extends ContentDetails {
   readonly bytes: Buffer;
 }
 
+export interface StoredFileRequest extends AddDocumentRequest {
+  readonly kind: 'pdf' | 'image';
+  readonly contentId: string;
+  /** Ruta del fichero en el almacén. */
+  readonly documentKey: string;
+  /** Solo los PDF tienen páginas. */
+  readonly pageCount: number | null;
+}
+
+/** Guarda un fichero de la biblioteca (PDF o imagen): comprueba el espacio del plan, lo sube y lo registra. */
 @Injectable()
-export class AddDocumentUseCase {
-  private readonly logger = new Logger(AddDocumentUseCase.name);
+export class StoreContentFileUseCase {
+  private readonly logger = new Logger(StoreContentFileUseCase.name);
 
   constructor(
     @Inject(CONTENT_REPOSITORY) private readonly contents: ContentRepository,
     @Inject(FILE_STORAGE) private readonly storage: FileStorage,
   ) {}
 
-  async execute(request: AddDocumentRequest): Promise<StoredContent> {
-    if (!isPdfFile(request.bytes))
-      throw new DomainError('DOCUMENT_NOT_PDF', HTTP_STATUS.badRequest);
+  async execute(request: StoredFileRequest): Promise<StoredContent> {
     await this.assertRoomFor(request);
-    const contentId = generateUuidV7();
-    const documentKey = buildDocumentKey({ centerId: request.actor.centerId, contentId });
-    await this.storage.putFile({ key: documentKey, bytes: request.bytes });
-    await this.saveOrDiscard(request, { contentId, documentKey });
-    return requireContent(this.contents, request.actor, contentId);
+    await this.storage.putFile({ key: request.documentKey, bytes: request.bytes });
+    await this.saveOrDiscard(request);
+    return requireContent(this.contents, request.actor, request.contentId);
   }
 
   private async assertRoomFor(request: AddDocumentRequest): Promise<void> {
@@ -92,26 +100,73 @@ export class AddDocumentUseCase {
   }
 
   /** Un fichero que sobra en el almacén solo cuesta dinero: si no se pudo guardar, se intenta borrar. */
-  private async saveOrDiscard(
-    request: AddDocumentRequest,
-    ids: { contentId: string; documentKey: string },
-  ): Promise<void> {
+  private async saveOrDiscard(request: StoredFileRequest): Promise<void> {
     try {
       await this.contents.addDocument(request.actor, {
-        id: ids.contentId,
-        documentKey: ids.documentKey,
+        id: request.contentId,
+        kind: request.kind,
+        documentKey: request.documentKey,
         title: request.title,
         need: request.need,
         level: request.level,
         sizeBytes: BigInt(request.bytes.length),
-        pageCount: countPdfPages(request.bytes),
+        pageCount: request.pageCount,
       });
     } catch (error) {
-      await this.storage.deleteFile(ids.documentKey).catch((deleteError: unknown) => {
-        this.logger.warn(`Could not delete ${ids.documentKey} from the file storage`, deleteError);
+      await this.storage.deleteFile(request.documentKey).catch((deleteError: unknown) => {
+        this.logger.warn(
+          `Could not delete ${request.documentKey} from the file storage`,
+          deleteError,
+        );
       });
       throw error;
     }
+  }
+}
+
+@Injectable()
+export class AddDocumentUseCase {
+  constructor(private readonly storeFile: StoreContentFileUseCase) {}
+
+  async execute(request: AddDocumentRequest): Promise<StoredContent> {
+    if (!isPdfFile(request.bytes))
+      throw new DomainError('DOCUMENT_NOT_PDF', HTTP_STATUS.badRequest);
+    const contentId = generateUuidV7();
+    return this.storeFile.execute({
+      ...request,
+      kind: 'pdf',
+      contentId,
+      documentKey: buildDocumentKey({ centerId: request.actor.centerId, contentId }),
+      pageCount: countPdfPages(request.bytes),
+    });
+  }
+}
+
+@Injectable()
+export class AddImageUseCase {
+  constructor(private readonly storeFile: StoreContentFileUseCase) {}
+
+  /** El formato se lee de los bytes, con las mismas reglas que las fotos de perfil. */
+  async execute(request: AddDocumentRequest): Promise<StoredContent> {
+    const decision = decidePhotoUpload(request.bytes);
+    if (decision.kind === 'not_an_image') {
+      throw new DomainError('PHOTO_NOT_IMAGE', HTTP_STATUS.badRequest);
+    }
+    if (decision.kind === 'too_large') {
+      throw new DomainError('PHOTO_TOO_LARGE', HTTP_STATUS.payloadTooLarge);
+    }
+    const contentId = generateUuidV7();
+    return this.storeFile.execute({
+      ...request,
+      kind: 'image',
+      contentId,
+      documentKey: buildImageKey({
+        centerId: request.actor.centerId,
+        contentId,
+        format: decision.format,
+      }),
+      pageCount: null,
+    });
   }
 }
 

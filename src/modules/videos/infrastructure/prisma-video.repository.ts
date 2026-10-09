@@ -5,6 +5,7 @@ import {
 } from '../../../shared/database/tenant-prisma.service';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
 import {
+  type InFlightVideo,
   type NewVideo,
   type ProcessingUpdate,
   type StoredVideo,
@@ -65,6 +66,29 @@ export class PrismaVideoRepository implements VideoRepository {
         usedBytes: used._sum.sizeBytes ?? NO_BYTES,
       };
     });
+  }
+
+  async listInFlight(actor: ActorContext): Promise<InFlightVideo[]> {
+    return this.tenantPrismaService.runInTenantContext(actor, (client) =>
+      client.video.findMany({
+        where: { status: { in: ['uploading', 'processing'] } },
+        orderBy: { createdAt: 'asc' },
+        select: { ...VIDEO_SELECT, createdAt: true },
+      }),
+    );
+  }
+
+  async countUploadsInProgress(actor: ActorContext, abandonedBefore: Date): Promise<number> {
+    return this.tenantPrismaService.runInTenantContext(actor, (client) =>
+      client.video.count({
+        where: {
+          OR: [
+            { status: 'processing' },
+            { status: 'uploading', createdAt: { gte: abandonedBefore } },
+          ],
+        },
+      }),
+    );
   }
 
   async countTechniqueVideos(actor: ActorContext, membershipId: string): Promise<number> {

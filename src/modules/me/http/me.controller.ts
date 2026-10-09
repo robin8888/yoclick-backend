@@ -9,6 +9,7 @@ import {
 import { CurrentUserId } from '../../../shared/auth/decorators/current-user-id.decorator';
 import { UserScoped } from '../../../shared/auth/decorators/user-scoped.decorator';
 import { ProblemDetailsDto } from '../../../shared/errors/problem-details.dto';
+import { type WithPhotoUrl } from '../../photos/application/photo-url-signer';
 import { GetMyConsentsUseCase } from '../application/get-my-consents.use-case';
 import { GetMyProfileUseCase } from '../application/get-my-profile.use-case';
 import { ListMyMembershipsUseCase } from '../application/list-my-memberships.use-case';
@@ -27,11 +28,13 @@ import {
   UpdateProfileRequestDto,
 } from './dto/profile-dtos';
 
-export function serializeProfile(profile: Profile): Record<string, unknown> {
+export function serializeProfile(profile: WithPhotoUrl<Profile>): Record<string, unknown> {
   return { ...profile, createdAt: profile.createdAt.toISOString() };
 }
 
-export function serializeMembership(membership: MyMembership): Record<string, unknown> {
+export function serializeMembership(
+  membership: WithPhotoUrl<MyMembership>,
+): Record<string, unknown> {
   return { ...membership, joinedAt: membership.joinedAt.toISOString() };
 }
 

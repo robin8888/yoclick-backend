@@ -24,6 +24,8 @@ export interface ContentDetailView extends ContentView {
   readonly playback: { streamUrl: string; thumbnailUrl: string; expiresAt: string } | null;
   /** Enlace firmado que caduca, para leer o descargar el PDF. */
   readonly document: { url: string; expiresAt: string } | null;
+  /** Enlace firmado que caduca, para ver la imagen. */
+  readonly image: { url: string; expiresAt: string } | null;
 }
 
 /** Convierte una pieza guardada en lo que ve la app, firmando los enlaces en el momento. */
@@ -50,10 +52,21 @@ export class ContentPresenter {
       pageCount: content.pageCount,
       durationSeconds: content.video?.durationSeconds ?? null,
       isReady,
-      thumbnailUrl: links?.thumbnailUrl ?? null,
+      thumbnailUrl: this.resolveThumbnailUrl(content, links?.thumbnailUrl ?? null),
       createdAt: content.createdAt.toISOString(),
       assignments: content.assignments,
     };
+  }
+
+  /** Una imagen es su propia miniatura: la app la pinta sin pedir el detalle. */
+  private resolveThumbnailUrl(
+    content: StoredContent,
+    videoThumbnailUrl: string | null,
+  ): string | null {
+    if (content.kind === 'image' && content.documentKey) {
+      return this.fileStorage.signDownload(content.documentKey).url;
+    }
+    return videoThumbnailUrl;
   }
 
   presentDetail(content: StoredContent): ContentDetailView {
@@ -65,6 +78,7 @@ export class ContentPresenter {
     const download = content.documentKey
       ? this.fileStorage.signDownload(content.documentKey)
       : null;
+    const signed = download && { url: download.url, expiresAt: download.expiresAt.toISOString() };
     return {
       ...view,
       playback: links && {
@@ -72,7 +86,8 @@ export class ContentPresenter {
         thumbnailUrl: links.thumbnailUrl,
         expiresAt: links.expiresAt.toISOString(),
       },
-      document: download && { url: download.url, expiresAt: download.expiresAt.toISOString() },
+      document: content.kind === 'pdf' ? signed : null,
+      image: content.kind === 'image' ? signed : null,
     };
   }
 }

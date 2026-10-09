@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
+import { PhotoUrlSigner } from '../../photos/application/photo-url-signer';
 import { VideoPresenter } from '../../videos/application/video-presenter';
 import { type ProfileView } from './ports/team-profile.repository';
 import { type StaffReviewView } from './ports/staff-review.repository';
@@ -7,7 +8,10 @@ import { type StaffReviewView } from './ports/staff-review.repository';
 /** Convierte un perfil en lo que ve la app, firmando los enlaces de sus vídeos en el momento. */
 @Injectable()
 export class ProfilePresenter {
-  constructor(private readonly videoPresenter: VideoPresenter) {}
+  constructor(
+    private readonly videoPresenter: VideoPresenter,
+    private readonly photoUrlSigner: PhotoUrlSigner,
+  ) {}
 
   present(profile: ProfileView, actor: ActorContext): Record<string, unknown> {
     const viewer = { isClient: actor.role === 'client' };
@@ -15,6 +19,8 @@ export class ProfilePresenter {
       membershipId: profile.membershipId,
       isMe: profile.membershipId === actor.membershipId,
       fullName: profile.fullName,
+      photoUrl: this.photoUrlSigner.sign(profile.photoKey),
+      photos: this.photoUrlSigner.signGallery(profile.photos),
       staffTitle: profile.staffTitle,
       headline: profile.headline,
       bio: profile.bio,

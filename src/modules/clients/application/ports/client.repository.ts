@@ -7,6 +7,8 @@ export interface ClientView {
   readonly membershipId: string;
   readonly fullName: string;
   readonly email: string;
+  /** Ruta de su foto de perfil; la API la convierte en un enlace firmado. */
+  readonly photoKey: string | null;
   readonly status: 'active' | 'blocked';
   readonly activity: ClientActivity;
   readonly level: ClientLevelName | null;

@@ -18,7 +18,7 @@ import { resolveClientActivity } from '../domain/client-activity';
 const LISTED_STATUSES = ['active', 'blocked'] as const;
 
 const WITH_USER_AND_GROUP = {
-  user: { select: { fullName: true, email: true } },
+  user: { select: { fullName: true, email: true, photoKey: true } },
   group: { select: { id: true, name: true } },
 } satisfies Prisma.MembershipInclude;
 
@@ -67,6 +67,7 @@ function toClientView(
     membershipId: membership.id,
     fullName: membership.user.fullName,
     email: membership.user.email,
+    photoKey: membership.user.photoKey,
     status: membership.status === 'blocked' ? 'blocked' : 'active',
     activity: resolveClientActivity({ joinedAt: membership.joinedAt, lastBookingAt, now }),
     level: membership.level,

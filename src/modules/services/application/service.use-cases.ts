@@ -2,22 +2,69 @@ import { Inject, Injectable } from '@nestjs/common';
 import { DomainError } from '../../../shared/errors/domain-error';
 import { HTTP_STATUS } from '../../../shared/errors/http-status';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
+import { PhotoUrlSigner } from '../../photos/application/photo-url-signer';
+import { canClientsSeeProfile } from '../../team-profiles/domain/profile-rules';
 import {
   SERVICE_REPOSITORY,
   type NewService,
   type ServicePatch,
   type ServiceRepository,
+  type ServiceStaffMember,
   type ServiceView,
   type ServiceWriteOutcome,
 } from './ports/service.repository';
 
+export interface SignedServiceStaffMember {
+  readonly membershipId: string;
+  readonly fullName: string;
+  readonly photoUrl: string | null;
+  readonly photos: readonly { readonly id: string; readonly url: string }[];
+}
+
+export type SignedService = Omit<ServiceView, 'staff'> & {
+  readonly staff: readonly SignedServiceStaffMember[];
+};
+
+/** Pone los enlaces de foto de quien atiende; a la clientela solo si su perfil profesional está publicado. */
+@Injectable()
+export class ServicePhotoSigner {
+  constructor(private readonly urlSigner: PhotoUrlSigner) {}
+
+  sign(service: ServiceView, actor: ActorContext): SignedService {
+    return {
+      ...service,
+      staff: service.staff.map((member) => this.signStaffMember(member, actor)),
+    };
+  }
+
+  private signStaffMember(
+    member: ServiceStaffMember,
+    actor: ActorContext,
+  ): SignedServiceStaffMember {
+    const { photoKey, profileStatus, galleryPhotos, ...visible } = member;
+    const isHiddenFromViewer =
+      actor.role === 'client' && !(profileStatus && canClientsSeeProfile(profileStatus));
+    return {
+      ...visible,
+      photoUrl: isHiddenFromViewer ? null : this.urlSigner.sign(photoKey),
+      photos: isHiddenFromViewer ? [] : this.urlSigner.signGallery(galleryPhotos),
+    };
+  }
+}
+
 /** La clientela solo ve lo visible; el equipo ve todo lo que no está archivado. */
 @Injectable()
 export class ListServicesUseCase {
-  constructor(@Inject(SERVICE_REPOSITORY) private readonly services: ServiceRepository) {}
+  constructor(
+    @Inject(SERVICE_REPOSITORY) private readonly services: ServiceRepository,
+    private readonly photoSigner: ServicePhotoSigner,
+  ) {}
 
-  async execute(actor: ActorContext): Promise<ServiceView[]> {
-    return this.services.listServices(actor, { onlyVisible: actor.role === 'client' });
+  async execute(actor: ActorContext): Promise<SignedService[]> {
+    const services = await this.services.listServices(actor, {
+      onlyVisible: actor.role === 'client',
+    });
+    return services.map((service) => this.photoSigner.sign(service, actor));
   }
 }
 
@@ -41,22 +88,34 @@ export interface CreateServiceRequest {
 /** Si no se indica quién lo atiende, lo atiende quien lo crea. */
 @Injectable()
 export class CreateServiceUseCase {
-  constructor(@Inject(SERVICE_REPOSITORY) private readonly services: ServiceRepository) {}
+  constructor(
+    @Inject(SERVICE_REPOSITORY) private readonly services: ServiceRepository,
+    private readonly photoSigner: ServicePhotoSigner,
+  ) {}
 
-  async execute({ actor, service }: CreateServiceRequest): Promise<ServiceView> {
+  async execute({ actor, service }: CreateServiceRequest): Promise<SignedService> {
     const staffMembershipIds = service.staffMembershipIds ?? [actor.membershipId];
-    return unwrapWriteOutcome(
+    const created = unwrapWriteOutcome(
       await this.services.createService(actor, { ...service, staffMembershipIds }),
     );
+    return this.photoSigner.sign(created, actor);
   }
 }
 
 @Injectable()
 export class UpdateServiceUseCase {
-  constructor(@Inject(SERVICE_REPOSITORY) private readonly services: ServiceRepository) {}
+  constructor(
+    @Inject(SERVICE_REPOSITORY) private readonly services: ServiceRepository,
+    private readonly photoSigner: ServicePhotoSigner,
+  ) {}
 
-  async execute(actor: ActorContext, serviceId: string, patch: ServicePatch): Promise<ServiceView> {
-    return unwrapWriteOutcome(await this.services.updateService(actor, serviceId, patch));
+  async execute(
+    actor: ActorContext,
+    serviceId: string,
+    patch: ServicePatch,
+  ): Promise<SignedService> {
+    const updated = unwrapWriteOutcome(await this.services.updateService(actor, serviceId, patch));
+    return this.photoSigner.sign(updated, actor);
   }
 }
 

@@ -4,6 +4,7 @@ import {
   ArchiveServiceUseCase,
   CreateServiceUseCase,
   ListServicesUseCase,
+  ServicePhotoSigner,
   UpdateServiceUseCase,
 } from './application/service.use-cases';
 import { ServicesController } from './http/services.controller';
@@ -13,6 +14,7 @@ import { PrismaServiceRepository } from './infrastructure/prisma-service.reposit
   controllers: [ServicesController],
   providers: [
     ListServicesUseCase,
+    ServicePhotoSigner,
     CreateServiceUseCase,
     UpdateServiceUseCase,
     ArchiveServiceUseCase,

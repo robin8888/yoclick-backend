@@ -85,6 +85,17 @@ export const ERROR_CATALOG = {
   DOCUMENT_QUOTA_EXCEEDED: {
     title: 'El centro ha llenado su espacio de documentos. Borra alguno o amplía el plan',
   },
+  PHOTO_NOT_IMAGE: { title: 'La foto tiene que ser una imagen JPEG, PNG o WebP' },
+  PHOTO_TOO_LARGE: { title: 'La foto es demasiado grande. Máximo 5 MB' },
+  PROFILE_PHOTO_LIMIT_REACHED: {
+    title: 'Ya tienes seis fotos en tu perfil. Borra una para subir otra',
+  },
+  PHOTO_QUOTA_EXCEEDED: {
+    title: 'Tu centro ha llenado su espacio de fotos. Quita alguna para poder subir otra',
+  },
+  VIDEO_UPLOADS_IN_PROGRESS: {
+    title: 'Tu centro ya tiene varios vídeos subiéndose. Espera a que terminen para subir otro',
+  },
   CONTENT_VIDEO_ALREADY_IN_LIBRARY: { title: 'Este vídeo ya está en la biblioteca' },
   CONTENT_ASSIGNMENT_INVALID: {
     title: 'A quién se asigna el contenido no existe en este centro',

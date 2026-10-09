@@ -9,10 +9,17 @@ export interface CertificationView {
   readonly isVerified: boolean;
 }
 
+export interface GalleryPhotoView {
+  readonly id: string;
+  readonly key: string;
+}
+
 export interface ProfileView {
   readonly membershipId: string;
   readonly role: 'owner' | 'admin' | 'staff';
   readonly fullName: string;
+  /** Ruta de la foto de perfil de la persona (la misma en todos sus centros). */
+  readonly photoKey: string | null;
   readonly staffTitle: string | null;
   readonly headline: string | null;
   readonly bio: string | null;
@@ -25,6 +32,8 @@ export interface ProfileView {
   readonly introVideo: StoredVideo | null;
   readonly techniqueVideos: readonly StoredVideo[];
   readonly rating: RatingSummary | null;
+  /** La galería del perfil, en el orden en que se enseña. */
+  readonly photos: readonly GalleryPhotoView[];
 }
 
 export interface ProfileContent {
@@ -40,6 +49,11 @@ export type ReviewProfileOutcome =
 
 export type AddCertificationOutcome =
   { readonly kind: 'added' } | { readonly kind: 'limit_reached' };
+
+export type AddPhotoOutcome =
+  | { readonly kind: 'added' }
+  | { readonly kind: 'limit_reached' }
+  | { readonly kind: 'quota_exceeded' };
 
 export interface TeamSettings {
   readonly showTeamOnWeb: boolean;
@@ -64,6 +78,13 @@ export interface TeamProfileRepository {
   ): Promise<AddCertificationOutcome>;
   removeCertification(actor: ActorContext, certificationId: string): Promise<boolean>;
   verifyCertification(actor: ActorContext, certificationId: string): Promise<boolean>;
+  /** Añade una foto al final de la galería; el perfil vuelve a borrador. */
+  addPhoto(
+    actor: ActorContext,
+    photo: { id: string; key: string; sizeBytes: number },
+  ): Promise<AddPhotoOutcome>;
+  /** Quita una foto de la galería (el perfil vuelve a borrador) y devuelve su ruta; `null` si no es mía. */
+  removePhoto(actor: ActorContext, photoId: string): Promise<string | null>;
   readSettings(actor: ActorContext): Promise<TeamSettings>;
   saveSettings(actor: ActorContext, settings: Partial<TeamSettings>): Promise<TeamSettings>;
 }

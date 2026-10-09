@@ -20,6 +20,10 @@ export class MemberParamsDto extends createZodDto(
   z.strictObject({ centerId: z.uuid(), membershipId: z.uuid() }),
 ) {}
 
+export class PhotoParamsDto extends createZodDto(
+  z.strictObject({ centerId: z.uuid(), photoId: z.uuid() }),
+) {}
+
 export class CertificationParamsDto extends createZodDto(
   z.strictObject({ centerId: z.uuid(), certificationId: z.uuid() }),
 ) {}
@@ -96,6 +100,10 @@ const profileShape = {
   /** `true` en el perfil de quien hace la petición. */
   isMe: z.boolean(),
   fullName: z.string(),
+  /** Foto de perfil de la persona; la clientela solo la ve si el perfil está publicado. */
+  photoUrl: z.string().nullable(),
+  /** Galería del perfil (hasta 6), en el orden en que se enseña. */
+  photos: z.array(z.strictObject({ id: z.uuid(), url: z.string() })),
   staffTitle: z.string().nullable(),
   headline: z.string().nullable(),
   bio: z.string().nullable(),

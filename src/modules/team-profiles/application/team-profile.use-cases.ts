@@ -3,6 +3,8 @@ import { v7 as generateUuidV7 } from 'uuid';
 import { DomainError } from '../../../shared/errors/domain-error';
 import { HTTP_STATUS } from '../../../shared/errors/http-status';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
+import { PhotoFileKeeper } from '../../photos/application/photo-file-keeper';
+import { buildGalleryPhotoKey } from '../../photos/domain/photo-rules';
 import { isVideoVisibleToClients } from '../../videos/domain/video-rules';
 import {
   canClientsSeeProfile,
@@ -11,6 +13,7 @@ import {
 } from '../domain/profile-rules';
 import {
   TEAM_PROFILE_REPOSITORY,
+  type AddPhotoOutcome,
   type ProfileView,
   type TeamProfileRepository,
   type TeamSettings,
@@ -130,6 +133,53 @@ export class ManageMyCertificationsUseCase {
     if (!(await this.profiles.removeCertification(actor, certificationId))) {
       throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
     }
+  }
+}
+
+@Injectable()
+export class ManageMyPhotosUseCase {
+  constructor(
+    @Inject(TEAM_PROFILE_REPOSITORY) private readonly profiles: TeamProfileRepository,
+    private readonly files: PhotoFileKeeper,
+  ) {}
+
+  /** Añade una foto a mi galería; el perfil vuelve a borrador, como al guardar su contenido. */
+  async add(request: { actor: ActorContext; bytes: Buffer }): Promise<void> {
+    const { actor, bytes } = request;
+    const format = this.files.assertAcceptable(bytes);
+    const id = this.files.newPhotoId();
+    const key = buildGalleryPhotoKey({
+      centerId: actor.centerId,
+      membershipId: actor.membershipId,
+      photoId: id,
+      format,
+    });
+    await this.files.save({ key, bytes });
+    const outcome = await this.addOrDiscard(actor, { id, key, sizeBytes: bytes.length });
+    if (outcome.kind === 'added') return;
+    await this.files.discard(key);
+    const code =
+      outcome.kind === 'limit_reached' ? 'PROFILE_PHOTO_LIMIT_REACHED' : 'PHOTO_QUOTA_EXCEEDED';
+    throw new DomainError(code, HTTP_STATUS.conflict);
+  }
+
+  /** Un fichero que sobra en el almacén solo cuesta dinero: si no se pudo guardar, se borra. */
+  private async addOrDiscard(
+    actor: ActorContext,
+    photo: { id: string; key: string; sizeBytes: number },
+  ): Promise<AddPhotoOutcome> {
+    try {
+      return await this.profiles.addPhoto(actor, photo);
+    } catch (error) {
+      await this.files.discard(photo.key);
+      throw error;
+    }
+  }
+
+  async remove(actor: ActorContext, photoId: string): Promise<void> {
+    const removedKey = await this.profiles.removePhoto(actor, photoId);
+    if (removedKey === null) throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
+    await this.files.discard(removedKey);
   }
 }
 

@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { type Environment } from '../../shared/config/environment.schema';
 import { VIDEO_HOSTING, type VideoHosting } from './application/ports/video-hosting';
 import { VIDEO_REPOSITORY } from './application/ports/video.repository';
+import { VideoSynchronizer } from './application/video-synchronizer';
 import { VideoPresenter } from './application/video-presenter';
 import {
   DeleteVideoUseCase,
@@ -41,6 +42,7 @@ function createVideoHosting(configService: ConfigService<Environment, true>): Vi
     { provide: VIDEO_HOSTING, inject: [ConfigService], useFactory: createVideoHosting },
     { provide: VIDEO_REPOSITORY, useClass: PrismaVideoRepository },
     VideoPresenter,
+    VideoSynchronizer,
     StartVideoUploadUseCase,
     GetVideoPlanUseCase,
     GetVideoUseCase,

@@ -19,7 +19,14 @@ export class ServiceRouteParamsDto extends createZodDto(
   z.strictObject({ centerId: z.uuid(), serviceId: z.uuid() }),
 ) {}
 
-const serviceStaffShape = { membershipId: z.uuid(), fullName: z.string() };
+const serviceStaffShape = {
+  membershipId: z.uuid(),
+  fullName: z.string(),
+  /** Foto de perfil. La clientela solo la ve si el perfil profesional de la persona está publicado. */
+  photoUrl: z.string().nullable(),
+  /** Galería del perfil profesional, en orden; vacía para la clientela mientras no esté publicado. */
+  photos: z.array(z.strictObject({ id: z.uuid(), url: z.string() })),
+};
 
 const serviceShape = {
   id: z.uuid(),

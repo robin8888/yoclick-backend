@@ -48,6 +48,8 @@ const clientShape = {
   membershipId: z.uuid(),
   fullName: z.string(),
   email: z.string(),
+  /** Foto de perfil de la persona; solo la ve el equipo del centro. */
+  photoUrl: z.string().nullable(),
   status: z.enum(['active', 'blocked']),
   /** Nuevo (primera semana), activo (cita en los últimos 30 días) o inactivo. */
   activity: z.enum(['new', 'active', 'inactive']),

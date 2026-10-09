@@ -26,12 +26,12 @@ import { ProblemDetailsDto } from '../../../shared/errors/problem-details.dto';
 import { ActivityRecorder } from '../../activity/application/activity-recorder';
 import { assertRouteTargetsActorCenter } from '../../../shared/tenancy/assert-route-targets-actor-center';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
-import { type ServiceView } from '../application/ports/service.repository';
 import {
   ArchiveServiceUseCase,
   CreateServiceUseCase,
   ListServicesUseCase,
   UpdateServiceUseCase,
+  type SignedService,
 } from '../application/service.use-cases';
 import {
   CenterRouteParamsDto,
@@ -42,7 +42,7 @@ import {
   UpdateServiceRequestDto,
 } from './service.dto';
 
-function serializeService(service: ServiceView): Record<string, unknown> {
+function serializeService(service: SignedService): Record<string, unknown> {
   return { ...service, currency: 'EUR' };
 }
 

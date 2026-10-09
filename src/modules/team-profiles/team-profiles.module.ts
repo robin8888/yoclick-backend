@@ -11,6 +11,7 @@ import {
   GetTeamProfileUseCase,
   ListTeamProfilesUseCase,
   ManageMyCertificationsUseCase,
+  ManageMyPhotosUseCase,
   ModerateTeamProfileUseCase,
   SaveMyProfileUseCase,
   SubmitMyProfileUseCase,
@@ -21,6 +22,7 @@ import {
   TeamSettingsController,
 } from './http/profile-moderation.controller';
 import { StaffReviewsController } from './http/staff-reviews.controller';
+import { MyProfilePhotosController } from './http/my-profile-photos.controller';
 import { MyProfileController, TeamProfilesController } from './http/team-profiles.controller';
 import { PrismaStaffReviewRepository } from './infrastructure/prisma-staff-review.repository';
 import { PrismaTeamProfileRepository } from './infrastructure/prisma-team-profile.repository';
@@ -29,6 +31,7 @@ import { PrismaTeamProfileRepository } from './infrastructure/prisma-team-profil
 @Module({
   controllers: [
     MyProfileController,
+    MyProfilePhotosController,
     TeamSettingsController,
     StaffReviewsController,
     ProfileModerationController,
@@ -41,6 +44,7 @@ import { PrismaTeamProfileRepository } from './infrastructure/prisma-team-profil
     SaveMyProfileUseCase,
     SubmitMyProfileUseCase,
     ManageMyCertificationsUseCase,
+    ManageMyPhotosUseCase,
     ModerateTeamProfileUseCase,
     TeamSettingsUseCase,
     CreateStaffReviewUseCase,

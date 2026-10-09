@@ -85,6 +85,9 @@ export async function buildVisibleToClientFilter(
         ],
       },
     },
-    OR: [{ kind: 'pdf' }, { video: { status: 'ready', reviewStatus: 'approved' } }],
+    OR: [
+      { kind: { in: ['pdf', 'image'] } },
+      { video: { status: 'ready', reviewStatus: 'approved' } },
+    ],
   };
 }

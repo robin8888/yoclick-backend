@@ -8,10 +8,14 @@ import {
   type TeamRepository,
 } from '../application/ports/team.repository';
 
-const WITH_USER = { user: { select: { fullName: true, email: true } } } as const;
+const WITH_USER = {
+  user: { select: { fullName: true, email: true, photoKey: true } },
+} as const;
 const TEAM_ROLES = ['owner', 'admin', 'staff'] as const;
 
-type MembershipWithUser = Membership & { user: { fullName: string; email: string } };
+type MembershipWithUser = Membership & {
+  user: { fullName: string; email: string; photoKey: string | null };
+};
 
 function toTeamMember(membership: MembershipWithUser): TeamMember {
   return {
@@ -19,6 +23,7 @@ function toTeamMember(membership: MembershipWithUser): TeamMember {
     userId: membership.userId,
     fullName: membership.user.fullName,
     email: membership.user.email,
+    photoKey: membership.user.photoKey,
     role: membership.role,
     status: membership.status,
     staffTitle: membership.staffTitle,

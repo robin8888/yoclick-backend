@@ -35,7 +35,7 @@ export class PrismaContentRepository implements ContentRepository {
       });
       const used = await client.contentItem.aggregate({
         _sum: { sizeBytes: true },
-        where: { kind: 'pdf' },
+        where: { kind: { in: ['pdf', 'image'] } },
       });
       return {
         storageLimitBytes: center.documentStorageLimitBytes,
@@ -70,7 +70,7 @@ export class PrismaContentRepository implements ContentRepository {
         data: {
           id: document.id,
           centerId: actor.centerId,
-          kind: 'pdf',
+          kind: document.kind,
           title: document.title,
           need: document.need,
           level: document.level,

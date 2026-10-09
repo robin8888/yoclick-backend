@@ -15,7 +15,7 @@ export class ContentRouteParamsDto extends createZodDto(
   z.strictObject({ centerId: z.uuid(), contentId: z.uuid() }),
 ) {}
 
-/** El PDF viaja como cuerpo del POST; lo que lo describe va en la dirección. */
+/** El PDF o la imagen viajan como cuerpo del POST; lo que lo describe va en la dirección. */
 export class AddDocumentQueryDto extends createZodDto(
   z.strictObject({
     title: titleSchema,
@@ -68,7 +68,7 @@ const assignmentShape = z.strictObject({
 
 const contentViewShape = {
   id: z.uuid(),
-  kind: z.enum(['video', 'pdf']),
+  kind: z.enum(['video', 'pdf', 'image']),
   title: z.string(),
   need: z.string().nullable(),
   level: levelSchema.nullable(),
@@ -109,5 +109,7 @@ export class ContentDetailResponseDto extends createZodDto(
       })
       .nullable(),
     document: z.strictObject({ url: z.string(), expiresAt: z.iso.datetime() }).nullable(),
+    /** Solo si `kind` es `image`: enlace firmado que caduca. */
+    image: z.strictObject({ url: z.string(), expiresAt: z.iso.datetime() }).nullable(),
   }),
 ) {}

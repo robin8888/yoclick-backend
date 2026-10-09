@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { PhotoUrlSigner, type WithPhotoUrl } from '../../photos/application/photo-url-signer';
 import {
   PROFILE_REPOSITORY,
   type MyMembership,
@@ -8,9 +9,13 @@ import {
 /** "Mis centros": los centros a los que pertenece la persona, con la marca para pintarlos. */
 @Injectable()
 export class ListMyMembershipsUseCase {
-  constructor(@Inject(PROFILE_REPOSITORY) private readonly profiles: ProfileRepository) {}
+  constructor(
+    @Inject(PROFILE_REPOSITORY) private readonly profiles: ProfileRepository,
+    private readonly urlSigner: PhotoUrlSigner,
+  ) {}
 
-  async execute(userId: string): Promise<MyMembership[]> {
-    return this.profiles.listMemberships(userId);
+  async execute(userId: string): Promise<WithPhotoUrl<MyMembership>[]> {
+    const memberships = await this.profiles.listMemberships(userId);
+    return memberships.map((membership) => this.urlSigner.attachPhotoUrl(membership));
   }
 }

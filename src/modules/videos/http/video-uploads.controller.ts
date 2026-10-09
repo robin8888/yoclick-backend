@@ -9,9 +9,11 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { CurrentActor } from '../../../shared/auth/decorators/current-actor.decorator';
 import { Roles } from '../../../shared/auth/decorators/roles.decorator';
 import { ProblemDetailsDto } from '../../../shared/errors/problem-details.dto';
+import { RATE_LIMITS } from '../../../shared/rate-limit/rate-limit-policies';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
 import { assertRouteTargetsActorCenter } from '../../../shared/tenancy/assert-route-targets-actor-center';
 import { PushDispatcher } from '../../push/application/push-dispatcher';
@@ -45,12 +47,13 @@ export class VideoUploadsController {
   ) {}
 
   @Post('videos')
+  @Throttle({ default: RATE_LIMITS.startVideoUpload })
   @Roles('owner', 'admin', 'staff')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     operationId: 'videos_start_upload',
     summary:
-      'Reserva un vídeo y devuelve la firma para subirlo directamente al servicio de vídeo. 403 VIDEO_NOT_INCLUDED si el plan no incluye vídeo; 409 VIDEO_QUOTA_EXCEEDED si no cabe.',
+      'Reserva un vídeo y devuelve la firma para subirlo directamente al servicio de vídeo. 403 VIDEO_NOT_INCLUDED si el plan no incluye vídeo; 409 VIDEO_QUOTA_EXCEEDED si no cabe; 409 VIDEO_UPLOADS_IN_PROGRESS si ya hay 5 vídeos subiéndose; 429 RATE_LIMITED.',
   })
   @ApiCreatedResponse({ type: StartVideoUploadResponseDto })
   async start(

@@ -11,6 +11,7 @@ import { ServicesModule } from './modules/services/services.module';
 import { SchedulingModule } from './modules/scheduling/scheduling.module';
 import { BookingsModule } from './modules/bookings/bookings.module';
 import { ContentModule } from './modules/content/content.module';
+import { PhotosModule } from './modules/photos/photos.module';
 import { RoutinesModule } from './modules/routines/routines.module';
 import { TeamProfilesModule } from './modules/team-profiles/team-profiles.module';
 import { VideosModule } from './modules/videos/videos.module';
@@ -67,6 +68,7 @@ import { buildLoggerOptions } from './shared/logging/build-logger-options';
     TeamProfilesModule,
     VideosModule,
     ContentModule,
+    PhotosModule,
     ActivityModule,
     PrivacyModule,
     HealthModule,

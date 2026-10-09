@@ -32,8 +32,11 @@ import {
   ListPendingInvitationsUseCase,
   RevokeInvitationUseCase,
 } from '../application/invitation.use-cases';
-import { type TeamMember } from '../application/ports/team.repository';
-import { ListTeamUseCase, UpdateTeamMemberUseCase } from '../application/team.use-cases';
+import {
+  ListTeamUseCase,
+  UpdateTeamMemberUseCase,
+  type SignedTeamMember,
+} from '../application/team.use-cases';
 import {
   CenterRouteParamsDto,
   InvitationResponseDto,
@@ -51,7 +54,7 @@ function assertRouteTargetsActorCenter(actor: ActorContext, routeCenterId: strin
   if (routeCenterId !== actor.centerId) throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
 }
 
-function serializeMember(member: TeamMember): Record<string, unknown> {
+function serializeMember(member: SignedTeamMember): Record<string, unknown> {
   return { ...member, joinedAt: member.joinedAt.toISOString() };
 }
 

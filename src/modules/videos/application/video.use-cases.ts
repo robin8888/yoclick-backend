@@ -6,9 +6,10 @@ import { HTTP_STATUS } from '../../../shared/errors/http-status';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
 import {
   decideVideoUpload,
-  mapBunnyStatusToVideoStatus,
+  STALE_UPLOAD_AFTER_MS,
   type VideoUploadDecision,
 } from '../domain/video-rules';
+import { VideoSynchronizer } from './video-synchronizer';
 import { VIDEO_HOSTING, type VideoHosting, type VideoUploadTarget } from './ports/video-hosting';
 import {
   VIDEO_REPOSITORY,
@@ -23,6 +24,7 @@ const REFUSED_UPLOAD_ERRORS: Readonly<
 > = {
   not_included: ['VIDEO_NOT_INCLUDED', HTTP_STATUS.forbidden],
   too_large: ['VIDEO_TOO_LARGE', HTTP_STATUS.payloadTooLarge],
+  too_many_in_progress: ['VIDEO_UPLOADS_IN_PROGRESS', HTTP_STATUS.conflict],
   quota_exceeded: ['VIDEO_QUOTA_EXCEEDED', HTTP_STATUS.conflict],
 };
 
@@ -47,6 +49,7 @@ export class StartVideoUploadUseCase {
   constructor(
     @Inject(VIDEO_REPOSITORY) private readonly videos: VideoRepository,
     @Inject(VIDEO_HOSTING) private readonly hosting: VideoHosting,
+    private readonly synchronizer: VideoSynchronizer,
   ) {}
 
   async execute(
@@ -63,8 +66,17 @@ export class StartVideoUploadUseCase {
   }
 
   private async assertUploadAllowed(request: StartVideoUploadRequest): Promise<void> {
+    await this.synchronizer.reconcileInFlight(request.actor);
     const facts = await this.videos.readStorageFacts(request.actor);
-    const decision = decideVideoUpload({ ...facts, requestedBytes: BigInt(request.sizeBytes) });
+    const uploadsInProgressCount = await this.videos.countUploadsInProgress(
+      request.actor,
+      new Date(Date.now() - STALE_UPLOAD_AFTER_MS),
+    );
+    const decision = decideVideoUpload({
+      ...facts,
+      uploadsInProgressCount,
+      requestedBytes: BigInt(request.sizeBytes),
+    });
     if (decision === 'allowed') return;
     const [code, httpStatus] = REFUSED_UPLOAD_ERRORS[decision];
     throw new DomainError(code, httpStatus);
@@ -120,7 +132,7 @@ export class GetVideoPlanUseCase {
 export class GetVideoUseCase {
   constructor(
     @Inject(VIDEO_REPOSITORY) private readonly videos: VideoRepository,
-    @Inject(VIDEO_HOSTING) private readonly hosting: VideoHosting,
+    private readonly synchronizer: VideoSynchronizer,
   ) {}
 
   /** Mientras el vídeo se sube o se procesa, pregunta al servicio de vídeo y guarda el estado nuevo. */
@@ -128,15 +140,7 @@ export class GetVideoUseCase {
     const video = await this.videos.find(actor, videoId);
     if (!video) throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
     if (video.status === 'ready' || video.status === 'failed') return video;
-    const state = await this.hosting.fetchProcessingState(video.providerVideoId);
-    const update = state
-      ? {
-          status: mapBunnyStatusToVideoStatus(state.bunnyStatusCode),
-          sizeBytes: state.sizeBytes,
-          durationSeconds: state.durationSeconds,
-        }
-      : { status: 'failed' as const, sizeBytes: 0n, durationSeconds: null };
-    return (await this.videos.applyProcessingUpdate(actor, videoId, update)) ?? video;
+    return this.synchronizer.sync(actor, video);
   }
 }
 

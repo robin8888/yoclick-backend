@@ -7,8 +7,9 @@ export interface AccountErasureRepository {
    * se elimina el teléfono, la fecha de nacimiento, los códigos y las sesiones, y se sale de todos
    * los centros. Se conserva lo que la ley obliga a conservar (facturas, pruebas de consentimiento),
    * ya desvinculado de cualquier dato identificable.
+   * Devuelve la ruta de la foto de perfil que tenía, para borrarla del almacén.
    */
-  anonymize(userId: string, erasedAt: Date): Promise<void>;
+  anonymize(userId: string, erasedAt: Date): Promise<string | null>;
 }
 
 export const ACCOUNT_ERASURE_REPOSITORY = Symbol('ACCOUNT_ERASURE_REPOSITORY');

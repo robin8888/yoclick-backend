@@ -9,6 +9,8 @@ export interface CenterSubscriptionFacts {
   /** Espacio de vídeo contratado; `null` si el plan no incluye vídeo. */
   readonly videoStorageLimitBytes: number | null;
   readonly videoStorageUsedBytes: number;
+  /** Espacio de fotos de la galería del equipo: tope del plan y lo que ocupan. */
+  readonly photoStorage: { readonly usedBytes: number; readonly limitBytes: number };
 }
 
 export interface CenterSubscriptionRepository {

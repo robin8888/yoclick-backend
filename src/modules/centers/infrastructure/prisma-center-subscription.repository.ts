@@ -19,6 +19,7 @@ export class PrismaCenterSubscriptionRepository implements CenterSubscriptionRep
           trialEndsAt: true,
           maxClients: true,
           videoStorageLimitBytes: true,
+          photoStorageLimitBytes: true,
         },
       });
       const activeClientCount = await client.membership.count({
@@ -27,6 +28,9 @@ export class PrismaCenterSubscriptionRepository implements CenterSubscriptionRep
       const videoStorage = await client.video.aggregate({
         _sum: { sizeBytes: true },
         where: { status: { not: 'failed' } },
+      });
+      const galleryPhotos = await client.staffProfilePhoto.aggregate({
+        _sum: { sizeBytes: true },
       });
       return {
         status: center.status,
@@ -37,6 +41,10 @@ export class PrismaCenterSubscriptionRepository implements CenterSubscriptionRep
         videoStorageLimitBytes:
           center.videoStorageLimitBytes === null ? null : Number(center.videoStorageLimitBytes),
         videoStorageUsedBytes: Number(videoStorage._sum.sizeBytes ?? BigInt(0)),
+        photoStorage: {
+          usedBytes: galleryPhotos._sum.sizeBytes ?? 0,
+          limitBytes: Number(center.photoStorageLimitBytes),
+        },
       };
     });
   }

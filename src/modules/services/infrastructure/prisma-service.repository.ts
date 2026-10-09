@@ -22,7 +22,23 @@ const WITH_ACTIVE_STAFF = {
   staff: {
     where: { membership: { status: 'active', role: { in: [...TEAM_ROLES] } } },
     orderBy: [{ membership: { joinedAt: 'asc' } }, { membershipId: 'asc' }],
-    include: { membership: { select: { id: true, user: { select: { fullName: true } } } } },
+    include: {
+      membership: {
+        select: {
+          id: true,
+          user: { select: { fullName: true, photoKey: true } },
+          staffProfile: {
+            select: {
+              status: true,
+              photos: {
+                orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+                select: { id: true, key: true },
+              },
+            },
+          },
+        },
+      },
+    },
   },
 } satisfies Prisma.ServiceInclude;
 
@@ -44,6 +60,9 @@ function toServiceView(service: ServiceWithStaff): ServiceView {
     staff: service.staff.map(({ membership }) => ({
       membershipId: membership.id,
       fullName: membership.user.fullName,
+      photoKey: membership.user.photoKey,
+      profileStatus: membership.staffProfile?.status ?? null,
+      galleryPhotos: membership.staffProfile?.photos ?? [],
     })),
   };
 }

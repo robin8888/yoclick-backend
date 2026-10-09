@@ -1,6 +1,7 @@
 import {
   MAX_DOCUMENT_SIZE_BYTES,
   buildDocumentKey,
+  buildImageKey,
   countPdfPages,
   decideDocumentUpload,
   isPdfFile,
@@ -88,5 +89,17 @@ describe('selectAddedTargets', () => {
     const advanced = { kind: 'level', level: 'advanced' } as const;
 
     expect(selectAddedTargets([beginners], [advanced])).toEqual([advanced]);
+  });
+});
+
+describe('buildImageKey', () => {
+  it.each([
+    ['jpeg', 'jpg'],
+    ['png', 'png'],
+    ['webp', 'webp'],
+  ] as const)('keeps a %s image under the center with the %s extension', (format, extension) => {
+    const key = buildImageKey({ centerId: 'center-1', contentId: 'item-1', format });
+
+    expect(key).toBe(`content/images/center-1/item-1.${extension}`);
   });
 });

@@ -1,3 +1,5 @@
+import { PHOTO_FILE_EXTENSIONS, type PhotoFormat } from '../../photos/domain/photo-rules';
+
 const BYTES_PER_MEGABYTE = 1_048_576;
 const MAX_DOCUMENT_SIZE_MEGABYTES = 50;
 export const MAX_DOCUMENT_SIZE_BYTES = MAX_DOCUMENT_SIZE_MEGABYTES * BYTES_PER_MEGABYTE;
@@ -58,4 +60,13 @@ export function selectAddedTargets(
 /** Ruta del PDF en el almacén: por centro, para que un fichero nunca se confunda con el de otro. */
 export function buildDocumentKey(request: { centerId: string; contentId: string }): string {
   return `${request.centerId}/${request.contentId}.pdf`;
+}
+
+/** Ruta de una imagen en el almacén: por centro, con la extensión que corresponde a su formato real. */
+export function buildImageKey(request: {
+  centerId: string;
+  contentId: string;
+  format: PhotoFormat;
+}): string {
+  return `content/images/${request.centerId}/${request.contentId}.${PHOTO_FILE_EXTENSIONS[request.format]}`;
 }

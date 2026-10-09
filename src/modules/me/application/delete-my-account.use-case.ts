@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { DomainError } from '../../../shared/errors/domain-error';
 import { HTTP_STATUS } from '../../../shared/errors/http-status';
+import { PhotoFileKeeper } from '../../photos/application/photo-file-keeper';
 import { ReauthenticationChecker } from '../../auth/application/reauthentication.checker';
 import {
   SESSION_REPOSITORY,
@@ -24,6 +25,7 @@ export class DeleteMyAccountUseCase {
     private readonly reauthenticationChecker: ReauthenticationChecker,
     @Inject(ACCOUNT_ERASURE_REPOSITORY) private readonly erasure: AccountErasureRepository,
     @Inject(SESSION_REPOSITORY) private readonly sessions: SessionRepository,
+    private readonly photoFiles: PhotoFileKeeper,
   ) {}
 
   async execute(userId: string, password: string): Promise<void> {
@@ -36,6 +38,6 @@ export class DeleteMyAccountUseCase {
     const now = new Date();
     // Primero se cierran las sesiones: si el borrado fallara a medias, nadie sigue dentro con la cuenta.
     await this.sessions.revokeAllOfUser(userId, now);
-    await this.erasure.anonymize(userId, now);
+    await this.photoFiles.discard(await this.erasure.anonymize(userId, now));
   }
 }

@@ -27,9 +27,9 @@ import { ImportClientsUseCase } from '../application/import-clients.use-case';
 import {
   GetClientUseCase,
   ListClientsUseCase,
+  type SignedClient,
   UpdateClientUseCase,
 } from '../application/client.use-cases';
-import { type ClientView } from '../application/ports/client.repository';
 import {
   CenterRouteParamsDto,
   ClientListQueryDto,
@@ -42,7 +42,7 @@ import {
 } from './client.dto';
 import { ActivityRecorder } from '../../activity/application/activity-recorder';
 
-function serializeClient(client: ClientView): Record<string, unknown> {
+function serializeClient(client: SignedClient): Record<string, unknown> {
   return {
     ...client,
     joinedAt: client.joinedAt.toISOString(),

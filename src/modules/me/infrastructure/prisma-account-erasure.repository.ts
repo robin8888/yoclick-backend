@@ -19,8 +19,12 @@ export class PrismaAccountErasureRepository implements AccountErasureRepository 
     return ownedCenterCount > 0;
   }
 
-  async anonymize(userId: string, erasedAt: Date): Promise<void> {
-    await this.tenantPrismaService.runInUserContext(userId, async (client) => {
+  async anonymize(userId: string, erasedAt: Date): Promise<string | null> {
+    return this.tenantPrismaService.runInUserContext(userId, async (client) => {
+      const { photoKey } = await client.user.findUniqueOrThrow({
+        where: { id: userId },
+        select: { photoKey: true },
+      });
       await client.user.update({
         where: { id: userId },
         data: {
@@ -28,6 +32,7 @@ export class PrismaAccountErasureRepository implements AccountErasureRepository 
           fullName: ERASED_FULL_NAME,
           phone: null,
           birthDate: null,
+          photoKey: null,
           // Un valor que no es un hash válido: ninguna contraseña lo verifica.
           passwordHash: `erased:${randomBytes(UNUSABLE_PASSWORD_BYTES).toString('hex')}`,
           emailVerifiedAt: null,
@@ -45,6 +50,7 @@ export class PrismaAccountErasureRepository implements AccountErasureRepository 
         where: { userId, status: { not: 'left' } },
         data: { status: 'left' },
       });
+      return photoKey;
     });
   }
 }

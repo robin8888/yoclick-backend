@@ -3,7 +3,7 @@ import { type ClientLevelName } from '../../../clients/domain/client-rules';
 import { type VideoStatusName } from '../../../videos/domain/video-rules';
 import { type ContentTarget } from '../../domain/content-rules';
 
-export type ContentKindName = 'video' | 'pdf';
+export type ContentKindName = 'video' | 'pdf' | 'image';
 
 /** A quién se le enseña la pieza: `label` es el nombre del grupo o de la persona (nulo si es un nivel). */
 export interface StoredContentAssignment {
@@ -48,6 +48,7 @@ export interface ContentChanges {
 
 export interface NewDocument extends ContentDetails {
   readonly id: string;
+  readonly kind: 'pdf' | 'image';
   readonly documentKey: string;
   readonly sizeBytes: bigint;
   readonly pageCount: number | null;

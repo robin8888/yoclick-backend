@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { PhotoUrlSigner, type WithPhotoUrl } from '../../photos/application/photo-url-signer';
 import { ReauthenticationChecker } from '../../auth/application/reauthentication.checker';
 import {
   PROFILE_REPOSITORY,
@@ -10,8 +11,8 @@ import {
 
 export interface PersonalDataExport {
   readonly exportedAt: Date;
-  readonly profile: Profile;
-  readonly memberships: readonly MyMembership[];
+  readonly profile: WithPhotoUrl<Profile>;
+  readonly memberships: readonly WithPhotoUrl<MyMembership>[];
   readonly consentHistory: readonly ConsentState[];
 }
 
@@ -27,6 +28,7 @@ export class ExportMyDataUseCase {
   constructor(
     private readonly reauthenticationChecker: ReauthenticationChecker,
     @Inject(PROFILE_REPOSITORY) private readonly profiles: ProfileRepository,
+    private readonly urlSigner: PhotoUrlSigner,
   ) {}
 
   async execute(userId: string, password: string): Promise<PersonalDataExport> {
@@ -39,6 +41,11 @@ export class ExportMyDataUseCase {
     ]);
     if (!profile) throw new Error('The account vanished during its own export');
 
-    return { exportedAt: new Date(), profile, memberships, consentHistory };
+    return {
+      exportedAt: new Date(),
+      profile: this.urlSigner.attachPhotoUrl(profile),
+      memberships: memberships.map((membership) => this.urlSigner.attachPhotoUrl(membership)),
+      consentHistory,
+    };
   }
 }

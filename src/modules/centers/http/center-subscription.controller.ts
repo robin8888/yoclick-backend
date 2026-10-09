@@ -28,6 +28,11 @@ class CenterSubscriptionResponseDto extends createZodDto(
     /** Espacio de vídeo contratado en bytes (plan Premium); `null` si el plan no incluye vídeo. */
     videoStorageLimitBytes: z.number().int().nullable(),
     videoStorageUsedBytes: z.number().int(),
+    /** Espacio de fotos de la galería del equipo: tope del plan y lo que ocupan. */
+    photoStorage: z.strictObject({
+      usedBytes: z.number().int().nonnegative(),
+      limitBytes: z.number().int().nonnegative(),
+    }),
   }),
 ) {}
 

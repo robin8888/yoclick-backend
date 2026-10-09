@@ -10,19 +10,21 @@ import { type ProfileNotificationData } from '../../notifications/domain/notific
 import { VIDEO_SELECT } from '../../videos/infrastructure/video-select';
 import {
   type AddCertificationOutcome,
+  type AddPhotoOutcome,
   type ProfileContent,
   type ProfileView,
   type ReviewProfileOutcome,
   type TeamProfileRepository,
   type TeamSettings,
 } from '../application/ports/team-profile.repository';
+import { decideGalleryQuota, isGalleryFull } from '../../photos/domain/photo-rules';
 import { MAX_CERTIFICATIONS, summarizeRatings } from '../domain/profile-rules';
 
 const MEMBER_SELECT = {
   id: true,
   role: true,
   staffTitle: true,
-  user: { select: { fullName: true } },
+  user: { select: { fullName: true, photoKey: true } },
   profileVideo: { select: VIDEO_SELECT },
   techniqueVideos: { orderBy: { createdAt: 'asc' }, select: VIDEO_SELECT },
   staffProfile: {
@@ -37,6 +39,10 @@ const MEMBER_SELECT = {
       certifications: {
         orderBy: { createdAt: 'asc' },
         select: { id: true, name: true, detail: true, verifiedAt: true },
+      },
+      photos: {
+        orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+        select: { id: true, key: true },
       },
     },
   },
@@ -55,6 +61,7 @@ const NO_PROFILE_YET = {
   reviewNote: null,
   publishConsentAt: null,
   certifications: [],
+  photos: [],
 } as const;
 
 function toProfileView(member: MemberRow, ratings: readonly number[]): ProfileView {
@@ -63,6 +70,7 @@ function toProfileView(member: MemberRow, ratings: readonly number[]): ProfileVi
     membershipId: member.id,
     role: member.role as ProfileView['role'],
     fullName: member.user.fullName,
+    photoKey: member.user.photoKey,
     staffTitle: member.staffTitle,
     headline: profile.headline,
     bio: profile.bio,
@@ -78,6 +86,7 @@ function toProfileView(member: MemberRow, ratings: readonly number[]): ProfileVi
     introVideo: member.profileVideo,
     techniqueVideos: member.techniqueVideos,
     rating: summarizeRatings(ratings),
+    photos: profile.photos,
   };
 }
 
@@ -142,6 +151,26 @@ async function loadPublishedRatings(
     ]);
   }
   return ratingsByStaff;
+}
+
+/** Compara lo que ocupan las fotos de galería de todo el centro, más la nueva, con el espacio del plan. */
+async function isOverGalleryQuota(
+  client: TenantTransactionClient,
+  actor: ActorContext,
+  requestedBytes: number,
+): Promise<boolean> {
+  const center = await client.center.findUniqueOrThrow({
+    where: { id: actor.centerId },
+    select: { photoStorageLimitBytes: true },
+  });
+  const used = await client.staffProfilePhoto.aggregate({ _sum: { sizeBytes: true } });
+  return (
+    decideGalleryQuota({
+      storageLimitBytes: center.photoStorageLimitBytes,
+      usedBytes: BigInt(used._sum.sizeBytes ?? 0),
+      requestedBytes: BigInt(requestedBytes),
+    }) === 'quota_exceeded'
+  );
 }
 
 @Injectable()
@@ -292,6 +321,57 @@ export class PrismaTeamProfileRepository implements TeamProfileRepository {
       }),
     );
     return result.count === 1;
+  }
+
+  async addPhoto(
+    actor: ActorContext,
+    photo: { id: string; key: string; sizeBytes: number },
+  ): Promise<AddPhotoOutcome> {
+    return this.tenantPrismaService.runInTenantContext(actor, async (client) => {
+      // Bloquea el centro (el espacio de fotos es de todo el equipo) y el perfil (el tope de seis es
+      // de la persona) para que dos subidas a la vez no los superen. Siempre en este orden.
+      await client.$queryRaw`select 1 from centers where id = ${actor.centerId}::uuid for update`;
+      await client.$queryRaw`select 1 from staff_profiles where membership_id = ${actor.membershipId}::uuid for update`;
+      const { _count: photoCount, _max: lastPhoto } = await client.staffProfilePhoto.aggregate({
+        where: { membershipId: actor.membershipId },
+        _count: true,
+        _max: { position: true },
+      });
+      if (isGalleryFull(photoCount)) return { kind: 'limit_reached' } as const;
+      if (await isOverGalleryQuota(client, actor, photo.sizeBytes)) {
+        return { kind: 'quota_exceeded' } as const;
+      }
+      await client.staffProfile.upsert({
+        where: { membershipId: actor.membershipId },
+        create: { membershipId: actor.membershipId, centerId: actor.centerId, status: 'draft' },
+        update: { status: 'draft' },
+      });
+      await client.staffProfilePhoto.create({
+        data: {
+          ...photo,
+          centerId: actor.centerId,
+          membershipId: actor.membershipId,
+          position: (lastPhoto.position ?? -1) + 1,
+        },
+      });
+      return { kind: 'added' } as const;
+    });
+  }
+
+  async removePhoto(actor: ActorContext, photoId: string): Promise<string | null> {
+    return this.tenantPrismaService.runInTenantContext(actor, async (client) => {
+      const photo = await client.staffProfilePhoto.findFirst({
+        where: { id: photoId, membershipId: actor.membershipId },
+        select: { key: true },
+      });
+      if (!photo) return null;
+      await client.staffProfilePhoto.delete({ where: { id: photoId } });
+      await client.staffProfile.update({
+        where: { membershipId: actor.membershipId },
+        data: { status: 'draft' },
+      });
+      return photo.key;
+    });
   }
 
   async readSettings(actor: ActorContext): Promise<TeamSettings> {

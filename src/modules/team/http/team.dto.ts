@@ -28,6 +28,7 @@ const teamMemberShape = {
   userId: z.uuid(),
   fullName: z.string(),
   email: z.string(),
+  photoUrl: z.string().nullable(),
   role: roleSchema,
   status: statusSchema,
   staffTitle: z.string().nullable(),

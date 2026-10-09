@@ -20,6 +20,11 @@ export type VideoAttachment =
   /** Uno de sus (hasta tres) vídeos de técnica. */
   | { readonly kind: 'technique'; readonly membershipId: string };
 
+/** Un vídeo que aún se sube o se procesa; `createdAt` sirve para descartar las subidas abandonadas. */
+export interface InFlightVideo extends StoredVideo {
+  readonly createdAt: Date;
+}
+
 export interface NewVideo {
   readonly id: string;
   readonly providerVideoId: string;
@@ -41,6 +46,10 @@ export interface ProcessingUpdate {
 
 export interface VideoRepository {
   readStorageFacts(actor: ActorContext): Promise<VideoStorageFacts>;
+  /** Vídeos subiéndose o procesándose, los más antiguos primero. */
+  listInFlight(actor: ActorContext): Promise<InFlightVideo[]>;
+  /** Cuántos se están subiendo o procesando; no cuenta los que siguen sin subirse desde `abandonedBefore`. */
+  countUploadsInProgress(actor: ActorContext, abandonedBefore: Date): Promise<number>;
   countTechniqueVideos(actor: ActorContext, membershipId: string): Promise<number>;
   /**
    * Crea el vídeo y devuelve el de presentación anterior (si lo había) para borrarlo del servicio.

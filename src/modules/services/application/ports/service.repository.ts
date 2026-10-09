@@ -1,8 +1,13 @@
 import { type ActorContext } from '../../../../shared/tenancy/actor-context';
+import { type StaffProfileStatusName } from '../../../team-profiles/domain/profile-rules';
 
 export interface ServiceStaffMember {
   readonly membershipId: string;
   readonly fullName: string;
+  readonly photoKey: string | null;
+  /** Estado del perfil profesional; `null` si todavía no tiene. La clientela solo ve fotos si está publicado. */
+  readonly profileStatus: StaffProfileStatusName | null;
+  readonly galleryPhotos: readonly { readonly id: string; readonly key: string }[];
 }
 
 /** Un servicio tal y como lo ve la app. */

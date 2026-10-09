@@ -35,6 +35,8 @@ const profileResponseSchema = z.strictObject({
   phone: z.string().nullable(),
   birthDate: z.iso.date().nullable(),
   locale: z.string(),
+  /** Enlace firmado y temporal a mi foto de perfil; nulo si no tengo. */
+  photoUrl: z.string().nullable(),
   isEmailVerified: z.boolean(),
   createdAt: z.iso.datetime(),
 });
@@ -47,6 +49,8 @@ const membershipResponseSchema = z.strictObject({
   role: z.enum(['owner', 'admin', 'staff', 'client']),
   status: z.enum(['invited', 'active', 'blocked', 'left']),
   joinedAt: z.iso.datetime(),
+  /** Mi foto de perfil (la misma en todos los centros); nulo si no tengo. */
+  photoUrl: z.string().nullable(),
   center: z.strictObject({
     name: z.string(),
     slug: z.string(),

@@ -10,13 +10,20 @@ import {
   type TeamRepository,
 } from './ports/team.repository';
 import { ActivityRecorder } from '../../activity/application/activity-recorder';
+import { PhotoUrlSigner, type WithPhotoUrl } from '../../photos/application/photo-url-signer';
+
+export type SignedTeamMember = WithPhotoUrl<TeamMember>;
 
 @Injectable()
 export class ListTeamUseCase {
-  constructor(@Inject(TEAM_REPOSITORY) private readonly team: TeamRepository) {}
+  constructor(
+    @Inject(TEAM_REPOSITORY) private readonly team: TeamRepository,
+    private readonly urlSigner: PhotoUrlSigner,
+  ) {}
 
-  async execute(actor: ActorContext): Promise<TeamMember[]> {
-    return this.team.listTeam(actor);
+  async execute(actor: ActorContext): Promise<SignedTeamMember[]> {
+    const members = await this.team.listTeam(actor);
+    return members.map((member) => this.urlSigner.attachPhotoUrl(member));
   }
 }
 
@@ -32,9 +39,10 @@ export class UpdateTeamMemberUseCase {
   constructor(
     @Inject(TEAM_REPOSITORY) private readonly team: TeamRepository,
     private readonly activity: ActivityRecorder,
+    private readonly urlSigner: PhotoUrlSigner,
   ) {}
 
-  async execute(request: UpdateTeamMemberRequest): Promise<TeamMember> {
+  async execute(request: UpdateTeamMemberRequest): Promise<SignedTeamMember> {
     const { actor, membershipId, update } = request;
     const target = await this.team.findMember(actor, membershipId);
     if (!target) throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
@@ -52,6 +60,6 @@ export class UpdateTeamMemberUseCase {
     }
     const updated = await this.team.updateMember(actor, membershipId, update);
     await this.activity.record(actor, { kind: 'team_member_updated', subject: updated.fullName });
-    return updated;
+    return this.urlSigner.attachPhotoUrl(updated);
   }
 }

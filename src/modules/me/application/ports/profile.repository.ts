@@ -6,6 +6,8 @@ export interface Profile {
   /** Fecha sin hora, `YYYY-MM-DD`. */
   readonly birthDate: string | null;
   readonly locale: string;
+  /** Ruta de su foto de perfil en el almacén; la API la convierte en un enlace firmado. */
+  readonly photoKey: string | null;
   readonly isEmailVerified: boolean;
   readonly createdAt: Date;
 }
@@ -24,6 +26,8 @@ export interface MyMembership {
   readonly role: 'owner' | 'admin' | 'staff' | 'client';
   readonly status: 'invited' | 'active' | 'blocked' | 'left';
   readonly joinedAt: Date;
+  /** Ruta de la foto de perfil de la persona (la misma en todos sus centros). */
+  readonly photoKey: string | null;
   /** Resumen de marca para pintar "Mis centros" sin una segunda petición. */
   readonly center: {
     readonly name: string;

@@ -37,5 +37,13 @@ export const RATE_LIMITS = {
   issueCheckinToken: { limit: 30, ttl: ONE_MINUTE },
   /** Escanear QR: quien atiende pasa a varias personas seguidas, nunca cientos por minuto. */
   checkInClient: { limit: 60, ttl: ONE_MINUTE },
+  /**
+   * Subidas de ficheros (fotos, PDF, inicio de subida de vídeo): cada una cuesta almacenamiento y
+   * tráfico de CDN. Una persona sube unas pocas al día; un bucle que llena el almacén no. Se suman al
+   * tope de espacio por centro, que es el límite que de verdad acota la factura.
+   */
+  uploadPhoto: { limit: 10, ttl: ONE_MINUTE },
+  uploadDocument: { limit: 10, ttl: ONE_MINUTE },
+  startVideoUpload: { limit: 10, ttl: MILLISECONDS_PER_HOUR },
   accountSecurity: { limit: 5, ttl: ONE_MINUTE },
 } as const satisfies Record<string, RateLimitPolicy>;

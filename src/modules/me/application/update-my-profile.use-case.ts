@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { PhotoUrlSigner, type WithPhotoUrl } from '../../photos/application/photo-url-signer';
 import { accountGoneError } from './account-gone.error';
 import {
   PROFILE_REPOSITORY,
@@ -9,12 +10,15 @@ import {
 
 @Injectable()
 export class UpdateMyProfileUseCase {
-  constructor(@Inject(PROFILE_REPOSITORY) private readonly profiles: ProfileRepository) {}
+  constructor(
+    @Inject(PROFILE_REPOSITORY) private readonly profiles: ProfileRepository,
+    private readonly urlSigner: PhotoUrlSigner,
+  ) {}
 
   /** El correo no se cambia aquí: exigiría confirmar el nuevo buzón y es un flujo propio. */
-  async execute(userId: string, patch: ProfilePatch): Promise<Profile> {
+  async execute(userId: string, patch: ProfilePatch): Promise<WithPhotoUrl<Profile>> {
     const updated = await this.profiles.updateProfile(userId, patch);
     if (!updated) throw accountGoneError();
-    return updated;
+    return this.urlSigner.attachPhotoUrl(updated);
   }
 }
