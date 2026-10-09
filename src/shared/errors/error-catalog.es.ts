@@ -80,6 +80,15 @@ export const ERROR_CATALOG = {
   TECHNIQUE_VIDEO_LIMIT_REACHED: {
     title: 'Ya tienes tres vídeos de técnica. Borra uno para subir otro',
   },
+  DOCUMENT_NOT_PDF: { title: 'El fichero no es un PDF válido' },
+  DOCUMENT_TOO_LARGE: { title: 'El PDF es demasiado grande. Máximo 50 MB' },
+  DOCUMENT_QUOTA_EXCEEDED: {
+    title: 'El centro ha llenado su espacio de documentos. Borra alguno o amplía el plan',
+  },
+  CONTENT_VIDEO_ALREADY_IN_LIBRARY: { title: 'Este vídeo ya está en la biblioteca' },
+  CONTENT_ASSIGNMENT_INVALID: {
+    title: 'A quién se asigna el contenido no existe en este centro',
+  },
   PRIVACY_REQUEST_ALREADY_OPEN: { title: 'Ya tienes una solicitud abierta de ese derecho' },
   PRIVACY_REQUEST_CLOSED: { title: 'Esta solicitud ya está resuelta' },
   PROFILE_CONSENT_REQUIRED: {

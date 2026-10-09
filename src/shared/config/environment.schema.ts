@@ -70,6 +70,19 @@ const baseEnvironmentSchema = z.object({
   BUNNY_STREAM_TOKEN_AUTH: z.enum(['enabled', 'disabled']).default('disabled'),
   // Dominio de reproducción de la librería, p. ej. vz-1234abcd-xyz.b-cdn.net
   BUNNY_STREAM_CDN_HOSTNAME: z.string().min(1).optional(),
+  // Documentos (PDF): `bunny` los guarda en Bunny Storage; `fake` los guarda en memoria (desarrollo y tests).
+  FILE_STORAGE_PROVIDER: z.enum(['fake', 'bunny']).default('fake'),
+  // Solo hacen falta con FILE_STORAGE_PROVIDER=bunny (se exigen en ese caso, ver más abajo).
+  BUNNY_STORAGE_ZONE: z.string().min(1).optional(),
+  BUNNY_STORAGE_API_KEY: z.string().min(1).optional(),
+  // Dominio del pull zone conectado a la zona de almacenamiento, p. ej. yoclick-files-cdn.b-cdn.net
+  BUNNY_STORAGE_CDN_HOSTNAME: z.string().min(1).optional(),
+  // Servidor de la región de la zona; el de Falkenstein (Alemania) es el de por defecto.
+  BUNNY_STORAGE_HOST: z.string().min(1).default('storage.bunnycdn.com'),
+  BUNNY_STORAGE_TOKEN_KEY: z.string().min(1).optional(),
+  // `enabled` firma los enlaces de descarga (hay que activar Token Authentication en el pull zone y usar su
+  // clave); `disabled` los deja sin firmar, que es lo único que acepta un CDN sin esa protección.
+  BUNNY_STORAGE_TOKEN_AUTH: z.enum(['enabled', 'disabled']).default('disabled'),
   EMAIL_PROVIDER: z.enum(['console', 'brevo']).default('console'),
   // Solo hacen falta con EMAIL_PROVIDER=brevo (se exigen en ese caso, ver más abajo).
   BREVO_API_KEY: z.string().min(1).optional(),
@@ -191,11 +204,36 @@ function listVideoProviderRequirements(environment: ParsedEnvironment): Producti
   return requirements;
 }
 
+const BUNNY_STORAGE_SETTINGS = [
+  'BUNNY_STORAGE_ZONE',
+  'BUNNY_STORAGE_API_KEY',
+  'BUNNY_STORAGE_CDN_HOSTNAME',
+] as const;
+
+/** Con Bunny Storage hacen falta sus tres valores; con `fake` no. */
+function listFileStorageRequirements(environment: ParsedEnvironment): ProductionRequirement[] {
+  if (environment.FILE_STORAGE_PROVIDER !== 'bunny') return [];
+  const requirements: ProductionRequirement[] = BUNNY_STORAGE_SETTINGS.map((path) => ({
+    isMet: environment[path] !== undefined,
+    path,
+    message: 'is required when FILE_STORAGE_PROVIDER=bunny',
+  }));
+  if (environment.BUNNY_STORAGE_TOKEN_AUTH === 'enabled') {
+    requirements.push({
+      isMet: environment.BUNNY_STORAGE_TOKEN_KEY !== undefined,
+      path: 'BUNNY_STORAGE_TOKEN_KEY',
+      message: 'is required when BUNNY_STORAGE_TOKEN_AUTH=enabled',
+    });
+  }
+  return requirements;
+}
+
 export const environmentSchema = baseEnvironmentSchema.superRefine((environment, context) => {
   const isProduction = environment.NODE_ENV === 'production';
   const requirements = [
     ...listEmailProviderRequirements(environment),
     ...listVideoProviderRequirements(environment),
+    ...listFileStorageRequirements(environment),
     ...(isProduction ? listProductionRequirements(environment) : []),
   ];
 

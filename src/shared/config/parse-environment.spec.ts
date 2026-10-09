@@ -258,6 +258,38 @@ describe('parseEnvironment', () => {
       },
     );
 
+    it.each(['BUNNY_STORAGE_ZONE', 'BUNNY_STORAGE_API_KEY', 'BUNNY_STORAGE_CDN_HOSTNAME'])(
+      'requires %s when Bunny Storage is selected',
+      (variableName) => {
+        expect(() =>
+          parseEnvironment(
+            developmentEnvironment({
+              FILE_STORAGE_PROVIDER: 'bunny',
+              BUNNY_STORAGE_ZONE: 'yoclick-files',
+              BUNNY_STORAGE_API_KEY: 'key',
+              BUNNY_STORAGE_CDN_HOSTNAME: 'yoclick-files-cdn.b-cdn.net',
+              [variableName]: undefined,
+            }),
+          ),
+        ).toThrow(new RegExp(variableName));
+      },
+    );
+
+    it('asks for the storage token key only when the signed downloads are enabled', () => {
+      const bunny = {
+        FILE_STORAGE_PROVIDER: 'bunny',
+        BUNNY_STORAGE_ZONE: 'yoclick-files',
+        BUNNY_STORAGE_API_KEY: 'key',
+        BUNNY_STORAGE_CDN_HOSTNAME: 'yoclick-files-cdn.b-cdn.net',
+        BUNNY_STORAGE_TOKEN_KEY: undefined,
+      };
+
+      expect(() => parseEnvironment(developmentEnvironment(bunny))).not.toThrow();
+      expect(() =>
+        parseEnvironment(developmentEnvironment({ ...bunny, BUNNY_STORAGE_TOKEN_AUTH: 'enabled' })),
+      ).toThrow(/BUNNY_STORAGE_TOKEN_KEY/);
+    });
+
     it('asks for the token key only when the signed links are enabled', () => {
       const bunny = {
         VIDEO_PROVIDER: 'bunny',

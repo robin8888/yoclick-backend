@@ -112,6 +112,7 @@ enum NotificationKind {
   booking_rescheduled
   booking_rescheduled_by_team
   routine_updated
+  content_assigned
   member_joined
 
   @@map("notification_kind")
@@ -261,6 +262,8 @@ model Center {
   logoUpdatedAt DateTime?    @map("logo_updated_at") @db.Timestamptz
   /// Espacio de vídeo contratado (plan Premium). Nulo = el plan no incluye vídeo. Solo lo cambia Yoclick.
   videoStorageLimitBytes BigInt? @map("video_storage_limit_bytes")
+  /// Espacio de documentos (PDF) del plan. Todos los planes incluyen PDF; solo cambia el tope. Solo lo cambia Yoclick.
+  documentStorageLimitBytes BigInt @default(1073741824) @map("document_storage_limit_bytes")
   /// Las opiniones sobre el equipo se revisan antes de publicarse.
   reviewsNeedApproval    Boolean   @default(true) @map("reviews_need_approval")
   /// El equipo (fotos, vídeos y valoraciones) se enseña en la web de reservas.
@@ -269,6 +272,8 @@ model Center {
   updatedAt     DateTime     @updatedAt @map("updated_at") @db.Timestamptz
 
   videos              Video[]
+  contentItems        ContentItem[]
+  contentAssignments  ContentAssignment[]
   staffProfiles       StaffProfile[]
   staffCertifications StaffCertification[]
   staffReviews        StaffReview[]
@@ -335,6 +340,9 @@ model Membership {
   profileVideo Video? @relation("ProfileVideo", fields: [profileVideoId], references: [id], onDelete: SetNull)
 
   uploadedVideos      Video[]             @relation("VideoUploader")
+  createdContentItems ContentItem[]       @relation("ContentAuthor")
+  contentAssignments  ContentAssignment[] @relation("ContentClient")
+  assignedContent     ContentAssignment[] @relation("ContentAssigner")
   techniqueVideos     Video[]             @relation("TechniqueVideos")
   staffProfile        StaffProfile?       @relation("StaffProfileOwner")
   reviewedStaffProfiles StaffProfile[]    @relation("StaffProfileReviewer")
@@ -603,6 +611,7 @@ model ClientGroup {
   instructor         Membership?         @relation("GroupInstructor", fields: [instructorMembershipId], references: [id])
   members            Membership[]        @relation("GroupMembers")
   routineAssignments RoutineAssignment[]
+  contentAssignments ContentAssignment[]
 
   @@index([centerId])
   @@map("client_groups")
@@ -842,6 +851,7 @@ model Video {
   techniqueOf  Membership?   @relation("TechniqueVideos", fields: [techniqueOfMembershipId], references: [id], onDelete: SetNull)
   routineItems RoutineItem[]
   profileOf    Membership?   @relation("ProfileVideo")
+  contentItem  ContentItem?
 
   @@index([centerId])
   @@map("videos")
@@ -943,4 +953,63 @@ model StaffReview {
   @@index([centerId, status])
   @@index([staffMembershipId, status])
   @@map("staff_reviews")
+}
+
+/// Qué tipo de contenido es una pieza de la biblioteca del centro.
+enum ContentKind {
+  video
+  pdf
+
+  @@map("content_kind")
+}
+
+/// Pieza de la biblioteca del centro: un vídeo (ya alojado en el servicio de vídeo) o un PDF (en el
+/// almacén de ficheros). Los clientes solo la ven cuando se le asigna. Borrarla libera su espacio.
+model ContentItem {
+  id                    String      @id @db.Uuid
+  centerId              String      @map("center_id") @db.Uuid
+  kind                  ContentKind
+  title                 String
+  /// Necesidad que cubre, del vocabulario del sector («Técnica», «Fuerza»...). Nulo = sin clasificar.
+  need                  String?
+  /// Nivel al que va dirigido, para filtrar. No decide quién lo ve: eso lo hacen las asignaciones.
+  level                 ClientLevel?
+  videoId               String?     @unique @map("video_id") @db.Uuid
+  /// Ruta del PDF en el almacén de ficheros; solo si es un PDF.
+  documentKey           String?     @unique @map("document_key")
+  sizeBytes             BigInt      @default(0) @map("size_bytes")
+  pageCount             Int?        @map("page_count")
+  createdByMembershipId String      @map("created_by_membership_id") @db.Uuid
+  createdAt             DateTime    @default(now()) @map("created_at") @db.Timestamptz
+
+  center      Center              @relation(fields: [centerId], references: [id])
+  video       Video?              @relation(fields: [videoId], references: [id], onDelete: Restrict)
+  createdBy   Membership          @relation("ContentAuthor", fields: [createdByMembershipId], references: [id])
+  assignments ContentAssignment[]
+
+  @@index([centerId])
+  @@map("content_items")
+}
+
+/// A quién se le enseña una pieza: a todo un nivel, a un grupo o a un cliente concreto (solo uno de los tres).
+model ContentAssignment {
+  id                     String       @id @db.Uuid
+  centerId               String       @map("center_id") @db.Uuid
+  contentId              String       @map("content_id") @db.Uuid
+  level                  ClientLevel?
+  groupId                String?      @map("group_id") @db.Uuid
+  clientMembershipId     String?      @map("client_membership_id") @db.Uuid
+  assignedByMembershipId String       @map("assigned_by_membership_id") @db.Uuid
+  assignedAt             DateTime     @default(now()) @map("assigned_at") @db.Timestamptz
+
+  center     Center       @relation(fields: [centerId], references: [id])
+  content    ContentItem  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  group      ClientGroup? @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  client     Membership?  @relation("ContentClient", fields: [clientMembershipId], references: [id], onDelete: Cascade)
+  assignedBy Membership   @relation("ContentAssigner", fields: [assignedByMembershipId], references: [id])
+
+  @@index([centerId, contentId])
+  @@index([groupId])
+  @@index([clientMembershipId])
+  @@map("content_assignments")
 }

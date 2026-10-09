@@ -32,7 +32,7 @@ interface CallOptions {
   readonly centerId?: string;
   readonly body?: object;
   /** Cuerpo en bruto, para probar JSON mal formado. */
-  readonly rawBody?: string;
+  readonly rawBody?: string | Buffer;
   readonly headers?: Record<string, string>;
   /** Por defecto la sesión lleva segundo factor, como la de quien administra un centro. */
   readonly isMfaVerified?: boolean;

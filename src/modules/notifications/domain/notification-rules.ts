@@ -16,6 +16,7 @@ export const NOTIFICATION_KINDS = [
   'booking_rescheduled',
   'booking_rescheduled_by_team',
   'routine_updated',
+  'content_assigned',
   'member_joined',
 ] as const;
 export type NotificationKindName = (typeof NOTIFICATION_KINDS)[number];
@@ -114,6 +115,12 @@ export type MemberJoinedNotificationData = {
 /** Los datos del aviso de una rutina asignada. */
 export type RoutineNotificationData = {
   readonly routineName: string;
+  readonly actorName: string;
+};
+
+/** Los datos del aviso de un vídeo o un PDF asignado. */
+export type ContentNotificationData = {
+  readonly contentTitle: string;
   readonly actorName: string;
 };
 

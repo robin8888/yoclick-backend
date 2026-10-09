@@ -24,6 +24,7 @@ const COPY_BY_KIND: Readonly<Record<string, PushCopy>> = {
   member_joined: { title: 'Alguien nuevo se ha unido', body: OPEN_APP_BODY },
   routine_updated: { title: 'Han actualizado una rutina tuya', body: OPEN_APP_BODY },
   routine_assigned: { title: 'Tienes una rutina nueva', body: OPEN_APP_BODY },
+  content_assigned: { title: 'Tienes contenido nuevo', body: OPEN_APP_BODY },
   staff_video_submitted: { title: 'Hay un vídeo por revisar', body: OPEN_APP_BODY },
   staff_video_reviewed: { title: 'Han revisado tu vídeo', body: OPEN_APP_BODY },
   privacy_request_received: { title: 'Nueva solicitud de datos', body: OPEN_APP_BODY },

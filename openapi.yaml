@@ -4087,6 +4087,349 @@ paths:
       summary: Si el plan del centro incluye vídeo, el espacio contratado y el usado.
       tags:
         - videos
+  /v1/centers/{centerId}/content:
+    get:
+      operationId: content_list
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContentLibraryResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: La biblioteca del centro, con a quién se enseña cada pieza y el espacio de PDF usado.
+      tags:
+        - content
+  /v1/centers/{centerId}/content/{contentId}:
+    patch:
+      operationId: content_update
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: contentId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateContentRequestDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContentResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Cambia el título, la necesidad o el nivel de una pieza.
+      tags:
+        - content
+    delete:
+      operationId: content_delete
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: contentId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "204":
+          description: ""
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Borra una pieza y libera su espacio (el vídeo se borra si no lo usa una rutina).
+      tags:
+        - content
+  /v1/centers/{centerId}/content/{contentId}/assignments:
+    put:
+      operationId: content_assign
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: contentId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignContentRequestDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContentResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Fija a quién se enseña la pieza (niveles, grupos o clientes); la lista sustituye a la anterior y se avisa por push solo a quien es nuevo. 422 CONTENT_ASSIGNMENT_INVALID si un grupo o cliente no existe.
+      tags:
+        - content
+  /v1/centers/{centerId}/content/documents:
+    post:
+      operationId: content_add_document
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: title
+          required: true
+          in: query
+          schema:
+            minLength: 1
+            maxLength: 120
+            type: string
+        - name: need
+          required: false
+          in: query
+          schema:
+            minLength: 1
+            maxLength: 40
+            type: string
+        - name: level
+          required: false
+          in: query
+          schema:
+            type: string
+            enum:
+              - beginner
+              - intermediate
+              - advanced
+      requestBody:
+        required: true
+        content:
+          application/pdf:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "201":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContentResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Sube un PDF (cuerpo `application/pdf`, hasta 50 MB) y lo añade a la biblioteca. 400 DOCUMENT_NOT_PDF, 413 DOCUMENT_TOO_LARGE, 409 DOCUMENT_QUOTA_EXCEEDED.
+      tags:
+        - content
+  /v1/centers/{centerId}/content/videos:
+    post:
+      operationId: content_add_video
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddVideoContentRequestDto"
+      responses:
+        "201":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContentResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Añade a la biblioteca un vídeo ya reservado con `videos_start_upload`. 409 CONTENT_VIDEO_ALREADY_IN_LIBRARY si ya está.
+      tags:
+        - content
+  /v1/centers/{centerId}/my-content:
+    get:
+      operationId: content_list_mine
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MyContentListResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Los vídeos y PDF asignados a quien pregunta; los vídeos solo cuando ya se pueden ver.
+      tags:
+        - content
+  /v1/centers/{centerId}/my-content/{contentId}:
+    get:
+      operationId: content_get_mine
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: contentId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContentDetailResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Una pieza asignada, con el enlace firmado para reproducir el vídeo o leer el PDF. 404 si no es suya.
+      tags:
+        - content
   /v1/centers/{centerId}/activity:
     get:
       operationId: activity_list
@@ -8608,6 +8951,7 @@ components:
                   - booking_rescheduled
                   - booking_rescheduled_by_team
                   - routine_updated
+                  - content_assigned
                   - member_joined
               data:
                 type: object
@@ -9743,6 +10087,571 @@ components:
         - isIncluded
         - limitBytes
         - usedBytes
+      additionalProperties: false
+    ContentLibraryResponseDto:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              kind:
+                type: string
+                enum:
+                  - video
+                  - pdf
+              title:
+                type: string
+              need:
+                type: string
+                nullable: true
+              level:
+                type: string
+                enum:
+                  - beginner
+                  - intermediate
+                  - advanced
+                  - null
+                nullable: true
+              sizeBytes:
+                type: integer
+                minimum: 0
+                maximum: 9007199254740991
+              pageCount:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+                nullable: true
+              durationSeconds:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+                nullable: true
+              isReady:
+                type: boolean
+              thumbnailUrl:
+                type: string
+                nullable: true
+              createdAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+              assignments:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                    level:
+                      type: string
+                      enum:
+                        - beginner
+                        - intermediate
+                        - advanced
+                        - null
+                      nullable: true
+                    groupId:
+                      type: string
+                      format: uuid
+                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      nullable: true
+                    clientMembershipId:
+                      type: string
+                      format: uuid
+                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      nullable: true
+                    label:
+                      type: string
+                      nullable: true
+                  required:
+                    - id
+                    - level
+                    - groupId
+                    - clientMembershipId
+                    - label
+                  additionalProperties: false
+            required:
+              - id
+              - kind
+              - title
+              - need
+              - level
+              - sizeBytes
+              - pageCount
+              - durationSeconds
+              - isReady
+              - thumbnailUrl
+              - createdAt
+              - assignments
+            additionalProperties: false
+        storage:
+          type: object
+          properties:
+            limitBytes:
+              type: integer
+              minimum: 0
+              maximum: 9007199254740991
+            usedBytes:
+              type: integer
+              minimum: 0
+              maximum: 9007199254740991
+          required:
+            - limitBytes
+            - usedBytes
+          additionalProperties: false
+      required:
+        - items
+        - storage
+      additionalProperties: false
+    UpdateContentRequestDto:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 120
+        need:
+          type: string
+          minLength: 1
+          maxLength: 40
+          nullable: true
+        level:
+          type: string
+          enum:
+            - beginner
+            - intermediate
+            - advanced
+            - null
+          nullable: true
+      additionalProperties: false
+    ContentResponseDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        kind:
+          type: string
+          enum:
+            - video
+            - pdf
+        title:
+          type: string
+        need:
+          type: string
+          nullable: true
+        level:
+          type: string
+          enum:
+            - beginner
+            - intermediate
+            - advanced
+            - null
+          nullable: true
+        sizeBytes:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        pageCount:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+          nullable: true
+        durationSeconds:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+          nullable: true
+        isReady:
+          type: boolean
+        thumbnailUrl:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+        assignments:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              level:
+                type: string
+                enum:
+                  - beginner
+                  - intermediate
+                  - advanced
+                  - null
+                nullable: true
+              groupId:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                nullable: true
+              clientMembershipId:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                nullable: true
+              label:
+                type: string
+                nullable: true
+            required:
+              - id
+              - level
+              - groupId
+              - clientMembershipId
+              - label
+            additionalProperties: false
+      required:
+        - id
+        - kind
+        - title
+        - need
+        - level
+        - sizeBytes
+        - pageCount
+        - durationSeconds
+        - isReady
+        - thumbnailUrl
+        - createdAt
+        - assignments
+      additionalProperties: false
+    AssignContentRequestDto:
+      type: object
+      properties:
+        targets:
+          maxItems: 50
+          type: array
+          items:
+            oneOf:
+              - type: object
+                properties:
+                  kind:
+                    type: string
+                    enum:
+                      - level
+                  level:
+                    type: string
+                    enum:
+                      - beginner
+                      - intermediate
+                      - advanced
+                required:
+                  - kind
+                  - level
+                additionalProperties: false
+              - type: object
+                properties:
+                  kind:
+                    type: string
+                    enum:
+                      - group
+                  groupId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                required:
+                  - kind
+                  - groupId
+                additionalProperties: false
+              - type: object
+                properties:
+                  kind:
+                    type: string
+                    enum:
+                      - client
+                  membershipId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                required:
+                  - kind
+                  - membershipId
+                additionalProperties: false
+      required:
+        - targets
+      additionalProperties: false
+    AddVideoContentRequestDto:
+      type: object
+      properties:
+        videoId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        title:
+          type: string
+          minLength: 1
+          maxLength: 120
+        need:
+          type: string
+          minLength: 1
+          maxLength: 40
+          nullable: true
+        level:
+          type: string
+          enum:
+            - beginner
+            - intermediate
+            - advanced
+            - null
+          nullable: true
+      required:
+        - videoId
+        - title
+      additionalProperties: false
+    MyContentListResponseDto:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              kind:
+                type: string
+                enum:
+                  - video
+                  - pdf
+              title:
+                type: string
+              need:
+                type: string
+                nullable: true
+              level:
+                type: string
+                enum:
+                  - beginner
+                  - intermediate
+                  - advanced
+                  - null
+                nullable: true
+              sizeBytes:
+                type: integer
+                minimum: 0
+                maximum: 9007199254740991
+              pageCount:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+                nullable: true
+              durationSeconds:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+                nullable: true
+              isReady:
+                type: boolean
+              thumbnailUrl:
+                type: string
+                nullable: true
+              createdAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+              assignments:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                    level:
+                      type: string
+                      enum:
+                        - beginner
+                        - intermediate
+                        - advanced
+                        - null
+                      nullable: true
+                    groupId:
+                      type: string
+                      format: uuid
+                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      nullable: true
+                    clientMembershipId:
+                      type: string
+                      format: uuid
+                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      nullable: true
+                    label:
+                      type: string
+                      nullable: true
+                  required:
+                    - id
+                    - level
+                    - groupId
+                    - clientMembershipId
+                    - label
+                  additionalProperties: false
+            required:
+              - id
+              - kind
+              - title
+              - need
+              - level
+              - sizeBytes
+              - pageCount
+              - durationSeconds
+              - isReady
+              - thumbnailUrl
+              - createdAt
+              - assignments
+            additionalProperties: false
+      required:
+        - items
+      additionalProperties: false
+    ContentDetailResponseDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        kind:
+          type: string
+          enum:
+            - video
+            - pdf
+        title:
+          type: string
+        need:
+          type: string
+          nullable: true
+        level:
+          type: string
+          enum:
+            - beginner
+            - intermediate
+            - advanced
+            - null
+          nullable: true
+        sizeBytes:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        pageCount:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+          nullable: true
+        durationSeconds:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+          nullable: true
+        isReady:
+          type: boolean
+        thumbnailUrl:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+        assignments:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              level:
+                type: string
+                enum:
+                  - beginner
+                  - intermediate
+                  - advanced
+                  - null
+                nullable: true
+              groupId:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                nullable: true
+              clientMembershipId:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                nullable: true
+              label:
+                type: string
+                nullable: true
+            required:
+              - id
+              - level
+              - groupId
+              - clientMembershipId
+              - label
+            additionalProperties: false
+        playback:
+          type: object
+          properties:
+            streamUrl:
+              type: string
+            thumbnailUrl:
+              type: string
+            expiresAt:
+              type: string
+              format: date-time
+              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+          required:
+            - streamUrl
+            - thumbnailUrl
+            - expiresAt
+          additionalProperties: false
+          nullable: true
+        document:
+          type: object
+          properties:
+            url:
+              type: string
+            expiresAt:
+              type: string
+              format: date-time
+              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+          required:
+            - url
+            - expiresAt
+          additionalProperties: false
+          nullable: true
+      required:
+        - id
+        - kind
+        - title
+        - need
+        - level
+        - sizeBytes
+        - pageCount
+        - durationSeconds
+        - isReady
+        - thumbnailUrl
+        - createdAt
+        - assignments
+        - playback
+        - document
       additionalProperties: false
     ActivityResponseDto:
       type: object
