@@ -27,6 +27,16 @@ export class RescheduleBookingRequestDto extends createZodDto(
   }),
 ) {}
 
+/** El equipo mueve la cita de un cliente a otra hora desde la agenda. */
+export class RescheduleAgendaBookingRequestDto extends createZodDto(
+  z.strictObject({
+    /** UTC con `Z`. Debe coincidir con un hueco del mismo servicio (rejilla de 15 minutos). */
+    startsAt: z.iso.datetime(),
+    /** La profesional de la hora nueva; sin ella, la misma de la cita. El personal solo la suya. */
+    staffMembershipId: z.uuid().optional(),
+  }),
+) {}
+
 /** Una cita que el equipo crea para un cliente desde la agenda. */
 export class CreateAgendaBookingRequestDto extends createZodDto(
   z.strictObject({

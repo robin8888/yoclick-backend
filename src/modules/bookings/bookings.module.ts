@@ -6,8 +6,10 @@ import {
   CreateBookingUseCase,
   GetDayAgendaUseCase,
   ListMyBookingsUseCase,
+  RescheduleBookingByTeamUseCase,
   RescheduleBookingUseCase,
 } from './application/booking.use-cases';
+import { AgendaReschedulingController } from './http/agenda-rescheduling.controller';
 import { BookingReschedulingController } from './http/booking-rescheduling.controller';
 import { CheckInClientUseCase, IssueCheckInCodeUseCase } from './application/check-in.use-cases';
 import { CHECK_IN_REPOSITORY } from './application/ports/check-in.repository';
@@ -34,6 +36,7 @@ import { PrismaSessionRecordRepository } from './infrastructure/prisma-session-r
     BookingReschedulingController,
     BookingSessionsController,
     AgendaController,
+    AgendaReschedulingController,
     SessionRecordsController,
     CheckInController,
   ],
@@ -42,6 +45,7 @@ import { PrismaSessionRecordRepository } from './infrastructure/prisma-session-r
     ListMyBookingsUseCase,
     CancelBookingUseCase,
     RescheduleBookingUseCase,
+    RescheduleBookingByTeamUseCase,
     CancelBookingByTeamUseCase,
     GetDayAgendaUseCase,
     StartSessionUseCase,

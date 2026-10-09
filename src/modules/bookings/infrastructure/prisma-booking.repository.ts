@@ -26,7 +26,10 @@ import {
 } from '../application/ports/booking.repository';
 import { recordBookingNotification } from '../../notifications/infrastructure/booking-notification.recorder';
 import { createBookingInTransaction } from './booking-creation';
-import { rescheduleBookingInTransaction } from './booking-rescheduling';
+import {
+  rescheduleBookingInTransaction,
+  rescheduleByTeamInTransaction,
+} from './booking-rescheduling';
 import {
   toBookingView,
   WITH_SESSION_DETAILS,
@@ -95,6 +98,15 @@ export class PrismaBookingRepository implements BookingRepository {
   ): Promise<RescheduleOutcome> {
     return this.tenantPrismaService.runInTenantContext(actor, (client) =>
       rescheduleBookingInTransaction(client, actor, command),
+    );
+  }
+
+  async rescheduleByTeam(
+    actor: ActorContext,
+    command: RescheduleBookingCommand,
+  ): Promise<RescheduleOutcome> {
+    return this.tenantPrismaService.runInTenantContext(actor, (client) =>
+      rescheduleByTeamInTransaction(client, actor, command),
     );
   }
 

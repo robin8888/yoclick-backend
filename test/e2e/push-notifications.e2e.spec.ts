@@ -60,6 +60,13 @@ describe('push notifications', () => {
     );
   }
 
+  async function twoFutureSlots(): Promise<[TestSlot, TestSlot]> {
+    const slots = (await world.fetchSlots(ana.userId, center.centerId, serviceId)).filter(
+      ({ startsAt }) => Date.parse(startsAt) - Date.now() >= MIN_HOURS_AHEAD * 3_600_000,
+    );
+    return [slots[0] as TestSlot, slots[1] as TestSlot];
+  }
+
   async function anaBooks(slot: TestSlot): Promise<string> {
     const response = await world.book(ana.userId, center.centerId, {
       serviceId,
@@ -194,6 +201,121 @@ describe('push notifications', () => {
       expect(response.statusCode).toBe(201);
       expect(pushSender.tokensFor('booking_created_by_team')).toEqual([TOKEN_ANA]);
       expect(pushSender.tokensFor('booking_created')).toEqual([TOKEN_OWNER]);
+    });
+
+    it('tells the client when the instructor moves their appointment', async () => {
+      const [current, target] = await twoFutureSlots();
+      const bookingId = await anaBooks(current);
+      pushSender.sent.length = 0;
+
+      const response = await world.call(
+        'POST',
+        agendaUrl(`/bookings/${bookingId}/reschedule`),
+        staff.userId,
+        { centerId: center.centerId, body: { startsAt: target.startsAt } },
+      );
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json<{ id: string; startsAt: string }>()).toMatchObject({
+        id: bookingId,
+        startsAt: target.startsAt,
+      });
+      expect(pushSender.tokensFor('booking_rescheduled_by_team')).toEqual([TOKEN_ANA]);
+      expect(pushSender.tokensFor('booking_rescheduled')).toEqual([TOKEN_OWNER]);
+    });
+
+    it('lets the administration move an appointment with less notice than the client needs', async () => {
+      const [, target] = await twoFutureSlots();
+      const soon = firstSlotAtLeast(
+        await world.fetchSlots(ana.userId, center.centerId, serviceId),
+        2,
+        20,
+      );
+      const bookingId = await anaBooks(soon);
+
+      const response = await world.call(
+        'POST',
+        agendaUrl(`/bookings/${bookingId}/reschedule`),
+        owner,
+        {
+          centerId: center.centerId,
+          body: { startsAt: target.startsAt },
+        },
+      );
+
+      expect(response.statusCode).toBe(200);
+    });
+
+    it('does not tell anybody when the appointment keeps its hour', async () => {
+      const [current] = await twoFutureSlots();
+      const bookingId = await anaBooks(current);
+      pushSender.sent.length = 0;
+
+      const response = await world.call(
+        'POST',
+        agendaUrl(`/bookings/${bookingId}/reschedule`),
+        owner,
+        {
+          centerId: center.centerId,
+          body: { startsAt: current.startsAt, staffMembershipId: staff.membershipId },
+        },
+      );
+
+      expect(response.statusCode).toBe(200);
+      expect(pushSender.sent).toEqual([]);
+    });
+
+    it('does not let an instructor move an appointment of somebody else', async () => {
+      const [current, target] = await twoFutureSlots();
+      const bookingId = await anaBooks(current);
+      const other = await world.addMember(center.centerId, 'other-mover', 'staff');
+
+      const response = await world.call(
+        'POST',
+        agendaUrl(`/bookings/${bookingId}/reschedule`),
+        other.userId,
+        { centerId: center.centerId, body: { startsAt: target.startsAt } },
+      );
+
+      expect(response.statusCode).toBe(404);
+    });
+
+    it('does not let a client use the agenda to move an appointment', async () => {
+      const [current, target] = await twoFutureSlots();
+      const bookingId = await anaBooks(current);
+
+      const response = await world.call(
+        'POST',
+        agendaUrl(`/bookings/${bookingId}/reschedule`),
+        ana.userId,
+        {
+          centerId: center.centerId,
+          body: { startsAt: target.startsAt },
+        },
+      );
+
+      expect(response.statusCode).toBe(403);
+    });
+
+    it('answers 409 BOOKING_NOT_RESCHEDULABLE when the appointment was cancelled', async () => {
+      const [current, target] = await twoFutureSlots();
+      const bookingId = await anaBooks(current);
+      await world.call('POST', agendaUrl(`/bookings/${bookingId}/cancel`), owner, {
+        centerId: center.centerId,
+      });
+
+      const response = await world.call(
+        'POST',
+        agendaUrl(`/bookings/${bookingId}/reschedule`),
+        owner,
+        {
+          centerId: center.centerId,
+          body: { startsAt: target.startsAt },
+        },
+      );
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toMatchObject({ code: 'BOOKING_NOT_RESCHEDULABLE' });
     });
 
     it('does not let an instructor cancel an appointment of somebody else', async () => {

@@ -4,6 +4,7 @@ import {
   CancelBookingUseCase,
   CreateBookingUseCase,
   GetDayAgendaUseCase,
+  RescheduleBookingByTeamUseCase,
   RescheduleBookingUseCase,
 } from './booking.use-cases';
 import {
@@ -45,6 +46,7 @@ function buildRepository(overrides: Partial<BookingRepository> = {}): BookingRep
   return {
     createBooking: jest.fn(),
     rescheduleBooking: jest.fn(),
+    rescheduleByTeam: jest.fn(),
     listClientBookings: jest.fn(),
     findCancellationFacts: jest.fn(),
     markCancelled: jest.fn(),
@@ -275,5 +277,44 @@ describe('GetDayAgendaUseCase', () => {
         ([, query]) => (query as { staffMembershipId: string | null }).staffMembershipId,
       ),
     ).toEqual(['membership-staff', 'membership-staff', null]);
+  });
+});
+
+describe('RescheduleBookingByTeamUseCase', () => {
+  const staff: ActorContext = { ...CLIENT, membershipId: 'membership-staff', role: 'staff' };
+  const command = {
+    bookingId: 'booking-1',
+    startsAt: new Date(NOW.getTime() + 72 * HOUR_MS),
+    now: NOW,
+  };
+
+  it('returns the moved booking', async () => {
+    const booking = buildBooking({ startsAt: command.startsAt });
+    const repository = buildRepository({
+      rescheduleByTeam: jest
+        .fn()
+        .mockResolvedValue({ kind: 'rescheduled', booking, hasChangedTime: true }),
+    });
+
+    const outcome = await new RescheduleBookingByTeamUseCase(repository).execute(staff, command);
+
+    expect(outcome.booking).toBe(booking);
+  });
+
+  it.each([
+    { kind: 'not_found', code: 'NOT_FOUND', status: 404 },
+    { kind: 'not_reschedulable', code: 'BOOKING_NOT_RESCHEDULABLE', status: 409 },
+    { kind: 'outside_window', code: 'OUTSIDE_BOOKING_WINDOW', status: 409 },
+    { kind: 'slot_unavailable', code: 'SLOT_UNAVAILABLE', status: 409 },
+    { kind: 'already_booked', code: 'ALREADY_BOOKED', status: 409 },
+  ] as const)('maps "$kind" to $status $code', async ({ kind, code, status }) => {
+    const outcome: RescheduleOutcome = { kind };
+    const repository = buildRepository({ rescheduleByTeam: jest.fn().mockResolvedValue(outcome) });
+
+    const error = await errorOf(
+      new RescheduleBookingByTeamUseCase(repository).execute(staff, command),
+    );
+
+    expect(error).toMatchObject({ code, httpStatus: status });
   });
 });

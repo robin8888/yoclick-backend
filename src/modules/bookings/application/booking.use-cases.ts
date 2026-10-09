@@ -74,6 +74,24 @@ export class RescheduleBookingUseCase {
   }
 }
 
+/**
+ * El equipo mueve la cita de un cliente desde la agenda. Sin antelación mínima: avisa al cliente por
+ * push. La hora nueva se vuelve a comprobar en el servidor.
+ */
+@Injectable()
+export class RescheduleBookingByTeamUseCase {
+  constructor(@Inject(BOOKING_REPOSITORY) private readonly bookings: BookingRepository) {}
+
+  async execute(
+    actor: ActorContext,
+    command: RescheduleBookingCommand,
+  ): Promise<Extract<RescheduleOutcome, { kind: 'rescheduled' }>> {
+    const outcome = await this.bookings.rescheduleByTeam(actor, command);
+    if (outcome.kind === 'rescheduled') return outcome;
+    throw new DomainError(...REFUSALS_BY_RESCHEDULE_OUTCOME[outcome.kind]);
+  }
+}
+
 export interface ListMyBookingsRequest {
   readonly actor: ActorContext;
   readonly scope: BookingListScope;

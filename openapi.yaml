@@ -2084,6 +2084,53 @@ paths:
       summary: Cancela una cita futura desde la agenda. La administración cancela cualquiera; el personal, solo las suyas. El cliente recibe un aviso push. Una ya cancelada, empezada o pasada responde 409 BOOKING_NOT_CANCELLABLE.
       tags:
         - bookings
+  /v1/centers/{centerId}/agenda/bookings/{bookingId}/reschedule:
+    post:
+      operationId: agenda_reschedule_booking
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: bookingId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RescheduleAgendaBookingRequestDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Mueve una cita futura a otra hora desde la agenda, con el mismo servicio. La administración mueve cualquiera; el personal, solo las suyas y a su propia agenda. Sin antelación mínima. El cliente recibe un aviso push. Una cancelada, empezada o pasada responde 409 BOOKING_NOT_RESCHEDULABLE.
+      tags:
+        - bookings
   /v1/centers/{centerId}/session-records:
     get:
       operationId: session_records_list
@@ -7555,6 +7602,20 @@ components:
       required:
         - clientMembershipId
         - serviceId
+        - startsAt
+      additionalProperties: false
+    RescheduleAgendaBookingRequestDto:
+      type: object
+      properties:
+        startsAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+        staffMembershipId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+      required:
         - startsAt
       additionalProperties: false
     SessionRecordsResponseDto:

@@ -46,6 +46,10 @@ export interface RescheduleBookingCommand {
   readonly bookingId: string;
   readonly startsAt: Date;
   readonly now: Date;
+  /** Persona del equipo preferida para la hora nueva; sin ella, la misma que tenía la cita. */
+  readonly preferredStaffMembershipId?: string | undefined;
+  /** Rejilla de inicios más fina cuando mueve la cita el equipo (p. ej. cada 15 minutos). */
+  readonly slotStepMinutes?: number | undefined;
 }
 
 export type RescheduleOutcome =
@@ -104,6 +108,14 @@ export interface BookingRepository {
   createBooking(actor: ActorContext, command: CreateBookingCommand): Promise<CreateBookingOutcome>;
   /** Mueve una reserva del propio cliente a otra hora en una sola transacción. */
   rescheduleBooking(
+    actor: ActorContext,
+    command: RescheduleBookingCommand,
+  ): Promise<RescheduleOutcome>;
+  /**
+   * Mueve una reserva a otra hora desde la agenda del centro. La administración mueve cualquiera; el
+   * personal, solo las de sus sesiones. No exige antelación y avisa al cliente.
+   */
+  rescheduleByTeam(
     actor: ActorContext,
     command: RescheduleBookingCommand,
   ): Promise<RescheduleOutcome>;
