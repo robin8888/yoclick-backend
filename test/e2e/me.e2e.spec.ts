@@ -1,5 +1,7 @@
 import { type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { BREACHED_PASSWORD_CHECKER } from '../../src/modules/auth/application/ports/breached-password.checker';
+import { FILE_STORAGE } from '../../src/modules/content/application/ports/file-storage';
+import { FakeFileStorage } from '../../src/modules/content/infrastructure/fake-file-storage';
 import { PrismaService } from '../../src/shared/database/prisma.service';
 import { TenantPrismaService } from '../../src/shared/database/tenant-prisma.service';
 import { EMAIL_SENDER } from '../../src/shared/email/email-sender';
@@ -20,6 +22,7 @@ interface SessionBody {
 }
 
 describe('the person own account (/v1/me)', () => {
+  const fileStorage = new FakeFileStorage();
   let application: NestFastifyApplication;
   let prismaService: PrismaService;
   let tenantPrismaService: TenantPrismaService;
@@ -74,6 +77,7 @@ describe('the person own account (/v1/me)', () => {
     application = await createTestApplication({
       overrides: [
         { token: EMAIL_SENDER, value: emails },
+        { token: FILE_STORAGE, value: fileStorage },
         { token: BREACHED_PASSWORD_CHECKER, value: new FakeBreachedPasswordChecker() },
       ],
     });
@@ -437,6 +441,23 @@ describe('the person own account (/v1/me)', () => {
         payload: { refreshToken: session.refreshToken },
       });
       expect(refresh.statusCode).toBe(401);
+    });
+
+    it('deletes the profile picture file from the storage', async () => {
+      const session = await signIn();
+      const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
+      const upload = await application.inject({
+        method: 'PUT',
+        url: '/v1/me/photo',
+        headers: { authorization: `Bearer ${session.accessToken}`, 'content-type': 'image/jpeg' },
+        payload: jpeg,
+      });
+      expect(upload.statusCode).toBe(200);
+      expect(fileStorage.files.size).toBe(1);
+
+      await deleteAccount(session.accessToken, { password: PASSWORD, confirmation: 'ELIMINAR' });
+
+      expect(fileStorage.files.size).toBe(0);
     });
 
     it('closes the door even to an access token that has not expired yet', async () => {

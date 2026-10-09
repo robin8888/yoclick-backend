@@ -10,24 +10,35 @@ import { resetTestDatabase } from '../support/test-database';
 import { createTestApplication } from './create-test-application';
 
 const MEGABYTE = 1_048_576;
+const JPEG_HEADER = Buffer.from([0xff, 0xd8, 0xff, 0xe0]);
+const PNG_HEADER = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const WEBP_HEADER = Buffer.concat([
+  Buffer.from('RIFF', 'latin1'),
+  Buffer.alloc(4),
+  Buffer.from('WEBPVP8 ', 'latin1'),
+]);
+const imageOfSize = (header: Buffer, size: number): Buffer =>
+  Buffer.concat([header, Buffer.alloc(size - header.length)]);
 const SAMPLE_PDF = Buffer.from(
   '%PDF-1.4\n<< /Type /Pages >> << /Type /Page >> << /Type /Page >>\n',
 );
 
 interface ContentBody {
   id: string;
-  kind: 'video' | 'pdf';
+  kind: 'video' | 'pdf' | 'image';
   title: string;
   need: string | null;
   level: string | null;
   sizeBytes: number;
   pageCount: number | null;
   isReady: boolean;
+  thumbnailUrl: string | null;
   assignments: { id: string; level: string | null; groupId: string | null; label: string | null }[];
 }
 
 interface DetailBody extends ContentBody {
   document: { url: string } | null;
+  image: { url: string } | null;
   playback: { streamUrl: string } | null;
 }
 
@@ -74,6 +85,27 @@ describe('content library', () => {
         rawBody: options.bytes ?? SAMPLE_PDF,
       },
     );
+
+  const uploadImage = (
+    userId: string,
+    options: { bytes?: Buffer; query?: string; contentType?: string } = {},
+  ) =>
+    world.call(
+      'POST',
+      `/v1/centers/${center.centerId}/content/images?${options.query ?? 'title=Postura%20correcta&need=Técnica'}`,
+      userId,
+      {
+        centerId: center.centerId,
+        headers: { 'content-type': options.contentType ?? 'application/octet-stream' },
+        rawBody: options.bytes ?? imageOfSize(JPEG_HEADER, 200),
+      },
+    );
+
+  async function addImage(query?: string): Promise<ContentBody> {
+    const response = await uploadImage(owner, query === undefined ? {} : { query });
+    expect(response.statusCode).toBe(201);
+    return response.json<ContentBody>();
+  }
 
   async function addPdf(query?: string): Promise<ContentBody> {
     const response = await uploadPdf(owner, query === undefined ? {} : { query });
@@ -466,6 +498,178 @@ describe('content library', () => {
 
       expect(response.statusCode).toBe(404);
       expect(storage.files.size).toBe(1);
+    });
+  });
+
+  describe('images', () => {
+    it.each([
+      ['JPEG', JPEG_HEADER, 'jpg'],
+      ['PNG', PNG_HEADER, 'png'],
+      ['WebP', WEBP_HEADER, 'webp'],
+    ])(
+      'stores a %s under the center and lists it as an image',
+      async (_name, header, extension) => {
+        const response = await uploadImage(owner, { bytes: imageOfSize(header, 300) });
+
+        expect(response.statusCode).toBe(201);
+        const content = response.json<ContentBody>();
+        expect(content).toMatchObject({
+          kind: 'image',
+          title: 'Postura correcta',
+          need: 'Técnica',
+          sizeBytes: 300,
+          pageCount: null,
+          isReady: true,
+        });
+        expect([...storage.files.keys()]).toEqual([
+          `content/images/${center.centerId}/${content.id}.${extension}`,
+        ]);
+      },
+    );
+
+    it.each([
+      ['a PDF', SAMPLE_PDF],
+      ['plain text', Buffer.from('not an image at all')],
+    ])('refuses %s sent as an image, whatever its content type says', async (_name, bytes) => {
+      const response = await uploadImage(owner, { bytes, contentType: 'image/png' });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json<{ code: string }>().code).toBe('PHOTO_NOT_IMAGE');
+      expect(storage.files.size).toBe(0);
+    });
+
+    it('refuses an image over 5 MB and accepts one of exactly 5 MB', async () => {
+      const tooLarge = await uploadImage(owner, {
+        bytes: imageOfSize(JPEG_HEADER, 5 * MEGABYTE + 1),
+      });
+      const limit = await uploadImage(owner, { bytes: imageOfSize(JPEG_HEADER, 5 * MEGABYTE) });
+
+      expect(tooLarge.statusCode).toBe(413);
+      expect(tooLarge.json<{ code: string }>().code).toBe('PHOTO_TOO_LARGE');
+      expect(limit.statusCode).toBe(201);
+      expect(storage.files.size).toBe(1);
+    });
+
+    it('needs a title', async () => {
+      const response = await uploadImage(owner, { query: 'need=Técnica' });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('shares the document space of the plan with the PDFs', async () => {
+      await inCenter((client) =>
+        client.center.update({
+          where: { id: center.centerId },
+          data: { documentStorageLimitBytes: BigInt(SAMPLE_PDF.length + 250) },
+        }),
+      );
+      await addPdf();
+
+      const response = await uploadImage(owner, { bytes: imageOfSize(JPEG_HEADER, 300) });
+      const library = (await call('GET', '/content', owner)).json<{
+        storage: { usedBytes: number };
+      }>();
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json<{ code: string }>().code).toBe('DOCUMENT_QUOTA_EXCEEDED');
+      expect(library.storage.usedBytes).toBe(SAMPLE_PDF.length);
+      expect(storage.files.size).toBe(1);
+    });
+
+    it('counts the images already stored when reporting the space used', async () => {
+      await addImage();
+
+      const library = await call('GET', '/content', owner);
+
+      expect(library.json<{ storage: { usedBytes: number } }>().storage.usedBytes).toBe(200);
+    });
+
+    it('shows a client the image only when assigned by level, group or directly, with a signed link', async () => {
+      const group = await call('POST', '/groups', owner, { name: 'Mañanas' });
+      const groupId = group.json<{ id: string }>().id;
+      await inCenter((client) =>
+        Promise.all([
+          client.membership.update({
+            where: { id: ana.membershipId },
+            data: { level: 'beginner' },
+          }),
+          client.membership.update({ where: { id: bea.membershipId }, data: { groupId } }),
+        ]),
+      );
+      const forLevel = await addImage('title=Nivel');
+      const forGroup = await addImage('title=Grupo');
+      const forBea = await addImage('title=Directa');
+      const unassigned = await addImage('title=Sin%20asignar');
+
+      await assign(forLevel.id, [{ kind: 'level', level: 'beginner' }]);
+      await assign(forGroup.id, [{ kind: 'group', groupId }]);
+      await assign(forBea.id, [{ kind: 'client', membershipId: bea.membershipId }]);
+
+      expect(await myContentIds(ana.userId)).toEqual([forLevel.id]);
+      expect(new Set(await myContentIds(bea.userId))).toEqual(new Set([forGroup.id, forBea.id]));
+      const mine = await callMyContent(`/${forLevel.id}`, ana.userId);
+      expect(mine.json<DetailBody>()).toMatchObject({ kind: 'image', document: null });
+      expect(mine.json<DetailBody>().image?.url).toContain(`${forLevel.id}.jpg`);
+      const myList = await callMyContent('', ana.userId);
+      expect(myList.json<{ items: ContentBody[] }>().items[0]?.thumbnailUrl).toBe(
+        mine.json<DetailBody>().image?.url,
+      );
+      const library = await call('GET', '/content', owner);
+      const listed = library
+        .json<{ items: ContentBody[] }>()
+        .items.find(({ id }) => id === forLevel.id);
+      expect(listed?.thumbnailUrl).toContain(`${forLevel.id}.jpg`);
+      expect((await callMyContent(`/${unassigned.id}`, ana.userId)).statusCode).toBe(404);
+      expect((await callMyContent(`/${forLevel.id}`, bea.userId)).statusCode).toBe(404);
+    });
+
+    it('lets the staff assign it, notifying the client, but not upload, edit or delete it', async () => {
+      const image = await addImage('title=Para%20Ana');
+
+      const assigned = await call('PUT', `/content/${image.id}/assignments`, staff.userId, {
+        targets: [{ kind: 'client', membershipId: ana.membershipId }],
+      });
+      const uploaded = await uploadImage(staff.userId);
+      const renamed = await call('PATCH', `/content/${image.id}`, staff.userId, { title: 'X' });
+      const deleted = await call('DELETE', `/content/${image.id}`, staff.userId);
+      const notices = (await call('GET', '/notifications', ana.userId)).json<{
+        notifications: { kind: string; data: Record<string, string> }[];
+      }>().notifications;
+
+      expect(assigned.statusCode).toBe(200);
+      expect([uploaded.statusCode, renamed.statusCode, deleted.statusCode]).toEqual([
+        403, 403, 403,
+      ]);
+      expect(notices).toMatchObject([
+        { kind: 'content_assigned', data: { contentTitle: 'Para Ana' } },
+      ]);
+    });
+
+    it('does not let a client upload an image', async () => {
+      const response = await uploadImage(ana.userId);
+
+      expect(response.statusCode).toBe(403);
+      expect(storage.files.size).toBe(0);
+    });
+
+    it('lets the owner rename and label it, and removes the file when deleted', async () => {
+      const image = await addImage();
+
+      const edited = await call('PATCH', `/content/${image.id}`, owner, {
+        title: 'Nueva foto',
+        need: 'Fuerza',
+        level: 'advanced',
+      });
+      const deleted = await call('DELETE', `/content/${image.id}`, owner);
+
+      expect(edited.json<ContentBody>()).toMatchObject({
+        kind: 'image',
+        title: 'Nueva foto',
+        need: 'Fuerza',
+        level: 'advanced',
+      });
+      expect(deleted.statusCode).toBe(204);
+      expect(storage.files.size).toBe(0);
     });
   });
 });

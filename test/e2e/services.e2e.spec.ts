@@ -53,7 +53,7 @@ describe('services', () => {
           isVisible: true,
         });
         expect(service.staff).toEqual([
-          { membershipId: center.ownerMembershipId, fullName: 'owner' },
+          { membershipId: center.ownerMembershipId, fullName: 'owner', photoUrl: null, photos: [] },
         ]);
       }
     });
@@ -95,7 +95,9 @@ describe('services', () => {
         minNoticeMinutes: 120,
         isVisible: true,
         room: null,
-        staff: [{ membershipId: center.ownerMembershipId, fullName: 'owner' }],
+        staff: [
+          { membershipId: center.ownerMembershipId, fullName: 'owner', photoUrl: null, photos: [] },
+        ],
       });
     });
 
@@ -209,7 +211,7 @@ describe('services', () => {
       });
 
       expect(response.json<TestService>().staff).toEqual([
-        { membershipId: staff.membershipId, fullName: 'staff' },
+        { membershipId: staff.membershipId, fullName: 'staff', photoUrl: null, photos: [] },
       ]);
     });
 

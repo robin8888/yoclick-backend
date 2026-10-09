@@ -15,6 +15,7 @@ import { createTestApplication } from './create-test-application';
 
 const MEGABYTE = 1_048_576;
 const GIGABYTE = 1024 * MEGABYTE;
+const BUNNY_UPLOADING = 0;
 const BUNNY_PROCESSING = 2;
 const BUNNY_FINISHED = 4;
 const TOKEN_OWNER = 'ExponentPushToken[owner-device-0001]';
@@ -23,11 +24,13 @@ const TOKEN_STAFF = 'ExponentPushToken[staff-device-0001]';
 /** El servicio de vídeo de desarrollo, pero con el estado de procesado a mano. */
 class ControlledVideoHosting extends FakeVideoHosting {
   statusCode = BUNNY_FINISHED;
+  /** Lo que el servicio dice que ocupa el vídeo; 0 = todavía no lo sabe. */
+  reportedBytes = BigInt(50 * MEGABYTE);
 
   override fetchProcessingState() {
     return Promise.resolve({
       bunnyStatusCode: this.statusCode,
-      sizeBytes: BigInt(50 * MEGABYTE),
+      sizeBytes: this.reportedBytes,
       durationSeconds: 42,
     });
   }
@@ -127,6 +130,7 @@ describe('videos', () => {
   beforeEach(async () => {
     await resetTestDatabase();
     hosting.statusCode = BUNNY_FINISHED;
+    hosting.reportedBytes = BigInt(50 * MEGABYTE);
     hosting.deletedVideoIds.length = 0;
     pushSender.sent.length = 0;
     owner = await world.fixtures.createUser('owner');
@@ -275,6 +279,111 @@ describe('videos', () => {
       expect((await call('DELETE', `/videos/${ownerVideo.id}`, owner)).statusCode).toBe(204);
       expect(hosting.deletedVideoIds).toHaveLength(2);
       expect((await call('GET', `/videos/${ownerVideo.id}`, owner)).statusCode).toBe(404);
+    });
+  });
+
+  describe('what a video really weighs', () => {
+    const subscription = async () =>
+      (await call('GET', '/subscription', owner)).json<{ videoStorageUsedBytes: number }>();
+
+    beforeEach(async () => {
+      await includeVideoInPlan(200 * MEGABYTE);
+    });
+
+    it('discards, fails and stops counting a video that declared little and is over the maximum', async () => {
+      const { video } = (await startUpload(owner, { sizeBytes: MEGABYTE })).json<StartBody>();
+      hosting.reportedBytes = BigInt(600 * MEGABYTE);
+
+      const refreshed = await call('GET', `/videos/${video.id}`, owner);
+
+      expect(refreshed.json<VideoBody>().status).toBe('failed');
+      expect(hosting.deletedVideoIds).toHaveLength(1);
+      expect((await subscription()).videoStorageUsedBytes).toBe(0);
+    });
+
+    it('keeps the real size when it is bigger than the declared one but fits', async () => {
+      const { video } = (await startUpload(owner, { sizeBytes: MEGABYTE })).json<StartBody>();
+      hosting.reportedBytes = BigInt(120 * MEGABYTE);
+
+      const refreshed = await call('GET', `/videos/${video.id}`, owner);
+
+      expect(refreshed.json<VideoBody>().status).toBe('ready');
+      expect((await subscription()).videoStorageUsedBytes).toBe(120 * MEGABYTE);
+      expect(hosting.deletedVideoIds).toEqual([]);
+    });
+
+    it('discards a video whose real size pushes the center over its space', async () => {
+      await startReadyVideo(owner, { sizeBytes: 100 * MEGABYTE });
+      hosting.reportedBytes = BigInt(50 * MEGABYTE);
+      const { video } = (await startUpload(owner, { sizeBytes: MEGABYTE })).json<StartBody>();
+      hosting.reportedBytes = BigInt(160 * MEGABYTE);
+
+      const refreshed = await call('GET', `/videos/${video.id}`, owner);
+
+      expect(refreshed.json<VideoBody>().status).toBe('failed');
+      expect(hosting.deletedVideoIds).toHaveLength(1);
+      expect((await subscription()).videoStorageUsedBytes).toBe(50 * MEGABYTE);
+    });
+
+    it('finds out the real size before reserving the next upload, even if nobody asked for the video', async () => {
+      hosting.statusCode = BUNNY_UPLOADING;
+      hosting.reportedBytes = 0n;
+      await startUpload(owner, { sizeBytes: MEGABYTE });
+      hosting.reportedBytes = BigInt(190 * MEGABYTE);
+
+      const second = await startUpload(owner, { sizeBytes: 20 * MEGABYTE });
+
+      expect(second.statusCode).toBe(409);
+      expect(second.json<{ code: string }>().code).toBe('VIDEO_QUOTA_EXCEEDED');
+    });
+  });
+
+  describe('uploads in progress', () => {
+    const inProgressLimit = 5;
+
+    beforeEach(async () => {
+      await includeVideoInPlan(5 * GIGABYTE);
+      hosting.statusCode = BUNNY_UPLOADING;
+      hosting.reportedBytes = 0n;
+    });
+
+    it('refuses a sixth video while five are still uploading, and allows it when one finishes', async () => {
+      for (let count = 0; count < inProgressLimit; count += 1) {
+        const response = await startUpload(owner, { sizeBytes: MEGABYTE });
+        expect(response.statusCode).toBe(201);
+      }
+
+      const refused = await startUpload(owner, { sizeBytes: MEGABYTE });
+      expect(refused.statusCode).toBe(409);
+      expect(refused.json<{ code: string }>().code).toBe('VIDEO_UPLOADS_IN_PROGRESS');
+
+      hosting.statusCode = BUNNY_FINISHED;
+      expect((await startUpload(owner, { sizeBytes: MEGABYTE })).statusCode).toBe(201);
+    });
+
+    it('counts the uploads of the whole center, not of one person', async () => {
+      for (let count = 0; count < inProgressLimit; count += 1) {
+        await startUpload(count % 2 === 0 ? owner : staff.userId, { sizeBytes: MEGABYTE });
+      }
+
+      expect((await startUpload(staff.userId)).statusCode).toBe(409);
+    });
+
+    it('ignores, discards and deletes uploads that never finished after a day', async () => {
+      for (let count = 0; count < inProgressLimit; count += 1) {
+        await startUpload(owner, { sizeBytes: MEGABYTE });
+      }
+      const dayAndAnHourAgo = new Date(Date.now() - 25 * 60 * 60 * 1000);
+      await inCenter((client) => client.video.updateMany({ data: { createdAt: dayAndAnHourAgo } }));
+
+      const response = await startUpload(owner, { sizeBytes: MEGABYTE });
+
+      expect(response.statusCode).toBe(201);
+      expect(hosting.deletedVideoIds).toHaveLength(inProgressLimit);
+      const failed = await inCenter((client) =>
+        client.video.count({ where: { status: 'failed' } }),
+      );
+      expect(failed).toBe(inProgressLimit);
     });
   });
 

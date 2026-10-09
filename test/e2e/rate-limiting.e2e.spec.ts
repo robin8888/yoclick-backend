@@ -133,6 +133,43 @@ describe('rate limiting per IP', () => {
     expect(blocked.statusCode).toBe(429);
   });
 
+  const CENTER_ID = '0199b0c0-0000-7000-8000-000000000001';
+
+  it.each([
+    ['profile photo', 'PUT', '/v1/me/photo', RATE_LIMITS.uploadPhoto.limit],
+    [
+      'gallery photo',
+      'POST',
+      `/v1/centers/${CENTER_ID}/team-profiles/me/photos`,
+      RATE_LIMITS.uploadPhoto.limit,
+    ],
+    [
+      'PDF document',
+      'POST',
+      `/v1/centers/${CENTER_ID}/content/documents`,
+      RATE_LIMITS.uploadDocument.limit,
+    ],
+    [
+      'content image',
+      'POST',
+      `/v1/centers/${CENTER_ID}/content/images`,
+      RATE_LIMITS.uploadPhoto.limit,
+    ],
+    ['video start', 'POST', `/v1/centers/${CENTER_ID}/videos`, RATE_LIMITS.startVideoUpload.limit],
+  ] as const)(
+    'limits the uploads of a %s, before authentication',
+    async (_name, method, url, limit) => {
+      const send = () => application.inject({ method, url });
+      const accepted: number[] = [];
+      for (let attempt = 0; attempt < limit; attempt += 1) accepted.push((await send()).statusCode);
+
+      const blocked = await send();
+
+      expect(accepted).not.toContain(429);
+      expect(blocked.statusCode).toBe(429);
+    },
+  );
+
   it('applies a global ceiling to every other route', async () => {
     for (let request = 0; request < DEFAULT_RATE_LIMIT.limit; request += 1) {
       await application.inject({ method: 'GET', url: '/v1/probe-guards/public' });
