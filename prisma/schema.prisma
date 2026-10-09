@@ -212,6 +212,8 @@ model User {
   phone            String?
   birthDate        DateTime? @map("birth_date") @db.Date
   locale           String    @default("es-ES")
+  /// Ruta de su foto de perfil en el almacén de ficheros; una por persona, la misma en todos sus centros.
+  photoKey         String?   @map("photo_key")
   createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -264,6 +266,8 @@ model Center {
   videoStorageLimitBytes BigInt? @map("video_storage_limit_bytes")
   /// Espacio de documentos (PDF) del plan. Todos los planes incluyen PDF; solo cambia el tope. Solo lo cambia Yoclick.
   documentStorageLimitBytes BigInt @default(1073741824) @map("document_storage_limit_bytes")
+  /// Espacio de fotos de la galería del equipo (100 MiB por defecto). Las fotos de perfil no cuentan: hay una por persona. Solo lo cambia Yoclick.
+  photoStorageLimitBytes BigInt @default(104857600) @map("photo_storage_limit_bytes")
   /// Las opiniones sobre el equipo se revisan antes de publicarse.
   reviewsNeedApproval    Boolean   @default(true) @map("reviews_need_approval")
   /// El equipo (fotos, vídeos y valoraciones) se enseña en la web de reservas.
@@ -276,6 +280,7 @@ model Center {
   contentAssignments  ContentAssignment[]
   staffProfiles       StaffProfile[]
   staffCertifications StaffCertification[]
+  staffProfilePhotos  StaffProfilePhoto[]
   staffReviews        StaffReview[]
   privacyRequests     PrivacyRequest[]
   memberships         Membership[]
@@ -905,6 +910,7 @@ model StaffProfile {
   membership     Membership           @relation("StaffProfileOwner", fields: [membershipId], references: [id])
   reviewedBy     Membership?          @relation("StaffProfileReviewer", fields: [reviewedByMembershipId], references: [id], onDelete: Restrict)
   certifications StaffCertification[]
+  photos         StaffProfilePhoto[]
 
   @@index([centerId, status])
   @@map("staff_profiles")
@@ -928,6 +934,24 @@ model StaffCertification {
 
   @@index([membershipId])
   @@map("staff_certifications")
+}
+
+/// Una foto de la galería del perfil profesional (hasta 6), en el orden en que se enseñan.
+model StaffProfilePhoto {
+  id           String   @id @db.Uuid
+  centerId     String   @map("center_id") @db.Uuid
+  membershipId String   @map("membership_id") @db.Uuid
+  /// Ruta del fichero en el almacén; la API firma el enlace al servirla.
+  key          String
+  sizeBytes    Int      @map("size_bytes")
+  position     Int
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  center  Center       @relation(fields: [centerId], references: [id])
+  profile StaffProfile @relation(fields: [membershipId], references: [membershipId], onDelete: Cascade)
+
+  @@index([membershipId, position])
+  @@map("staff_profile_photos")
 }
 
 /// Opinión de un cliente sobre quien le dio una sesión. Solo tras una sesión real, una por reserva.
@@ -959,11 +983,12 @@ model StaffReview {
 enum ContentKind {
   video
   pdf
+  image
 
   @@map("content_kind")
 }
 
-/// Pieza de la biblioteca del centro: un vídeo (ya alojado en el servicio de vídeo) o un PDF (en el
+/// Pieza de la biblioteca del centro: un vídeo (ya alojado en el servicio de vídeo) o un PDF o una imagen (en el
 /// almacén de ficheros). Los clientes solo la ven cuando se le asigna. Borrarla libera su espacio.
 model ContentItem {
   id                    String      @id @db.Uuid
@@ -975,7 +1000,7 @@ model ContentItem {
   /// Nivel al que va dirigido, para filtrar. No decide quién lo ve: eso lo hacen las asignaciones.
   level                 ClientLevel?
   videoId               String?     @unique @map("video_id") @db.Uuid
-  /// Ruta del PDF en el almacén de ficheros; solo si es un PDF.
+  /// Ruta del PDF o de la imagen en el almacén de ficheros; solo si es un PDF o una imagen.
   documentKey           String?     @unique @map("document_key")
   sizeBytes             BigInt      @default(0) @map("size_bytes")
   pageCount             Int?        @map("page_count")

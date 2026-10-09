@@ -3525,6 +3525,92 @@ paths:
       summary: Quita una titulación de mi perfil.
       tags:
         - team-profiles
+  /v1/centers/{centerId}/team-profiles/me/photos:
+    post:
+      operationId: team_profiles_add_photo
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          image/jpeg:
+            schema:
+              type: string
+              format: binary
+          image/png:
+            schema:
+              type: string
+              format: binary
+          image/webp:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "201":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfileResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Añade una foto al final de la galería de mi perfil (cuerpo JPEG, PNG o WebP, hasta 5 MB; máximo 6 fotos). El perfil vuelve a borrador. 400 PHOTO_NOT_IMAGE, 413 PHOTO_TOO_LARGE, 409 PROFILE_PHOTO_LIMIT_REACHED, 409 PHOTO_QUOTA_EXCEEDED (el centro llenó su espacio de fotos), 429 RATE_LIMITED.
+      tags:
+        - team-profiles
+  /v1/centers/{centerId}/team-profiles/me/photos/{photoId}:
+    delete:
+      operationId: team_profiles_remove_photo
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: photoId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "204":
+          description: ""
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Quita una foto de la galería de mi perfil. El perfil vuelve a borrador.
+      tags:
+        - team-profiles
   /v1/centers/{centerId}/team-settings:
     get:
       operationId: team_settings_get
@@ -3973,7 +4059,7 @@ paths:
                 $ref: "#/components/schemas/ProblemDetailsDto"
       security:
         - bearer: []
-      summary: Reserva un vídeo y devuelve la firma para subirlo directamente al servicio de vídeo. 403 VIDEO_NOT_INCLUDED si el plan no incluye vídeo; 409 VIDEO_QUOTA_EXCEEDED si no cabe.
+      summary: Reserva un vídeo y devuelve la firma para subirlo directamente al servicio de vídeo. 403 VIDEO_NOT_INCLUDED si el plan no incluye vídeo; 409 VIDEO_QUOTA_EXCEEDED si no cabe; 409 VIDEO_UPLOADS_IN_PROGRESS si ya hay 5 vídeos subiéndose; 429 RATE_LIMITED.
       tags:
         - videos
   /v1/centers/{centerId}/videos/{videoId}:
@@ -4312,7 +4398,79 @@ paths:
                 $ref: "#/components/schemas/ProblemDetailsDto"
       security:
         - bearer: []
-      summary: Sube un PDF (cuerpo `application/pdf`, hasta 50 MB) y lo añade a la biblioteca. 400 DOCUMENT_NOT_PDF, 413 DOCUMENT_TOO_LARGE, 409 DOCUMENT_QUOTA_EXCEEDED.
+      summary: Sube un PDF (cuerpo `application/pdf`, hasta 50 MB) y lo añade a la biblioteca. 400 DOCUMENT_NOT_PDF, 413 DOCUMENT_TOO_LARGE, 409 DOCUMENT_QUOTA_EXCEEDED, 429 RATE_LIMITED.
+      tags:
+        - content
+  /v1/centers/{centerId}/content/images:
+    post:
+      operationId: content_add_image
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: title
+          required: true
+          in: query
+          schema:
+            minLength: 1
+            maxLength: 120
+            type: string
+        - name: need
+          required: false
+          in: query
+          schema:
+            minLength: 1
+            maxLength: 40
+            type: string
+        - name: level
+          required: false
+          in: query
+          schema:
+            type: string
+            enum:
+              - beginner
+              - intermediate
+              - advanced
+      requestBody:
+        required: true
+        content:
+          image/jpeg:
+            schema:
+              type: string
+              format: binary
+          image/png:
+            schema:
+              type: string
+              format: binary
+          image/webp:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "201":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContentResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Sube una imagen (cuerpo JPEG, PNG o WebP, hasta 5 MB; se reconoce por su contenido, no por el tipo) y la añade a la biblioteca. Cuenta en el mismo espacio que los PDF. 400 PHOTO_NOT_IMAGE, 413 PHOTO_TOO_LARGE, 409 DOCUMENT_QUOTA_EXCEEDED, 429 RATE_LIMITED.
       tags:
         - content
   /v1/centers/{centerId}/content/videos:
@@ -4430,6 +4588,97 @@ paths:
       summary: Una pieza asignada, con el enlace firmado para reproducir el vídeo o leer el PDF. 404 si no es suya.
       tags:
         - content
+  /v1/me/photo:
+    put:
+      operationId: me_set_photo
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          image/jpeg:
+            schema:
+              type: string
+              format: binary
+          image/png:
+            schema:
+              type: string
+              format: binary
+          image/webp:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MyPhotoResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Cambia mi foto de perfil (cuerpo JPEG, PNG o WebP, hasta 5 MB; se reconoce por su contenido, no por el tipo). Sustituye a la anterior. 400 PHOTO_NOT_IMAGE, 413 PHOTO_TOO_LARGE, 429 RATE_LIMITED.
+      tags:
+        - me
+    delete:
+      operationId: me_remove_photo
+      parameters: []
+      responses:
+        "204":
+          description: ""
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Quita mi foto de perfil.
+      tags:
+        - me
+  /v1/centers/{centerId}/members/{membershipId}/photo:
+    delete:
+      operationId: members_remove_photo
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: membershipId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "204":
+          description: ""
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: "Moderación: quita la foto de perfil de una persona del centro (cliente o equipo). 404 si no es del centro."
+      tags:
+        - team
   /v1/centers/{centerId}/activity:
     get:
       operationId: activity_list
@@ -5178,6 +5427,24 @@ components:
           type: boolean
         fullName:
           type: string
+        photoUrl:
+          type: string
+          nullable: true
+        photos:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              url:
+                type: string
+            required:
+              - id
+              - url
+            additionalProperties: false
         staffTitle:
           type: string
           nullable: true
@@ -5362,6 +5629,8 @@ components:
         - membershipId
         - isMe
         - fullName
+        - photoUrl
+        - photos
         - staffTitle
         - headline
         - bio
@@ -5431,6 +5700,9 @@ components:
                 type: string
                 format: date-time
                 pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+              photoUrl:
+                type: string
+                nullable: true
               center:
                 type: object
                 properties:
@@ -5458,6 +5730,7 @@ components:
               - role
               - status
               - joinedAt
+              - photoUrl
               - center
             additionalProperties: false
       required:
@@ -5564,6 +5837,9 @@ components:
               nullable: true
             locale:
               type: string
+            photoUrl:
+              type: string
+              nullable: true
             isEmailVerified:
               type: boolean
             createdAt:
@@ -5577,6 +5853,7 @@ components:
             - phone
             - birthDate
             - locale
+            - photoUrl
             - isEmailVerified
             - createdAt
           additionalProperties: false
@@ -5611,6 +5888,9 @@ components:
                 type: string
                 format: date-time
                 pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+              photoUrl:
+                type: string
+                nullable: true
               center:
                 type: object
                 properties:
@@ -5638,6 +5918,7 @@ components:
               - role
               - status
               - joinedAt
+              - photoUrl
               - center
             additionalProperties: false
         consentHistory:
@@ -5943,6 +6224,9 @@ components:
                 type: string
               email:
                 type: string
+              photoUrl:
+                type: string
+                nullable: true
               role:
                 type: string
                 enum:
@@ -5980,6 +6264,7 @@ components:
               - userId
               - fullName
               - email
+              - photoUrl
               - role
               - status
               - staffTitle
@@ -6036,6 +6321,9 @@ components:
           type: string
         email:
           type: string
+        photoUrl:
+          type: string
+          nullable: true
         role:
           type: string
           enum:
@@ -6073,6 +6361,7 @@ components:
         - userId
         - fullName
         - email
+        - photoUrl
         - role
         - status
         - staffTitle
@@ -7095,6 +7384,21 @@ components:
           type: integer
           minimum: -9007199254740991
           maximum: 9007199254740991
+        photoStorage:
+          type: object
+          properties:
+            usedBytes:
+              type: integer
+              minimum: 0
+              maximum: 9007199254740991
+            limitBytes:
+              type: integer
+              minimum: 0
+              maximum: 9007199254740991
+          required:
+            - usedBytes
+            - limitBytes
+          additionalProperties: false
       required:
         - status
         - trialEndsAt
@@ -7102,6 +7406,7 @@ components:
         - activeClientCount
         - videoStorageLimitBytes
         - videoStorageUsedBytes
+        - photoStorage
       additionalProperties: false
     ServiceListResponseDto:
       type: object
@@ -7175,9 +7480,29 @@ components:
                       pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
                     fullName:
                       type: string
+                    photoUrl:
+                      type: string
+                      nullable: true
+                    photos:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                            format: uuid
+                            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                          url:
+                            type: string
+                        required:
+                          - id
+                          - url
+                        additionalProperties: false
                   required:
                     - membershipId
                     - fullName
+                    - photoUrl
+                    - photos
                   additionalProperties: false
             required:
               - id
@@ -7312,9 +7637,29 @@ components:
                 pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
               fullName:
                 type: string
+              photoUrl:
+                type: string
+                nullable: true
+              photos:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                    url:
+                      type: string
+                  required:
+                    - id
+                    - url
+                  additionalProperties: false
             required:
               - membershipId
               - fullName
+              - photoUrl
+              - photos
             additionalProperties: false
       required:
         - id
@@ -8560,6 +8905,9 @@ components:
                 type: string
               email:
                 type: string
+              photoUrl:
+                type: string
+                nullable: true
               status:
                 type: string
                 enum:
@@ -8615,6 +8963,7 @@ components:
               - membershipId
               - fullName
               - email
+              - photoUrl
               - status
               - activity
               - level
@@ -8722,6 +9071,9 @@ components:
           type: string
         email:
           type: string
+        photoUrl:
+          type: string
+          nullable: true
         status:
           type: string
           enum:
@@ -8777,6 +9129,7 @@ components:
         - membershipId
         - fullName
         - email
+        - photoUrl
         - status
         - activity
         - level
@@ -9709,6 +10062,24 @@ components:
                 type: boolean
               fullName:
                 type: string
+              photoUrl:
+                type: string
+                nullable: true
+              photos:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                    url:
+                      type: string
+                  required:
+                    - id
+                    - url
+                  additionalProperties: false
               staffTitle:
                 type: string
                 nullable: true
@@ -9893,6 +10264,8 @@ components:
               - membershipId
               - isMe
               - fullName
+              - photoUrl
+              - photos
               - staffTitle
               - headline
               - bio
@@ -10105,6 +10478,7 @@ components:
                 enum:
                   - video
                   - pdf
+                  - image
               title:
                 type: string
               need:
@@ -10244,6 +10618,7 @@ components:
           enum:
             - video
             - pdf
+            - image
         title:
           type: string
         need:
@@ -10431,6 +10806,7 @@ components:
                 enum:
                   - video
                   - pdf
+                  - image
               title:
                 type: string
               need:
@@ -10533,6 +10909,7 @@ components:
           enum:
             - video
             - pdf
+            - image
         title:
           type: string
         need:
@@ -10637,6 +11014,20 @@ components:
             - expiresAt
           additionalProperties: false
           nullable: true
+        image:
+          type: object
+          properties:
+            url:
+              type: string
+            expiresAt:
+              type: string
+              format: date-time
+              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+          required:
+            - url
+            - expiresAt
+          additionalProperties: false
+          nullable: true
       required:
         - id
         - kind
@@ -10652,6 +11043,15 @@ components:
         - assignments
         - playback
         - document
+        - image
+      additionalProperties: false
+    MyPhotoResponseDto:
+      type: object
+      properties:
+        photoUrl:
+          type: string
+      required:
+        - photoUrl
       additionalProperties: false
     ActivityResponseDto:
       type: object
