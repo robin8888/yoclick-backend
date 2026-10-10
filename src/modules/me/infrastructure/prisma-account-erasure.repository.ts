@@ -31,6 +31,7 @@ export class PrismaAccountErasureRepository implements AccountErasureRepository 
           email: `deleted-${userId}@${ERASED_EMAIL_DOMAIN}`,
           fullName: ERASED_FULL_NAME,
           phone: null,
+          address: null,
           birthDate: null,
           photoKey: null,
           // Un valor que no es un hash válido: ninguna contraseña lo verifica.

@@ -9,11 +9,14 @@ export function serializeBooking(booking: BookingView): Record<string, unknown> 
     endsAt: booking.endsAt.toISOString(),
     service: booking.service,
     staff: booking.staff,
+    room: booking.room,
+    session: booking.session,
     cancelledAt: booking.cancelledAt?.toISOString() ?? null,
     cancelWithinPolicy: booking.cancelWithinPolicy,
     startedAt: booking.startedAt?.toISOString() ?? null,
     endedAt: booking.endedAt?.toISOString() ?? null,
     actualDurationSeconds: calculateActualDurationSeconds(booking),
     createdAt: booking.createdAt.toISOString(),
+    createdBy: booking.createdBy,
   };
 }

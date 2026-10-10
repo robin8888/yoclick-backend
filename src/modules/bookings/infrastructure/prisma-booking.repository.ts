@@ -20,12 +20,25 @@ import {
   type CreateBookingCommand,
   type CreateBookingOutcome,
   type DayAgenda,
+  type GroupOptions,
+  type GroupOptionsQuery,
+  type JoinGroupSessionCommand,
+  type JoinGroupSessionOutcome,
+  type PlacementOptions,
+  type PlacementOptionsQuery,
   type RescheduleBookingCommand,
   type RescheduleOutcome,
+  type RoomAgenda,
   type TeamCancellationOutcome,
 } from '../application/ports/booking.repository';
 import { recordBookingNotification } from '../../notifications/infrastructure/booking-notification.recorder';
-import { createBookingInTransaction } from './booking-creation';
+import { createBookingInTransaction, joinGroupSessionInTransaction } from './booking-creation';
+import {
+  listGroupOptionsInTransaction,
+  listPlacementOptionsInTransaction,
+} from './placement-options';
+import { listRoomAgendaInTransaction } from './room-agenda';
+import { releaseSessionIfEmpty } from './session-release';
 import {
   rescheduleBookingInTransaction,
   rescheduleByTeamInTransaction,
@@ -89,6 +102,39 @@ export class PrismaBookingRepository implements BookingRepository {
   ): Promise<CreateBookingOutcome> {
     return this.tenantPrismaService.runInTenantContext(actor, (client) =>
       createBookingInTransaction(client, actor, command),
+    );
+  }
+
+  async joinGroupSession(
+    actor: ActorContext,
+    command: JoinGroupSessionCommand,
+  ): Promise<JoinGroupSessionOutcome> {
+    return this.tenantPrismaService.runInTenantContext(actor, (client) =>
+      joinGroupSessionInTransaction(client, actor, command),
+    );
+  }
+
+  async listRoomAgenda(actor: ActorContext, query: { date: string }): Promise<RoomAgenda> {
+    return this.tenantPrismaService.runInTenantContext(actor, (client) =>
+      listRoomAgendaInTransaction(client, query.date),
+    );
+  }
+
+  async listGroupOptions(
+    actor: ActorContext,
+    query: GroupOptionsQuery,
+  ): Promise<GroupOptions | null> {
+    return this.tenantPrismaService.runInTenantContext(actor, (client) =>
+      listGroupOptionsInTransaction(client, query),
+    );
+  }
+
+  async listPlacementOptions(
+    actor: ActorContext,
+    query: PlacementOptionsQuery,
+  ): Promise<PlacementOptions | null> {
+    return this.tenantPrismaService.runInTenantContext(actor, (client) =>
+      listPlacementOptionsInTransaction(client, query),
     );
   }
 
@@ -177,11 +223,9 @@ export class PrismaBookingRepository implements BookingRepository {
         where: { id: cancellation.bookingId },
         include: WITH_SESSION_DETAILS,
       });
-      // Libera el hueco de la persona del equipo (la restricción EXCLUDE solo mira sesiones programadas).
-      await client.classSession.update({
-        where: { id: booking.classSessionId },
-        data: { status: 'cancelled' },
-      });
+      // Libera el hueco de la persona y de la sala (la restricción EXCLUDE solo mira sesiones
+      // programadas), salvo que en una clase grupal quede alguien más apuntado.
+      await releaseSessionIfEmpty(client, booking.classSessionId);
       await recordCancellationNotice(client, actor, booking);
       return toBookingView(booking);
     });
@@ -212,10 +256,7 @@ export class PrismaBookingRepository implements BookingRepository {
         where: { id: booking.id },
         data: { status: 'cancelled', cancelledAt: request.now, cancelledBy: 'staff' },
       });
-      await client.classSession.update({
-        where: { id: booking.classSessionId },
-        data: { status: 'cancelled' },
-      });
+      await releaseSessionIfEmpty(client, booking.classSessionId);
       await recordCancellationNotice(client, actor, booking);
       const cancelled = await client.booking.findUniqueOrThrow({
         where: { id: booking.id },

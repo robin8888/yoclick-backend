@@ -427,7 +427,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ProfileResponseDto"
+                $ref: "#/components/schemas/MyProfileResponseDto"
         default:
           description: Error RFC 9457
           content:
@@ -454,7 +454,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ProfileResponseDto"
+                $ref: "#/components/schemas/MyProfileResponseDto"
         default:
           description: Error RFC 9457
           content:
@@ -2040,7 +2040,7 @@ paths:
                 $ref: "#/components/schemas/ProblemDetailsDto"
       security:
         - bearer: []
-      summary: Crea una cita para un cliente desde la agenda. Mismas reglas de hueco que la reserva del cliente. El personal solo puede ponerla en su propia agenda.
+      summary: Asigna una cita a un cliente desde la agenda. Solo el centro (propietario o administración) asigna citas; el equipo no. Mismas reglas de hueco que la reserva del cliente.
       tags:
         - bookings
   /v1/centers/{centerId}/agenda/bookings/{bookingId}/cancel:
@@ -2082,6 +2082,190 @@ paths:
       security:
         - bearer: []
       summary: Cancela una cita futura desde la agenda. La administración cancela cualquiera; el personal, solo las suyas. El cliente recibe un aviso push. Una ya cancelada, empezada o pasada responde 409 BOOKING_NOT_CANCELLABLE.
+      tags:
+        - bookings
+  /v1/centers/{centerId}/agenda/bookings/join-group:
+    post:
+      operationId: agenda_join_group_session
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JoinGroupSessionRequestDto"
+      responses:
+        "201":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Apunta a un cliente a una clase grupal que ya existe (misma hora, profesional y sala). 409 SESSION_FULL si ya no quedan plazas, ALREADY_BOOKED si el cliente tiene otra cita a esa hora.
+      tags:
+        - bookings
+  /v1/centers/{centerId}/agenda/placement-options:
+    get:
+      operationId: agenda_get_placement_options
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: date
+          required: true
+          in: query
+          schema:
+            format: date
+            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+            type: string
+        - name: serviceId
+          required: true
+          in: query
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: staffMembershipId
+          required: true
+          in: query
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlacementOptionsResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: "Para poner una cita: las horas libres de una profesional un día (cada cuarto de hora) con las salas libres que puede usar, y las clases grupales suyas a las que aún caben más personas."
+      tags:
+        - bookings
+  /v1/centers/{centerId}/agenda/group-options:
+    get:
+      operationId: agenda_get_group_options
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: date
+          required: true
+          in: query
+          schema:
+            format: date
+            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+            type: string
+        - name: serviceId
+          required: true
+          in: query
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupOptionsResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: "Para una cita grupal: cada sala con profesor que da el servicio, con sus horas libres ese día (profesor y sala libres) y sus grupos con plazas. En una cita grupal el profesor lo define la sala."
+      tags:
+        - bookings
+  /v1/centers/{centerId}/agenda/rooms:
+    get:
+      operationId: agenda_get_room_day
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: date
+          required: true
+          in: query
+          schema:
+            format: date
+            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoomAgendaResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: "La agenda del centro por sala: cada sala con su aforo, su profesor y lo que la ocupa ese día (clase, profesor, de qué hora a qué hora, plazas y alumnos apuntados). Las citas sin sala salen aparte."
       tags:
         - bookings
   /v1/centers/{centerId}/agenda/bookings/{bookingId}/reschedule:
@@ -2128,7 +2312,7 @@ paths:
                 $ref: "#/components/schemas/ProblemDetailsDto"
       security:
         - bearer: []
-      summary: Mueve una cita futura a otra hora desde la agenda, con el mismo servicio. La administración mueve cualquiera; el personal, solo las suyas y a su propia agenda. Sin antelación mínima. El cliente recibe un aviso push. Una cancelada, empezada o pasada responde 409 BOOKING_NOT_RESCHEDULABLE.
+      summary: Mueve una cita futura a otra hora desde la agenda, con el mismo servicio. Solo el centro (propietario o administración) mueve citas; el personal puede cancelarlas pero no moverlas. Sin antelación mínima. El cliente recibe un aviso push. Una cancelada, empezada o pasada responde 409 BOOKING_NOT_RESCHEDULABLE.
       tags:
         - bookings
   /v1/centers/{centerId}/session-records:
@@ -2419,6 +2603,52 @@ paths:
       tags:
         - rooms
   /v1/centers/{centerId}/rooms/{roomId}:
+    patch:
+      operationId: rooms_update
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: roomId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRoomRequestDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoomResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Cambia el nombre, el aforo o el profesor de una sala. Las citas ya puestas conservan su sala.
+      tags:
+        - rooms
     delete:
       operationId: rooms_archive
       parameters:
@@ -5416,233 +5646,50 @@ components:
       required:
         - recoveryCodes
       additionalProperties: false
-    ProfileResponseDto:
+    MyProfileResponseDto:
       type: object
       properties:
-        membershipId:
+        id:
           type: string
           format: uuid
           pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
-        isMe:
-          type: boolean
+        email:
+          type: string
         fullName:
+          type: string
+        phone:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        birthDate:
+          type: string
+          format: date
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+          nullable: true
+        locale:
           type: string
         photoUrl:
           type: string
           nullable: true
-        photos:
-          type: array
-          items:
-            type: object
-            properties:
-              id:
-                type: string
-                format: uuid
-                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
-              url:
-                type: string
-            required:
-              - id
-              - url
-            additionalProperties: false
-        staffTitle:
-          type: string
-          nullable: true
-        headline:
-          type: string
-          nullable: true
-        bio:
-          type: string
-          nullable: true
-        specialties:
-          type: array
-          items:
-            type: string
-        languages:
-          type: array
-          items:
-            type: string
-        status:
-          type: string
-          enum:
-            - draft
-            - pending
-            - published
-            - changes_requested
-        reviewNote:
-          type: string
-          nullable: true
-        hasPublishConsent:
+        isEmailVerified:
           type: boolean
-        certifications:
-          type: array
-          items:
-            type: object
-            properties:
-              id:
-                type: string
-                format: uuid
-                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
-              name:
-                type: string
-              detail:
-                type: string
-                nullable: true
-              isVerified:
-                type: boolean
-            required:
-              - id
-              - name
-              - detail
-              - isVerified
-            additionalProperties: false
-        introVideo:
-          type: object
-          properties:
-            id:
-              type: string
-              format: uuid
-              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
-            title:
-              type: string
-            status:
-              type: string
-              enum:
-                - uploading
-                - processing
-                - ready
-                - failed
-            reviewStatus:
-              type: string
-              enum:
-                - approved
-                - pending
-                - changes_requested
-            reviewNote:
-              type: string
-              nullable: true
-            durationSeconds:
-              type: integer
-              minimum: -9007199254740991
-              maximum: 9007199254740991
-              nullable: true
-            playback:
-              type: object
-              properties:
-                streamUrl:
-                  type: string
-                thumbnailUrl:
-                  type: string
-                expiresAt:
-                  type: string
-                  format: date-time
-                  pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
-              required:
-                - streamUrl
-                - thumbnailUrl
-                - expiresAt
-              additionalProperties: false
-              nullable: true
-          required:
-            - id
-            - title
-            - status
-            - reviewStatus
-            - reviewNote
-            - durationSeconds
-            - playback
-          additionalProperties: false
-          nullable: true
-        techniqueVideos:
-          type: array
-          items:
-            type: object
-            properties:
-              id:
-                type: string
-                format: uuid
-                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
-              title:
-                type: string
-              status:
-                type: string
-                enum:
-                  - uploading
-                  - processing
-                  - ready
-                  - failed
-              reviewStatus:
-                type: string
-                enum:
-                  - approved
-                  - pending
-                  - changes_requested
-              reviewNote:
-                type: string
-                nullable: true
-              durationSeconds:
-                type: integer
-                minimum: -9007199254740991
-                maximum: 9007199254740991
-                nullable: true
-              playback:
-                type: object
-                properties:
-                  streamUrl:
-                    type: string
-                  thumbnailUrl:
-                    type: string
-                  expiresAt:
-                    type: string
-                    format: date-time
-                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
-                required:
-                  - streamUrl
-                  - thumbnailUrl
-                  - expiresAt
-                additionalProperties: false
-                nullable: true
-            required:
-              - id
-              - title
-              - status
-              - reviewStatus
-              - reviewNote
-              - durationSeconds
-              - playback
-            additionalProperties: false
-        rating:
-          type: object
-          properties:
-            average:
-              type: number
-            count:
-              type: integer
-              minimum: -9007199254740991
-              maximum: 9007199254740991
-          required:
-            - average
-            - count
-          additionalProperties: false
-          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
       required:
-        - membershipId
-        - isMe
+        - id
+        - email
         - fullName
+        - phone
+        - address
+        - birthDate
+        - locale
         - photoUrl
-        - photos
-        - staffTitle
-        - headline
-        - bio
-        - specialties
-        - languages
-        - status
-        - reviewNote
-        - hasPublishConsent
-        - certifications
-        - introVideo
-        - techniqueVideos
-        - rating
+        - isEmailVerified
+        - createdAt
       additionalProperties: false
     UpdateProfileRequestDto:
       type: object
@@ -5654,6 +5701,11 @@ components:
         phone:
           type: string
           pattern: ^\+?[\d\s()-]{6,20}$
+          nullable: true
+        address:
+          type: string
+          minLength: 1
+          maxLength: 200
           nullable: true
         birthDate:
           type: string
@@ -5848,6 +5900,9 @@ components:
             phone:
               type: string
               nullable: true
+            address:
+              type: string
+              nullable: true
             birthDate:
               type: string
               format: date
@@ -5869,6 +5924,7 @@ components:
             - email
             - fullName
             - phone
+            - address
             - birthDate
             - locale
             - photoUrl
@@ -6291,6 +6347,21 @@ components:
                     - agenda:manage
                     - payments:view
                     - reports:view
+              services:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                    name:
+                      type: string
+                  required:
+                    - id
+                    - name
+                  additionalProperties: false
               joinedAt:
                 type: string
                 format: date-time
@@ -6305,6 +6376,7 @@ components:
               - status
               - staffTitle
               - permissions
+              - services
               - joinedAt
             additionalProperties: false
       required:
@@ -6341,6 +6413,13 @@ components:
           minLength: 1
           maxLength: 80
           nullable: true
+        serviceIds:
+          maxItems: 100
+          type: array
+          items:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
       additionalProperties: false
     TeamMemberResponseDto:
       type: object
@@ -6388,6 +6467,21 @@ components:
               - agenda:manage
               - payments:view
               - reports:view
+        services:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              name:
+                type: string
+            required:
+              - id
+              - name
+            additionalProperties: false
         joinedAt:
           type: string
           format: date-time
@@ -6402,6 +6496,7 @@ components:
         - status
         - staffTitle
         - permissions
+        - services
         - joinedAt
       additionalProperties: false
     PendingInvitationsResponseDto:
@@ -7929,6 +8024,46 @@ components:
             - membershipId
             - fullName
           additionalProperties: false
+        room:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            name:
+              type: string
+          required:
+            - id
+            - name
+          additionalProperties: false
+          nullable: true
+        session:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            mode:
+              type: string
+              enum:
+                - private
+                - group
+            capacity:
+              type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+            bookedCount:
+              type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+          required:
+            - id
+            - mode
+            - capacity
+            - bookedCount
+          additionalProperties: false
         cancelledAt:
           type: string
           format: date-time
@@ -7956,6 +8091,28 @@ components:
           type: string
           format: date-time
           pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+        createdBy:
+          type: object
+          properties:
+            membershipId:
+              type: string
+              format: uuid
+              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            fullName:
+              type: string
+            role:
+              type: string
+              enum:
+                - owner
+                - admin
+                - staff
+                - client
+          required:
+            - membershipId
+            - fullName
+            - role
+          additionalProperties: false
+          nullable: true
       required:
         - id
         - status
@@ -7963,12 +8120,15 @@ components:
         - endsAt
         - service
         - staff
+        - room
+        - session
         - cancelledAt
         - cancelWithinPolicy
         - startedAt
         - endedAt
         - actualDurationSeconds
         - createdAt
+        - createdBy
       additionalProperties: false
     MyBookingsResponseDto:
       type: object
@@ -8032,6 +8192,46 @@ components:
                   - membershipId
                   - fullName
                 additionalProperties: false
+              room:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  name:
+                    type: string
+                required:
+                  - id
+                  - name
+                additionalProperties: false
+                nullable: true
+              session:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  mode:
+                    type: string
+                    enum:
+                      - private
+                      - group
+                  capacity:
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                  bookedCount:
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                required:
+                  - id
+                  - mode
+                  - capacity
+                  - bookedCount
+                additionalProperties: false
               cancelledAt:
                 type: string
                 format: date-time
@@ -8059,6 +8259,28 @@ components:
                 type: string
                 format: date-time
                 pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+              createdBy:
+                type: object
+                properties:
+                  membershipId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  fullName:
+                    type: string
+                  role:
+                    type: string
+                    enum:
+                      - owner
+                      - admin
+                      - staff
+                      - client
+                required:
+                  - membershipId
+                  - fullName
+                  - role
+                additionalProperties: false
+                nullable: true
             required:
               - id
               - status
@@ -8066,12 +8288,15 @@ components:
               - endsAt
               - service
               - staff
+              - room
+              - session
               - cancelledAt
               - cancelWithinPolicy
               - startedAt
               - endedAt
               - actualDurationSeconds
               - createdAt
+              - createdBy
             additionalProperties: false
       required:
         - bookings
@@ -8136,6 +8361,46 @@ components:
                 - membershipId
                 - fullName
               additionalProperties: false
+            room:
+              type: object
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                  pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                name:
+                  type: string
+              required:
+                - id
+                - name
+              additionalProperties: false
+              nullable: true
+            session:
+              type: object
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                  pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                mode:
+                  type: string
+                  enum:
+                    - private
+                    - group
+                capacity:
+                  type: integer
+                  minimum: -9007199254740991
+                  maximum: 9007199254740991
+                bookedCount:
+                  type: integer
+                  minimum: -9007199254740991
+                  maximum: 9007199254740991
+              required:
+                - id
+                - mode
+                - capacity
+                - bookedCount
+              additionalProperties: false
             cancelledAt:
               type: string
               format: date-time
@@ -8163,6 +8428,28 @@ components:
               type: string
               format: date-time
               pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+            createdBy:
+              type: object
+              properties:
+                membershipId:
+                  type: string
+                  format: uuid
+                  pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                fullName:
+                  type: string
+                role:
+                  type: string
+                  enum:
+                    - owner
+                    - admin
+                    - staff
+                    - client
+              required:
+                - membershipId
+                - fullName
+                - role
+              additionalProperties: false
+              nullable: true
           required:
             - id
             - status
@@ -8170,12 +8457,15 @@ components:
             - endsAt
             - service
             - staff
+            - room
+            - session
             - cancelledAt
             - cancelWithinPolicy
             - startedAt
             - endedAt
             - actualDurationSeconds
             - createdAt
+            - createdBy
           additionalProperties: false
         withinPolicy:
           type: boolean
@@ -8285,6 +8575,46 @@ components:
                       - membershipId
                       - fullName
                     additionalProperties: false
+                  room:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      name:
+                        type: string
+                    required:
+                      - id
+                      - name
+                    additionalProperties: false
+                    nullable: true
+                  session:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      mode:
+                        type: string
+                        enum:
+                          - private
+                          - group
+                      capacity:
+                        type: integer
+                        minimum: -9007199254740991
+                        maximum: 9007199254740991
+                      bookedCount:
+                        type: integer
+                        minimum: -9007199254740991
+                        maximum: 9007199254740991
+                    required:
+                      - id
+                      - mode
+                      - capacity
+                      - bookedCount
+                    additionalProperties: false
                   cancelledAt:
                     type: string
                     format: date-time
@@ -8312,6 +8642,28 @@ components:
                     type: string
                     format: date-time
                     pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                  createdBy:
+                    type: object
+                    properties:
+                      membershipId:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      fullName:
+                        type: string
+                      role:
+                        type: string
+                        enum:
+                          - owner
+                          - admin
+                          - staff
+                          - client
+                    required:
+                      - membershipId
+                      - fullName
+                      - role
+                    additionalProperties: false
+                    nullable: true
                 required:
                   - id
                   - status
@@ -8319,12 +8671,15 @@ components:
                   - endsAt
                   - service
                   - staff
+                  - room
+                  - session
                   - cancelledAt
                   - cancelWithinPolicy
                   - startedAt
                   - endedAt
                   - actualDurationSeconds
                   - createdAt
+                  - createdBy
                 additionalProperties: false
               client:
                 type: object
@@ -8368,10 +8723,515 @@ components:
           type: string
           format: uuid
           pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        mode:
+          default: private
+          type: string
+          enum:
+            - private
+            - group
+        roomId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
       required:
         - clientMembershipId
         - serviceId
         - startsAt
+      additionalProperties: false
+    JoinGroupSessionRequestDto:
+      type: object
+      properties:
+        clientMembershipId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        classSessionId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+      required:
+        - clientMembershipId
+        - classSessionId
+      additionalProperties: false
+    PlacementOptionsResponseDto:
+      type: object
+      properties:
+        timezone:
+          type: string
+        hasUsableRooms:
+          type: boolean
+        openSlots:
+          type: array
+          items:
+            type: object
+            properties:
+              startsAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+              endsAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+              freeRooms:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                    name:
+                      type: string
+                    capacity:
+                      type: integer
+                      minimum: -9007199254740991
+                      maximum: 9007199254740991
+                  required:
+                    - id
+                    - name
+                    - capacity
+                  additionalProperties: false
+            required:
+              - startsAt
+              - endsAt
+              - freeRooms
+            additionalProperties: false
+        groupSessions:
+          type: array
+          items:
+            type: object
+            properties:
+              sessionId:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              startsAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+              endsAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+              serviceName:
+                type: string
+              room:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  name:
+                    type: string
+                required:
+                  - id
+                  - name
+                additionalProperties: false
+              capacity:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+              bookedCount:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+            required:
+              - sessionId
+              - startsAt
+              - endsAt
+              - serviceName
+              - room
+              - capacity
+              - bookedCount
+            additionalProperties: false
+      required:
+        - timezone
+        - hasUsableRooms
+        - openSlots
+        - groupSessions
+      additionalProperties: false
+    GroupOptionsResponseDto:
+      type: object
+      properties:
+        timezone:
+          type: string
+        rooms:
+          type: array
+          items:
+            type: object
+            properties:
+              room:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  name:
+                    type: string
+                  capacity:
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                  staff:
+                    type: object
+                    properties:
+                      membershipId:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      fullName:
+                        type: string
+                    required:
+                      - membershipId
+                      - fullName
+                    additionalProperties: false
+                required:
+                  - id
+                  - name
+                  - capacity
+                  - staff
+                additionalProperties: false
+              openSlots:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    startsAt:
+                      type: string
+                      format: date-time
+                      pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                    endsAt:
+                      type: string
+                      format: date-time
+                      pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                  required:
+                    - startsAt
+                    - endsAt
+                  additionalProperties: false
+              groupSessions:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    sessionId:
+                      type: string
+                      format: uuid
+                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                    startsAt:
+                      type: string
+                      format: date-time
+                      pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                    endsAt:
+                      type: string
+                      format: date-time
+                      pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                    serviceName:
+                      type: string
+                    room:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        name:
+                          type: string
+                      required:
+                        - id
+                        - name
+                      additionalProperties: false
+                    capacity:
+                      type: integer
+                      minimum: -9007199254740991
+                      maximum: 9007199254740991
+                    bookedCount:
+                      type: integer
+                      minimum: -9007199254740991
+                      maximum: 9007199254740991
+                  required:
+                    - sessionId
+                    - startsAt
+                    - endsAt
+                    - serviceName
+                    - room
+                    - capacity
+                    - bookedCount
+                  additionalProperties: false
+            required:
+              - room
+              - openSlots
+              - groupSessions
+            additionalProperties: false
+      required:
+        - timezone
+        - rooms
+      additionalProperties: false
+    RoomAgendaResponseDto:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+        timezone:
+          type: string
+        openingRanges:
+          type: array
+          items:
+            type: object
+            properties:
+              opensAt:
+                type: string
+              closesAt:
+                type: string
+            required:
+              - opensAt
+              - closesAt
+            additionalProperties: false
+        rooms:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              name:
+                type: string
+              capacity:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+              staff:
+                type: object
+                properties:
+                  membershipId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  fullName:
+                    type: string
+                required:
+                  - membershipId
+                  - fullName
+                additionalProperties: false
+                nullable: true
+              sessions:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                    startsAt:
+                      type: string
+                      format: date-time
+                      pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                    endsAt:
+                      type: string
+                      format: date-time
+                      pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                    mode:
+                      type: string
+                      enum:
+                        - private
+                        - group
+                    capacity:
+                      type: integer
+                      minimum: -9007199254740991
+                      maximum: 9007199254740991
+                    bookedCount:
+                      type: integer
+                      minimum: -9007199254740991
+                      maximum: 9007199254740991
+                    service:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        name:
+                          type: string
+                        color:
+                          type: string
+                          nullable: true
+                      required:
+                        - id
+                        - name
+                        - color
+                      additionalProperties: false
+                    teacher:
+                      type: object
+                      properties:
+                        membershipId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        fullName:
+                          type: string
+                      required:
+                        - membershipId
+                        - fullName
+                      additionalProperties: false
+                    attendees:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          bookingId:
+                            type: string
+                            format: uuid
+                            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                          clientMembershipId:
+                            type: string
+                            format: uuid
+                            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                          fullName:
+                            type: string
+                          status:
+                            type: string
+                            enum:
+                              - confirmed
+                              - cancelled
+                              - attended
+                              - no_show
+                        required:
+                          - bookingId
+                          - clientMembershipId
+                          - fullName
+                          - status
+                        additionalProperties: false
+                  required:
+                    - id
+                    - startsAt
+                    - endsAt
+                    - mode
+                    - capacity
+                    - bookedCount
+                    - service
+                    - teacher
+                    - attendees
+                  additionalProperties: false
+            required:
+              - id
+              - name
+              - capacity
+              - staff
+              - sessions
+            additionalProperties: false
+        sessionsWithoutRoom:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              startsAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+              endsAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+              mode:
+                type: string
+                enum:
+                  - private
+                  - group
+              capacity:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+              bookedCount:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+              service:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  name:
+                    type: string
+                  color:
+                    type: string
+                    nullable: true
+                required:
+                  - id
+                  - name
+                  - color
+                additionalProperties: false
+              teacher:
+                type: object
+                properties:
+                  membershipId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  fullName:
+                    type: string
+                required:
+                  - membershipId
+                  - fullName
+                additionalProperties: false
+              attendees:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    bookingId:
+                      type: string
+                      format: uuid
+                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                    clientMembershipId:
+                      type: string
+                      format: uuid
+                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                    fullName:
+                      type: string
+                    status:
+                      type: string
+                      enum:
+                        - confirmed
+                        - cancelled
+                        - attended
+                        - no_show
+                  required:
+                    - bookingId
+                    - clientMembershipId
+                    - fullName
+                    - status
+                  additionalProperties: false
+            required:
+              - id
+              - startsAt
+              - endsAt
+              - mode
+              - capacity
+              - bookedCount
+              - service
+              - teacher
+              - attendees
+            additionalProperties: false
+      required:
+        - date
+        - timezone
+        - openingRanges
+        - rooms
+        - sessionsWithoutRoom
       additionalProperties: false
     RescheduleAgendaBookingRequestDto:
       type: object
@@ -8454,6 +9314,46 @@ components:
                       - membershipId
                       - fullName
                     additionalProperties: false
+                  room:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      name:
+                        type: string
+                    required:
+                      - id
+                      - name
+                    additionalProperties: false
+                    nullable: true
+                  session:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      mode:
+                        type: string
+                        enum:
+                          - private
+                          - group
+                      capacity:
+                        type: integer
+                        minimum: -9007199254740991
+                        maximum: 9007199254740991
+                      bookedCount:
+                        type: integer
+                        minimum: -9007199254740991
+                        maximum: 9007199254740991
+                    required:
+                      - id
+                      - mode
+                      - capacity
+                      - bookedCount
+                    additionalProperties: false
                   cancelledAt:
                     type: string
                     format: date-time
@@ -8481,6 +9381,28 @@ components:
                     type: string
                     format: date-time
                     pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                  createdBy:
+                    type: object
+                    properties:
+                      membershipId:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      fullName:
+                        type: string
+                      role:
+                        type: string
+                        enum:
+                          - owner
+                          - admin
+                          - staff
+                          - client
+                    required:
+                      - membershipId
+                      - fullName
+                      - role
+                    additionalProperties: false
+                    nullable: true
                 required:
                   - id
                   - status
@@ -8488,12 +9410,15 @@ components:
                   - endsAt
                   - service
                   - staff
+                  - room
+                  - session
                   - cancelledAt
                   - cancelWithinPolicy
                   - startedAt
                   - endedAt
                   - actualDurationSeconds
                   - createdAt
+                  - createdBy
                 additionalProperties: false
               client:
                 type: object
@@ -8675,6 +9600,46 @@ components:
                 - membershipId
                 - fullName
               additionalProperties: false
+            room:
+              type: object
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                  pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                name:
+                  type: string
+              required:
+                - id
+                - name
+              additionalProperties: false
+              nullable: true
+            session:
+              type: object
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                  pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                mode:
+                  type: string
+                  enum:
+                    - private
+                    - group
+                capacity:
+                  type: integer
+                  minimum: -9007199254740991
+                  maximum: 9007199254740991
+                bookedCount:
+                  type: integer
+                  minimum: -9007199254740991
+                  maximum: 9007199254740991
+              required:
+                - id
+                - mode
+                - capacity
+                - bookedCount
+              additionalProperties: false
             cancelledAt:
               type: string
               format: date-time
@@ -8702,6 +9667,28 @@ components:
               type: string
               format: date-time
               pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+            createdBy:
+              type: object
+              properties:
+                membershipId:
+                  type: string
+                  format: uuid
+                  pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                fullName:
+                  type: string
+                role:
+                  type: string
+                  enum:
+                    - owner
+                    - admin
+                    - staff
+                    - client
+              required:
+                - membershipId
+                - fullName
+                - role
+              additionalProperties: false
+              nullable: true
           required:
             - id
             - status
@@ -8709,12 +9696,15 @@ components:
             - endsAt
             - service
             - staff
+            - room
+            - session
             - cancelledAt
             - cancelWithinPolicy
             - startedAt
             - endedAt
             - actualDurationSeconds
             - createdAt
+            - createdBy
           additionalProperties: false
       required:
         - clientFullName
@@ -8921,10 +9911,41 @@ components:
                 type: integer
                 minimum: -9007199254740991
                 maximum: 9007199254740991
+              staff:
+                type: object
+                properties:
+                  membershipId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  fullName:
+                    type: string
+                required:
+                  - membershipId
+                  - fullName
+                additionalProperties: false
+                nullable: true
+              services:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                    name:
+                      type: string
+                  required:
+                    - id
+                    - name
+                  additionalProperties: false
             required:
               - id
               - name
               - capacity
+              - staff
+              - services
             additionalProperties: false
       required:
         - rooms
@@ -8941,6 +9962,20 @@ components:
           type: integer
           minimum: 1
           maximum: 500
+        staffMembershipId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          default: null
+          nullable: true
+        serviceIds:
+          default: []
+          maxItems: 100
+          type: array
+          items:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
       required:
         - name
       additionalProperties: false
@@ -8957,10 +9992,65 @@ components:
           type: integer
           minimum: -9007199254740991
           maximum: 9007199254740991
+        staff:
+          type: object
+          properties:
+            membershipId:
+              type: string
+              format: uuid
+              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            fullName:
+              type: string
+          required:
+            - membershipId
+            - fullName
+          additionalProperties: false
+          nullable: true
+        services:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              name:
+                type: string
+            required:
+              - id
+              - name
+            additionalProperties: false
       required:
         - id
         - name
         - capacity
+        - staff
+        - services
+      additionalProperties: false
+    UpdateRoomRequestDto:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        capacity:
+          type: integer
+          minimum: 1
+          maximum: 500
+        staffMembershipId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          nullable: true
+        serviceIds:
+          maxItems: 100
+          type: array
+          items:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
       additionalProperties: false
     ClientListResponseDto:
       type: object
@@ -9959,6 +11049,234 @@ components:
       required:
         - hasPublishConsent
       additionalProperties: false
+    ProfileResponseDto:
+      type: object
+      properties:
+        membershipId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        isMe:
+          type: boolean
+        fullName:
+          type: string
+        photoUrl:
+          type: string
+          nullable: true
+        photos:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              url:
+                type: string
+            required:
+              - id
+              - url
+            additionalProperties: false
+        staffTitle:
+          type: string
+          nullable: true
+        headline:
+          type: string
+          nullable: true
+        bio:
+          type: string
+          nullable: true
+        specialties:
+          type: array
+          items:
+            type: string
+        languages:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum:
+            - draft
+            - pending
+            - published
+            - changes_requested
+        reviewNote:
+          type: string
+          nullable: true
+        hasPublishConsent:
+          type: boolean
+        certifications:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              name:
+                type: string
+              detail:
+                type: string
+                nullable: true
+              isVerified:
+                type: boolean
+            required:
+              - id
+              - name
+              - detail
+              - isVerified
+            additionalProperties: false
+        introVideo:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            title:
+              type: string
+            status:
+              type: string
+              enum:
+                - uploading
+                - processing
+                - ready
+                - failed
+            reviewStatus:
+              type: string
+              enum:
+                - approved
+                - pending
+                - changes_requested
+            reviewNote:
+              type: string
+              nullable: true
+            durationSeconds:
+              type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+              nullable: true
+            playback:
+              type: object
+              properties:
+                streamUrl:
+                  type: string
+                thumbnailUrl:
+                  type: string
+                expiresAt:
+                  type: string
+                  format: date-time
+                  pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+              required:
+                - streamUrl
+                - thumbnailUrl
+                - expiresAt
+              additionalProperties: false
+              nullable: true
+          required:
+            - id
+            - title
+            - status
+            - reviewStatus
+            - reviewNote
+            - durationSeconds
+            - playback
+          additionalProperties: false
+          nullable: true
+        techniqueVideos:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              title:
+                type: string
+              status:
+                type: string
+                enum:
+                  - uploading
+                  - processing
+                  - ready
+                  - failed
+              reviewStatus:
+                type: string
+                enum:
+                  - approved
+                  - pending
+                  - changes_requested
+              reviewNote:
+                type: string
+                nullable: true
+              durationSeconds:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+                nullable: true
+              playback:
+                type: object
+                properties:
+                  streamUrl:
+                    type: string
+                  thumbnailUrl:
+                    type: string
+                  expiresAt:
+                    type: string
+                    format: date-time
+                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                required:
+                  - streamUrl
+                  - thumbnailUrl
+                  - expiresAt
+                additionalProperties: false
+                nullable: true
+            required:
+              - id
+              - title
+              - status
+              - reviewStatus
+              - reviewNote
+              - durationSeconds
+              - playback
+            additionalProperties: false
+        rating:
+          type: object
+          properties:
+            average:
+              type: number
+            count:
+              type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+          required:
+            - average
+            - count
+          additionalProperties: false
+          nullable: true
+      required:
+        - membershipId
+        - isMe
+        - fullName
+        - photoUrl
+        - photos
+        - staffTitle
+        - headline
+        - bio
+        - specialties
+        - languages
+        - status
+        - reviewNote
+        - hasPublishConsent
+        - certifications
+        - introVideo
+        - techniqueVideos
+        - rating
+      additionalProperties: false
     AddCertificationRequestDto:
       type: object
       properties:
@@ -10623,6 +11941,8 @@ components:
                       format: uuid
                       pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
                       nullable: true
+                    isForEveryone:
+                      type: boolean
                     label:
                       type: string
                       nullable: true
@@ -10631,6 +11951,7 @@ components:
                     - level
                     - groupId
                     - clientMembershipId
+                    - isForEveryone
                     - label
                   additionalProperties: false
             required:
@@ -10763,6 +12084,8 @@ components:
                 format: uuid
                 pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
                 nullable: true
+              isForEveryone:
+                type: boolean
               label:
                 type: string
                 nullable: true
@@ -10771,6 +12094,7 @@ components:
               - level
               - groupId
               - clientMembershipId
+              - isForEveryone
               - label
             additionalProperties: false
       required:
@@ -10838,6 +12162,15 @@ components:
                 required:
                   - kind
                   - membershipId
+                additionalProperties: false
+              - type: object
+                properties:
+                  kind:
+                    type: string
+                    enum:
+                      - everyone
+                required:
+                  - kind
                 additionalProperties: false
       required:
         - targets
@@ -10951,6 +12284,8 @@ components:
                       format: uuid
                       pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
                       nullable: true
+                    isForEveryone:
+                      type: boolean
                     label:
                       type: string
                       nullable: true
@@ -10959,6 +12294,7 @@ components:
                     - level
                     - groupId
                     - clientMembershipId
+                    - isForEveryone
                     - label
                   additionalProperties: false
             required:
@@ -11054,6 +12390,8 @@ components:
                 format: uuid
                 pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
                 nullable: true
+              isForEveryone:
+                type: boolean
               label:
                 type: string
                 nullable: true
@@ -11062,6 +12400,7 @@ components:
               - level
               - groupId
               - clientMembershipId
+              - isForEveryone
               - label
             additionalProperties: false
         playback:

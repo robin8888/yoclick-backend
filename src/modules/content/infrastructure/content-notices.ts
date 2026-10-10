@@ -4,7 +4,7 @@ import { type ActorContext } from '../../../shared/tenancy/actor-context';
 import { type ContentNotificationData } from '../../notifications/domain/notification-rules';
 import { type ContentTarget } from '../domain/content-rules';
 
-/** Quién se entera de un contenido asignado: los clientes activos de ese nivel, grupo o la persona. */
+/** Quién se entera de un contenido asignado: los clientes activos de ese nivel o grupo, la persona o todos. */
 async function findRecipientsOfTarget(
   client: TenantTransactionClient,
   target: ContentTarget,

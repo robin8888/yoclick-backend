@@ -12,6 +12,9 @@ const phoneSchema = z
   .trim()
   .regex(/^\+?[\d\s()-]{6,20}$/);
 
+const MAX_ADDRESS_LENGTH = 200;
+const addressSchema = z.string().trim().min(1).max(MAX_ADDRESS_LENGTH);
+
 const birthDateSchema = z.iso.date().refine((value) => {
   const year = Number(value.slice(0, YEAR_DIGITS));
   return year >= EARLIEST_BIRTH_YEAR && new Date(`${value}T00:00:00.000Z`) <= new Date();
@@ -22,6 +25,7 @@ export class UpdateProfileRequestDto extends createZodDto(
     .strictObject({
       fullName: z.string().trim().min(MIN_FULL_NAME_LENGTH).max(MAX_FULL_NAME_LENGTH).optional(),
       phone: phoneSchema.nullable().optional(),
+      address: addressSchema.nullable().optional(),
       birthDate: birthDateSchema.nullable().optional(),
       locale: z.enum(['es-ES', 'en']).optional(),
     })
@@ -33,6 +37,7 @@ const profileResponseSchema = z.strictObject({
   email: z.string(),
   fullName: z.string(),
   phone: z.string().nullable(),
+  address: z.string().nullable(),
   birthDate: z.iso.date().nullable(),
   locale: z.string(),
   /** Enlace firmado y temporal a mi foto de perfil; nulo si no tengo. */
@@ -41,7 +46,7 @@ const profileResponseSchema = z.strictObject({
   createdAt: z.iso.datetime(),
 });
 
-export class ProfileResponseDto extends createZodDto(profileResponseSchema) {}
+export class MyProfileResponseDto extends createZodDto(profileResponseSchema) {}
 
 const membershipResponseSchema = z.strictObject({
   membershipId: z.uuid(),

@@ -29,11 +29,14 @@ function buildBooking(overrides: Partial<BookingView> = {}): BookingView {
     endsAt: new Date(NOW.getTime() + 3_600_000),
     service: { id: 'service-1', name: 'Sesión', durationMinutes: 60, color: null },
     staff: { membershipId: 'membership-staff', fullName: 'Ana' },
+    room: null,
+    session: { id: 'session-1', mode: 'private', capacity: 1, bookedCount: 1 },
     cancelledAt: null,
     cancelWithinPolicy: null,
     startedAt: null,
     endedAt: null,
     createdAt: NOW,
+    createdBy: null,
     ...overrides,
   };
 }

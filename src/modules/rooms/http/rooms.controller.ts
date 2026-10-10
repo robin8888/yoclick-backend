@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
@@ -19,6 +29,7 @@ import {
   ArchiveRoomUseCase,
   CreateRoomUseCase,
   ListRoomsUseCase,
+  UpdateRoomUseCase,
 } from '../application/room.use-cases';
 import {
   CenterRouteParamsDto,
@@ -26,6 +37,7 @@ import {
   RoomListResponseDto,
   RoomResponseDto,
   RoomRouteParamsDto,
+  UpdateRoomRequestDto,
 } from './room.dto';
 import { ActivityRecorder } from '../../activity/application/activity-recorder';
 
@@ -38,6 +50,7 @@ export class RoomsController {
   constructor(
     private readonly listRooms: ListRoomsUseCase,
     private readonly createRoom: CreateRoomUseCase,
+    private readonly updateRoom: UpdateRoomUseCase,
     private readonly archiveRoom: ArchiveRoomUseCase,
     private readonly activity: ActivityRecorder,
   ) {}
@@ -74,6 +87,25 @@ export class RoomsController {
     assertRouteTargetsActorCenter(actor, params.centerId);
     const room = await this.createRoom.execute(actor, body);
     await this.activity.record(actor, { kind: 'room_created', subject: room.name });
+    return { ...room };
+  }
+
+  @Patch(':roomId')
+  @Roles('owner', 'admin')
+  @AllowStaffWithPermission('services:manage')
+  @ApiOperation({
+    operationId: 'rooms_update',
+    summary:
+      'Cambia el nombre, el aforo o el profesor de una sala. Las citas ya puestas conservan su sala.',
+  })
+  @ApiOkResponse({ type: RoomResponseDto })
+  async update(
+    @CurrentActor() actor: ActorContext,
+    @Param() params: RoomRouteParamsDto,
+    @Body() body: UpdateRoomRequestDto,
+  ): Promise<Record<string, unknown>> {
+    assertRouteTargetsActorCenter(actor, params.centerId);
+    const room = await this.updateRoom.execute(actor, params.roomId, body);
     return { ...room };
   }
 

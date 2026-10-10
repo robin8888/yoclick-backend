@@ -11,6 +11,7 @@ export interface StoredContentAssignment {
   readonly level: ClientLevelName | null;
   readonly groupId: string | null;
   readonly clientMembershipId: string | null;
+  readonly isForEveryone: boolean;
   readonly label: string | null;
 }
 

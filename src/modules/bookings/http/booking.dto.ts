@@ -46,6 +46,136 @@ export class CreateAgendaBookingRequestDto extends createZodDto(
     startsAt: z.iso.datetime(),
     /** La profesional que la da; quien es profesional solo puede ponerla en su propia agenda. */
     staffMembershipId: z.uuid().optional(),
+    /** Privada (una persona, por defecto) o grupal (tantas como el aforo de la sala). */
+    mode: z.enum(['private', 'group']).default('private'),
+    /** Sala donde se da; sin ella se usa una libre de la profesional. La grupal necesita sala. */
+    roomId: z.uuid().optional(),
+  }),
+) {}
+
+/** Apuntar a un cliente a una clase grupal que ya existe. */
+export class JoinGroupSessionRequestDto extends createZodDto(
+  z.strictObject({ clientMembershipId: z.uuid(), classSessionId: z.uuid() }),
+) {}
+
+export class PlacementOptionsQueryDto extends createZodDto(
+  z.strictObject({
+    date: z.iso.date(),
+    serviceId: z.uuid(),
+    staffMembershipId: z.uuid(),
+  }),
+) {}
+
+const placementRoomShape = z.strictObject({
+  id: z.uuid(),
+  name: z.string(),
+  capacity: z.number().int(),
+});
+
+const roomSessionShape = z.strictObject({
+  id: z.uuid(),
+  startsAt: z.iso.datetime(),
+  endsAt: z.iso.datetime(),
+  mode: z.enum(['private', 'group']),
+  capacity: z.number().int(),
+  /** Plazas ocupadas por reservas no canceladas. */
+  bookedCount: z.number().int(),
+  service: z.strictObject({ id: z.uuid(), name: z.string(), color: z.string().nullable() }),
+  teacher: z.strictObject({ membershipId: z.uuid(), fullName: z.string() }),
+  attendees: z.array(
+    z.strictObject({
+      bookingId: z.uuid(),
+      clientMembershipId: z.uuid(),
+      fullName: z.string(),
+      status: z.enum(['confirmed', 'cancelled', 'attended', 'no_show']),
+    }),
+  ),
+});
+
+export class RoomAgendaQueryDto extends createZodDto(z.strictObject({ date: z.iso.date() })) {}
+
+export class RoomAgendaResponseDto extends createZodDto(
+  z.strictObject({
+    date: z.iso.date(),
+    timezone: z.string(),
+    /** Cuándo abre el centro ese día, en hora local; vacío si cierra. */
+    openingRanges: z.array(z.strictObject({ opensAt: z.string(), closesAt: z.string() })),
+    /** Cada sala del centro con lo que la ocupa ese día. */
+    rooms: z.array(
+      z.strictObject({
+        id: z.uuid(),
+        name: z.string(),
+        capacity: z.number().int(),
+        /** Profesor fijo de la sala; `null` si la usa cualquiera. */
+        staff: z.strictObject({ membershipId: z.uuid(), fullName: z.string() }).nullable(),
+        sessions: z.array(roomSessionShape),
+      }),
+    ),
+    /** Citas de ese día que no tienen sala. */
+    sessionsWithoutRoom: z.array(roomSessionShape),
+  }),
+) {}
+
+export class GroupOptionsQueryDto extends createZodDto(
+  z.strictObject({ date: z.iso.date(), serviceId: z.uuid() }),
+) {}
+
+export class GroupOptionsResponseDto extends createZodDto(
+  z.strictObject({
+    timezone: z.string(),
+    /** Salas con profesor que dan el servicio, con sus horas libres y sus grupos con plazas. */
+    rooms: z.array(
+      z.strictObject({
+        room: z.strictObject({
+          id: z.uuid(),
+          name: z.string(),
+          capacity: z.number().int(),
+          staff: z.strictObject({ membershipId: z.uuid(), fullName: z.string() }),
+        }),
+        openSlots: z.array(
+          z.strictObject({ startsAt: z.iso.datetime(), endsAt: z.iso.datetime() }),
+        ),
+        groupSessions: z.array(
+          z.strictObject({
+            sessionId: z.uuid(),
+            startsAt: z.iso.datetime(),
+            endsAt: z.iso.datetime(),
+            serviceName: z.string(),
+            room: z.strictObject({ id: z.uuid(), name: z.string() }),
+            capacity: z.number().int(),
+            bookedCount: z.number().int(),
+          }),
+        ),
+      }),
+    ),
+  }),
+) {}
+
+export class PlacementOptionsResponseDto extends createZodDto(
+  z.strictObject({
+    timezone: z.string(),
+    /** Si la profesional tiene salas que usar; sin ellas la cita no lleva sala ni puede ser grupal. */
+    hasUsableRooms: z.boolean(),
+    /** Horas libres de la profesional con las salas libres que puede usar a esa hora. */
+    openSlots: z.array(
+      z.strictObject({
+        startsAt: z.iso.datetime(),
+        endsAt: z.iso.datetime(),
+        freeRooms: z.array(placementRoomShape),
+      }),
+    ),
+    /** Clases grupales suyas ese día a las que todavía caben más personas. */
+    groupSessions: z.array(
+      z.strictObject({
+        sessionId: z.uuid(),
+        startsAt: z.iso.datetime(),
+        endsAt: z.iso.datetime(),
+        serviceName: z.string(),
+        room: z.strictObject({ id: z.uuid(), name: z.string() }),
+        capacity: z.number().int(),
+        bookedCount: z.number().int(),
+      }),
+    ),
   }),
 ) {}
 
@@ -77,6 +207,15 @@ export const bookingShape = {
     color: z.string().nullable(),
   }),
   staff: z.strictObject({ membershipId: z.uuid(), fullName: z.string() }),
+  /** Sala donde se da; `null` si la cita no tiene sala. */
+  room: z.strictObject({ id: z.uuid(), name: z.string() }).nullable(),
+  /** La sesión que ocupa: privada, o grupal con su aforo y las plazas ya ocupadas. */
+  session: z.strictObject({
+    id: z.uuid(),
+    mode: z.enum(['private', 'group']),
+    capacity: z.number().int(),
+    bookedCount: z.number().int(),
+  }),
   cancelledAt: z.iso.datetime().nullable(),
   /** Si se canceló con la antelación de la política; `null` mientras no se cancele. */
   cancelWithinPolicy: z.boolean().nullable(),
@@ -86,6 +225,14 @@ export const bookingShape = {
   /** Fin menos inicio en segundos enteros; `null` mientras no haya terminado. */
   actualDurationSeconds: z.number().int().nullable(),
   createdAt: z.iso.datetime(),
+  /** Quién asignó la cita y con qué papel; `null` en las anteriores a este dato. */
+  createdBy: z
+    .strictObject({
+      membershipId: z.uuid(),
+      fullName: z.string(),
+      role: z.enum(['owner', 'admin', 'staff', 'client']),
+    })
+    .nullable(),
 };
 
 export class BookingResponseDto extends createZodDto(z.strictObject(bookingShape)) {}

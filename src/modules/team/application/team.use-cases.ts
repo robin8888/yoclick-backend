@@ -59,6 +59,7 @@ export class UpdateTeamMemberUseCase {
       throw new DomainError('TEAM_CHANGE_NOT_ALLOWED', HTTP_STATUS.forbidden);
     }
     const updated = await this.team.updateMember(actor, membershipId, update);
+    if (!updated) throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
     await this.activity.record(actor, { kind: 'team_member_updated', subject: updated.fullName });
     return this.urlSigner.attachPhotoUrl(updated);
   }

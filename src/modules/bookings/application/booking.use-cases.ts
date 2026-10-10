@@ -15,6 +15,12 @@ import {
   type CreateBookingCommand,
   type CreateBookingOutcome,
   type DayAgenda,
+  type GroupOptions,
+  type GroupOptionsQuery,
+  type JoinGroupSessionCommand,
+  type PlacementOptions,
+  type PlacementOptionsQuery,
+  type RoomAgenda,
   type RescheduleBookingCommand,
   type RescheduleOutcome,
 } from './ports/booking.repository';
@@ -30,6 +36,7 @@ const REFUSALS_BY_OUTCOME: Readonly<
   outside_window: ['OUTSIDE_BOOKING_WINDOW', HTTP_STATUS.conflict],
   slot_unavailable: ['SLOT_UNAVAILABLE', HTTP_STATUS.conflict],
   already_booked: ['ALREADY_BOOKED', HTTP_STATUS.conflict],
+  room_unavailable: ['ROOM_UNAVAILABLE', HTTP_STATUS.conflict],
 };
 
 /** Reservar un hueco individual. La hora se vuelve a comprobar en el servidor, nunca se confía en la app. */
@@ -41,6 +48,58 @@ export class CreateBookingUseCase {
     const outcome = await this.bookings.createBooking(actor, command);
     if (outcome.kind === 'created') return outcome.booking;
     throw new DomainError(...REFUSALS_BY_OUTCOME[outcome.kind]);
+  }
+}
+
+/** Apuntar a un cliente a una clase grupal que ya existe, mientras queden plazas. */
+@Injectable()
+export class JoinGroupSessionUseCase {
+  constructor(@Inject(BOOKING_REPOSITORY) private readonly bookings: BookingRepository) {}
+
+  async execute(actor: ActorContext, command: JoinGroupSessionCommand): Promise<BookingView> {
+    const outcome = await this.bookings.joinGroupSession(actor, command);
+    if (outcome.kind === 'created') return outcome.booking;
+    if (outcome.kind === 'session_full') {
+      throw new DomainError('SESSION_FULL', HTTP_STATUS.conflict);
+    }
+    if (outcome.kind === 'already_booked') {
+      throw new DomainError('ALREADY_BOOKED', HTTP_STATUS.conflict);
+    }
+    throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
+  }
+}
+
+/** Horas libres de una persona del equipo con sus salas libres, y los grupos a los que aún caben más. */
+@Injectable()
+export class GetPlacementOptionsUseCase {
+  constructor(@Inject(BOOKING_REPOSITORY) private readonly bookings: BookingRepository) {}
+
+  async execute(actor: ActorContext, query: PlacementOptionsQuery): Promise<PlacementOptions> {
+    const options = await this.bookings.listPlacementOptions(actor, query);
+    if (!options) throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
+    return options;
+  }
+}
+
+/** La agenda del centro por sala: cuándo está ocupada cada una y con qué clase, profesor y alumnos. */
+@Injectable()
+export class GetRoomAgendaUseCase {
+  constructor(@Inject(BOOKING_REPOSITORY) private readonly bookings: BookingRepository) {}
+
+  async execute(actor: ActorContext, query: { date: string }): Promise<RoomAgenda> {
+    return this.bookings.listRoomAgenda(actor, query);
+  }
+}
+
+/** Salas con profesor, con sus horas libres y grupos con plazas, para asignar una cita grupal. */
+@Injectable()
+export class GetGroupOptionsUseCase {
+  constructor(@Inject(BOOKING_REPOSITORY) private readonly bookings: BookingRepository) {}
+
+  async execute(actor: ActorContext, query: GroupOptionsQuery): Promise<GroupOptions> {
+    const options = await this.bookings.listGroupOptions(actor, query);
+    if (!options) throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
+    return options;
   }
 }
 

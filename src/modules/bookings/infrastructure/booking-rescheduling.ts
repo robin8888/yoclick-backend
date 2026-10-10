@@ -64,9 +64,11 @@ async function hasEnoughNotice(
 type LoadedBooking = NonNullable<Awaited<ReturnType<typeof loadOwnBooking>>>;
 
 function canBeRescheduled(booking: LoadedBooking, now: Date): boolean {
+  // Una clase grupal no se mueve: su hora la comparten otras personas. Se cancela y se vuelve a asignar.
   return (
     booking.status === 'confirmed' &&
     booking.startedAt === null &&
+    booking.classSession.mode === 'private' &&
     booking.classSession.startsAt > now
   );
 }
@@ -95,6 +97,7 @@ async function reserveReplacementSession(
     now: command.now,
     clientMembershipId: booking.clientMembershipId,
     slotStepMinutes: command.slotStepMinutes,
+    preferredRoomId: previousSession.roomId,
   });
   if (reservation.kind !== 'reserved') {
     await client.classSession.update({

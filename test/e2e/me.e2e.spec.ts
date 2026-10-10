@@ -112,6 +112,7 @@ describe('the person own account (/v1/me)', () => {
         email: EMAIL,
         fullName: 'Robin Rodríguez',
         phone: null,
+        address: null,
         birthDate: null,
         locale: 'es-ES',
         isEmailVerified: true,
@@ -126,6 +127,7 @@ describe('the person own account (/v1/me)', () => {
       const response = await send('PATCH', '/v1/me', session.accessToken, {
         fullName: 'Robin R. Correa',
         phone: '+34 600 123 456',
+        address: 'Calle Mayor 12, 3.º B, Madrid',
         birthDate: '1990-05-17',
         locale: 'en',
       });
@@ -134,6 +136,7 @@ describe('the person own account (/v1/me)', () => {
       expect(response.json()).toMatchObject({
         fullName: 'Robin R. Correa',
         phone: '+34 600 123 456',
+        address: 'Calle Mayor 12, 3.º B, Madrid',
         birthDate: '1990-05-17',
         locale: 'en',
       });

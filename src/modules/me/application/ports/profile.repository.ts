@@ -5,6 +5,7 @@ export interface Profile {
   readonly email: string;
   readonly fullName: string;
   readonly phone: string | null;
+  readonly address: string | null;
   /** Fecha sin hora, `YYYY-MM-DD`. */
   readonly birthDate: string | null;
   readonly locale: string;
@@ -18,6 +19,7 @@ export interface Profile {
 export interface ProfilePatch {
   readonly fullName?: string | undefined;
   readonly phone?: string | null | undefined;
+  readonly address?: string | null | undefined;
   readonly birthDate?: string | null | undefined;
   readonly locale?: string | undefined;
 }

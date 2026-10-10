@@ -13,11 +13,27 @@ export interface BookingView {
     readonly color: string | null;
   };
   readonly staff: { readonly membershipId: string; readonly fullName: string };
+  /** Sala donde se da; `null` si la cita no tiene sala. */
+  readonly room: { readonly id: string; readonly name: string } | null;
+  /** La sesión que ocupa: privada (una persona) o grupal (varias hasta el aforo). */
+  readonly session: {
+    readonly id: string;
+    readonly mode: 'private' | 'group';
+    readonly capacity: number;
+    /** Plazas ya ocupadas (reservas no canceladas). */
+    readonly bookedCount: number;
+  };
   readonly cancelledAt: Date | null;
   readonly cancelWithinPolicy: boolean | null;
   readonly startedAt: Date | null;
   readonly endedAt: Date | null;
   readonly createdAt: Date;
+  /** Quién asignó la cita; `null` en las anteriores a este dato. */
+  readonly createdBy: {
+    readonly membershipId: string;
+    readonly fullName: string;
+    readonly role: 'owner' | 'admin' | 'staff' | 'client';
+  } | null;
 }
 
 export interface CreateBookingCommand {
@@ -31,6 +47,18 @@ export interface CreateBookingCommand {
   readonly clientMembershipId?: string | undefined;
   /** Rejilla de inicios más fina cuando pone la cita el equipo (p. ej. cada 15 minutos). */
   readonly slotStepMinutes?: number | undefined;
+  /** Privada (por defecto) o grupal: la grupal abre una sesión con el aforo de la sala. */
+  readonly mode?: 'private' | 'group' | undefined;
+  /** Sala elegida; sin ella se busca una libre de quien da la clase (si el centro tiene salas). */
+  readonly roomId?: string | null | undefined;
+  /** Sala que se prefiere si está libre (p. ej. la que ya tenía la cita al moverla). */
+  readonly preferredRoomId?: string | null | undefined;
+}
+
+export interface JoinGroupSessionCommand {
+  readonly classSessionId: string;
+  readonly clientMembershipId: string;
+  readonly now: Date;
 }
 
 export type CreateBookingOutcome =
@@ -40,6 +68,16 @@ export type CreateBookingOutcome =
   | { readonly kind: 'client_not_found' }
   | { readonly kind: 'outside_window' }
   | { readonly kind: 'slot_unavailable' }
+  | { readonly kind: 'already_booked' }
+  /** La sala no existe, está ocupada a esa hora o no la da esa persona. */
+  | { readonly kind: 'room_unavailable' };
+
+export type JoinGroupSessionOutcome =
+  | { readonly kind: 'created'; readonly booking: BookingView }
+  | { readonly kind: 'client_not_found' }
+  /** La sesión no existe, no es grupal, está cancelada o ya empezó. */
+  | { readonly kind: 'session_not_found' }
+  | { readonly kind: 'session_full' }
   | { readonly kind: 'already_booked' };
 
 export interface RescheduleBookingCommand {
@@ -69,7 +107,8 @@ export type RescheduleOutcome =
   | { readonly kind: 'slot_unavailable' }
   | { readonly kind: 'already_booked' }
   | { readonly kind: 'service_not_found' }
-  | { readonly kind: 'client_not_found' };
+  | { readonly kind: 'client_not_found' }
+  | { readonly kind: 'room_unavailable' };
 
 export type BookingListScope = 'upcoming' | 'past';
 
@@ -78,6 +117,103 @@ export interface CancellationFacts {
   readonly serviceCancelNoticeMinutes: number | null;
   /** `null` si el centro no tiene política de cancelación. */
   readonly centerFreeCancellationHours: number | null;
+}
+
+export interface PlacementOptionsQuery {
+  readonly serviceId: string;
+  readonly staffMembershipId: string;
+  readonly date: string;
+  readonly now: Date;
+  /** Rejilla de inicios (cada cuántos minutos puede empezar una cita). */
+  readonly stepMinutes: number;
+}
+
+export interface PlacementRoom {
+  readonly id: string;
+  readonly name: string;
+  readonly capacity: number;
+}
+
+export interface PlacementOptions {
+  readonly timeZone: string;
+  /** Si esa persona tiene salas que usar; sin ellas la cita no lleva sala ni puede ser grupal. */
+  readonly hasUsableRooms: boolean;
+  /** Horas en las que la persona está libre, con las salas libres que puede usar a esa hora. */
+  readonly openSlots: readonly {
+    readonly startsAt: Date;
+    readonly endsAt: Date;
+    readonly freeRooms: readonly PlacementRoom[];
+  }[];
+  /** Clases grupales de esa persona ese día a las que todavía se puede apuntar a alguien. */
+  readonly groupSessions: readonly {
+    readonly sessionId: string;
+    readonly startsAt: Date;
+    readonly endsAt: Date;
+    readonly serviceName: string;
+    readonly room: { readonly id: string; readonly name: string };
+    readonly capacity: number;
+    readonly bookedCount: number;
+  }[];
+}
+
+export interface GroupOptionsQuery {
+  readonly serviceId: string;
+  readonly date: string;
+  readonly now: Date;
+  readonly stepMinutes: number;
+}
+
+/** Una sala con profesor: sus horas libres y los grupos suyos de ese día con plazas. */
+export interface GroupRoomOptions {
+  readonly room: {
+    readonly id: string;
+    readonly name: string;
+    readonly capacity: number;
+    readonly staff: { readonly membershipId: string; readonly fullName: string };
+  };
+  readonly openSlots: readonly { readonly startsAt: Date; readonly endsAt: Date }[];
+  readonly groupSessions: PlacementOptions['groupSessions'];
+}
+
+export interface GroupOptions {
+  readonly timeZone: string;
+  readonly rooms: readonly GroupRoomOptions[];
+}
+
+/** Una clase que ocupa una sala (o una cita sin sala), con quienes están apuntados. */
+export interface RoomSessionView {
+  readonly id: string;
+  readonly startsAt: Date;
+  readonly endsAt: Date;
+  readonly mode: 'private' | 'group';
+  readonly capacity: number;
+  readonly bookedCount: number;
+  readonly service: { readonly id: string; readonly name: string; readonly color: string | null };
+  readonly teacher: { readonly membershipId: string; readonly fullName: string };
+  readonly attendees: readonly {
+    readonly bookingId: string;
+    readonly clientMembershipId: string;
+    readonly fullName: string;
+    readonly status: BookingStatusName;
+  }[];
+}
+
+export interface RoomDayView {
+  readonly id: string;
+  readonly name: string;
+  readonly capacity: number;
+  /** Profesor fijo de la sala; `null` si la usa cualquiera. */
+  readonly staff: { readonly membershipId: string; readonly fullName: string } | null;
+  readonly sessions: readonly RoomSessionView[];
+}
+
+export interface RoomAgenda {
+  readonly timeZone: string;
+  /** Cuándo abre el centro ese día (hora local): las filas de la línea temporal. */
+  readonly openingRanges: readonly { readonly opensAt: string; readonly closesAt: string }[];
+  readonly rooms: readonly RoomDayView[];
+  /** Citas de ese día que no tienen sala (anteriores a las salas o de centros sin ellas). */
+  readonly sessionsWithoutRoom: readonly RoomSessionView[];
 }
 
 export interface AgendaEntryView {
@@ -106,6 +242,24 @@ export interface BookingRepository {
    * hueco de la misma persona del equipo, por muchas peticiones que lleguen a la vez.
    */
   createBooking(actor: ActorContext, command: CreateBookingCommand): Promise<CreateBookingOutcome>;
+  /**
+   * Apunta a un cliente a una clase grupal que ya existe, si quedan plazas. El recuento de plazas
+   * y la reserva se hacen bajo un bloqueo de la sesión: nadie se pasa del aforo.
+   */
+  joinGroupSession(
+    actor: ActorContext,
+    command: JoinGroupSessionCommand,
+  ): Promise<JoinGroupSessionOutcome>;
+  /** Qué horas libres tiene una persona del equipo ese día (con las salas libres) y qué grupos puede completar. */
+  listPlacementOptions(
+    actor: ActorContext,
+    query: PlacementOptionsQuery,
+  ): Promise<PlacementOptions | null>;
+  /**
+   * Para una cita grupal: cada sala con profesor que da el servicio, con sus horas libres ese día
+   * (profesor y sala libres) y sus grupos con plazas. `null` si el servicio no existe.
+   */
+  listGroupOptions(actor: ActorContext, query: GroupOptionsQuery): Promise<GroupOptions | null>;
   /** Mueve una reserva del propio cliente a otra hora en una sola transacción. */
   rescheduleBooking(
     actor: ActorContext,
@@ -142,6 +296,8 @@ export interface BookingRepository {
     actor: ActorContext,
     query: { date: string; staffMembershipId: string | null },
   ): Promise<DayAgenda>;
+  /** La agenda del día por sala: cuándo está ocupada cada una, con su aforo, profesor y alumnos. */
+  listRoomAgenda(actor: ActorContext, query: { date: string }): Promise<RoomAgenda>;
 }
 
 export const BOOKING_REPOSITORY = Symbol('BOOKING_REPOSITORY');

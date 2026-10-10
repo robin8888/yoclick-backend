@@ -53,6 +53,10 @@ export const ERROR_CATALOG = {
   SLOT_UNAVAILABLE: { title: 'Ese hueco ya no está disponible. Elige otro' },
   OUTSIDE_BOOKING_WINDOW: { title: 'Ese día u hora todavía no se puede reservar' },
   ALREADY_BOOKED: { title: 'Ya tienes otra cita a esa hora' },
+  ROOM_UNAVAILABLE: {
+    title: 'Esa sala no está libre a esa hora o no la da esa persona. Elige otra',
+  },
+  SESSION_FULL: { title: 'Esta clase grupal ya no tiene plazas' },
   BOOKING_NOT_CANCELLABLE: { title: 'Esta reserva ya no se puede cancelar' },
   BOOKING_NOT_RESCHEDULABLE: { title: 'Esta reserva ya no se puede cambiar de hora' },
   RESCHEDULE_TOO_LATE: {

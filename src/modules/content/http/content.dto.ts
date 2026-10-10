@@ -48,6 +48,8 @@ const targetSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('level'), level: levelSchema }),
   z.strictObject({ kind: z.literal('group'), groupId: z.uuid() }),
   z.strictObject({ kind: z.literal('client'), membershipId: z.uuid() }),
+  /** Todo el alumnado del centro. */
+  z.strictObject({ kind: z.literal('everyone') }),
 ]);
 
 export class AssignContentRequestDto extends createZodDto(
@@ -62,6 +64,8 @@ const assignmentShape = z.strictObject({
   level: levelSchema.nullable(),
   groupId: z.uuid().nullable(),
   clientMembershipId: z.uuid().nullable(),
+  /** Para todo el alumnado del centro. */
+  isForEveryone: z.boolean(),
   /** Nombre del grupo o de la persona; nulo si es un nivel. */
   label: z.string().nullable(),
 });

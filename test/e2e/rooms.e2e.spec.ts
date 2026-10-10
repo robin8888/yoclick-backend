@@ -7,6 +7,8 @@ interface RoomBody {
   id: string;
   name: string;
   capacity: number;
+  staff: { membershipId: string; fullName: string } | null;
+  services: { id: string; name: string }[];
 }
 
 interface ServiceWithRoomBody {
@@ -62,6 +64,8 @@ describe('rooms and resources', () => {
       id: expect.stringMatching(/^[0-9a-f-]{36}$/) as string,
       name: 'Sala 1',
       capacity: 12,
+      staff: null,
+      services: [],
     });
     expect((await listRooms()).map(({ name, capacity }) => [name, capacity])).toEqual([
       ['Sala 1', 12],

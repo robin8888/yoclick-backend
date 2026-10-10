@@ -23,7 +23,7 @@ import { UpdateMyProfileUseCase } from '../application/update-my-profile.use-cas
 import {
   MyConsentsResponseDto,
   MyMembershipsResponseDto,
-  ProfileResponseDto,
+  MyProfileResponseDto,
   SetConsentRequestDto,
   UpdateProfileRequestDto,
 } from './dto/profile-dtos';
@@ -59,7 +59,7 @@ export class MeController {
 
   @Get()
   @ApiOperation({ operationId: 'me_get_profile', summary: 'Mi perfil.' })
-  @ApiOkResponse({ type: ProfileResponseDto })
+  @ApiOkResponse({ type: MyProfileResponseDto })
   async getProfile(@CurrentUserId() userId: string): Promise<Record<string, unknown>> {
     return serializeProfile(await this.getMyProfile.execute(userId));
   }
@@ -70,7 +70,7 @@ export class MeController {
     summary:
       'Cambia mi nombre, teléfono, fecha de nacimiento o idioma. El correo no se cambia aquí.',
   })
-  @ApiOkResponse({ type: ProfileResponseDto })
+  @ApiOkResponse({ type: MyProfileResponseDto })
   async updateProfile(
     @CurrentUserId() userId: string,
     @Body() body: UpdateProfileRequestDto,

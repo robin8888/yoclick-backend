@@ -8,13 +8,14 @@ interface TargetColumns {
   readonly level: ClientLevelName | null;
   readonly groupId: string | null;
   readonly clientMembershipId: string | null;
+  readonly forEveryone: boolean;
 }
 
 async function isValidTarget(
   client: TenantTransactionClient,
   target: ContentTarget,
 ): Promise<boolean> {
-  if (target.kind === 'level') return true;
+  if (target.kind === 'level' || target.kind === 'everyone') return true;
   if (target.kind === 'client') {
     return (
       (await client.membership.count({
@@ -36,14 +37,15 @@ export async function areAllTargetsValid(
 }
 
 function toTargetColumns(target: ContentTarget): TargetColumns {
-  const none = { level: null, groupId: null, clientMembershipId: null };
+  const none = { level: null, groupId: null, clientMembershipId: null, forEveryone: false };
+  if (target.kind === 'everyone') return { ...none, forEveryone: true };
   if (target.kind === 'level') return { ...none, level: target.level };
   if (target.kind === 'group') return { ...none, groupId: target.groupId };
   return { ...none, clientMembershipId: target.membershipId };
 }
 
 function describeTarget(columns: TargetColumns): string {
-  return `${columns.level ?? ''}|${columns.groupId ?? ''}|${columns.clientMembershipId ?? ''}`;
+  return `${columns.level ?? ''}|${columns.groupId ?? ''}|${columns.clientMembershipId ?? ''}|${String(columns.forEveryone)}`;
 }
 
 /** A quién se enseña ahora la pieza, antes de sustituirlo: sirve para avisar solo a los nuevos. */
@@ -53,9 +55,10 @@ export async function readCurrentTargets(
 ): Promise<ContentTarget[]> {
   const rows = await client.contentAssignment.findMany({
     where: { contentId },
-    select: { level: true, groupId: true, clientMembershipId: true },
+    select: { level: true, groupId: true, clientMembershipId: true, forEveryone: true },
   });
   return rows.flatMap((row): ContentTarget[] => {
+    if (row.forEveryone) return [{ kind: 'everyone' }];
     if (row.level !== null) return [{ kind: 'level', level: row.level }];
     if (row.groupId !== null) return [{ kind: 'group', groupId: row.groupId }];
     if (row.clientMembershipId === null) return [];

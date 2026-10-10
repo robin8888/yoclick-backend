@@ -8,6 +8,7 @@ interface BookingBody {
   status: string;
   startsAt: string;
   staff: { membershipId: string };
+  createdBy: { membershipId: string; fullName: string; role: string } | null;
 }
 
 describe('POST /agenda/bookings (an appointment made by the team)', () => {
@@ -56,11 +57,12 @@ describe('POST /agenda/bookings (an appointment made by the team)', () => {
     await application.close();
   });
 
-  it('lets a professional book a client on their own agenda, and the client sees it', async () => {
-    const response = await createFor(staff.userId, {
+  it('lets the center assign a client to a professional, and the client sees it', async () => {
+    const response = await createFor(owner, {
       clientMembershipId: ana.membershipId,
       serviceId,
       startsAt: slot.startsAt,
+      staffMembershipId: staff.membershipId,
     });
 
     expect(response.statusCode).toBe(201);
@@ -78,7 +80,33 @@ describe('POST /agenda/bookings (an appointment made by the team)', () => {
     );
   });
 
-  it('lets the team book at a quarter of an hour, which the client grid never offers', async () => {
+  it('records who assigned the appointment, and the client sees it too', async () => {
+    const response = await createFor(owner, {
+      clientMembershipId: ana.membershipId,
+      serviceId,
+      startsAt: slot.startsAt,
+      staffMembershipId: staff.membershipId,
+    });
+
+    const booking = response.json<BookingBody>();
+    expect(booking.createdBy).toEqual({
+      membershipId: center.ownerMembershipId,
+      fullName: expect.any(String) as string,
+      role: 'owner',
+    });
+    const mine = await world.call(
+      'GET',
+      `/v1/centers/${center.centerId}/bookings/mine?scope=upcoming`,
+      ana.userId,
+      { centerId: center.centerId },
+    );
+    expect(
+      mine.json<{ bookings: BookingBody[] }>().bookings.find(({ id }) => id === booking.id)
+        ?.createdBy?.role,
+    ).toBe('owner');
+  });
+
+  it('lets the center book at a quarter of an hour, which the client grid never offers', async () => {
     const fineSlots = await world.call(
       'GET',
       `/v1/centers/${center.centerId}/availability?serviceId=${serviceId}&from=${slot.startsAt.slice(0, 10)}&to=${slot.startsAt.slice(0, 10)}&stepMinutes=15&staffMembershipId=${staff.membershipId}`,
@@ -89,10 +117,11 @@ describe('POST /agenda/bookings (an appointment made by the team)', () => {
 
     const days = fineSlots.json<{ days: { slots: { startsAt: string }[] }[] }>().days;
     expect(days.flatMap((day) => day.slots.map(({ startsAt }) => startsAt))).toContain(quarterPast);
-    const response = await createFor(staff.userId, {
+    const response = await createFor(owner, {
       clientMembershipId: ana.membershipId,
       serviceId,
       startsAt: quarterPast,
+      staffMembershipId: staff.membershipId,
     });
     expect(response.statusCode).toBe(201);
   });
@@ -109,28 +138,36 @@ describe('POST /agenda/bookings (an appointment made by the team)', () => {
     expect(response.json<BookingBody>().staff.membershipId).toBe(staff.membershipId);
   });
 
-  it('does not let a professional book on someone else agenda', async () => {
+  it('does not let a professional assign appointments, not even on their own agenda', async () => {
     const response = await createFor(staff.userId, {
       clientMembershipId: ana.membershipId,
       serviceId,
       startsAt: slot.startsAt,
-      staffMembershipId: otherStaff.membershipId,
+      staffMembershipId: staff.membershipId,
     });
 
     expect(response.statusCode).toBe(403);
   });
 
   it('refuses a taken slot, a double booking of the client and unknown clients', async () => {
-    const body = { clientMembershipId: ana.membershipId, serviceId, startsAt: slot.startsAt };
-    await createFor(staff.userId, body);
+    const body = {
+      clientMembershipId: ana.membershipId,
+      serviceId,
+      startsAt: slot.startsAt,
+      staffMembershipId: staff.membershipId,
+    };
+    await createFor(owner, body);
     const bruno = await world.addMember(center.centerId, 'bruno', 'client');
 
-    const takenSlot = await createFor(staff.userId, {
+    const takenSlot = await createFor(owner, {
       ...body,
       clientMembershipId: bruno.membershipId,
     });
-    const sameClientTwice = await createFor(otherStaff.userId, body);
-    const stranger = await createFor(staff.userId, {
+    const sameClientTwice = await createFor(owner, {
+      ...body,
+      staffMembershipId: otherStaff.membershipId,
+    });
+    const stranger = await createFor(owner, {
       ...body,
       clientMembershipId: staff.membershipId,
     });
@@ -150,11 +187,12 @@ describe('POST /agenda/bookings (an appointment made by the team)', () => {
     expect(response.statusCode).toBe(403);
   });
 
-  it('tells administration about it, but not the professional who made it', async () => {
-    await createFor(staff.userId, {
+  it('tells the professional it was assigned to, but not the center who made it', async () => {
+    await createFor(owner, {
       clientMembershipId: ana.membershipId,
       serviceId,
       startsAt: slot.startsAt,
+      staffMembershipId: staff.membershipId,
     });
 
     const forOwner = await world.call(
@@ -174,7 +212,7 @@ describe('POST /agenda/bookings (an appointment made by the team)', () => {
       },
     );
 
-    expect(forOwner.json<{ unreadCount: number }>().unreadCount).toBe(1);
-    expect(forStaff.json<{ unreadCount: number }>().unreadCount).toBe(0);
+    expect(forOwner.json<{ unreadCount: number }>().unreadCount).toBe(0);
+    expect(forStaff.json<{ unreadCount: number }>().unreadCount).toBe(1);
   });
 });

@@ -5,6 +5,7 @@ import { type ActorContext } from '../../../shared/tenancy/actor-context';
 import {
   ROOM_REPOSITORY,
   type NewRoom,
+  type RoomPatch,
   type RoomRepository,
   type RoomView,
 } from './ports/room.repository';
@@ -30,9 +31,29 @@ export class CreateRoomUseCase {
         { path: 'name', code: 'room_name_taken' },
       ]);
     }
+    if (outcome.kind === 'staff_not_found' || outcome.kind === 'service_not_found') {
+      throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
+    }
     throw new DomainError('VALIDATION_FAILED', HTTP_STATUS.badRequest, [
       { path: 'name', code: 'too_many_rooms' },
     ]);
+  }
+}
+
+/** Cambia el nombre, el aforo o el profesor de una sala; las citas ya puestas no se tocan. */
+@Injectable()
+export class UpdateRoomUseCase {
+  constructor(@Inject(ROOM_REPOSITORY) private readonly rooms: RoomRepository) {}
+
+  async execute(actor: ActorContext, roomId: string, patch: RoomPatch): Promise<RoomView> {
+    const outcome = await this.rooms.updateRoom(actor, roomId, patch);
+    if (outcome.kind === 'updated') return outcome.room;
+    if (outcome.kind === 'duplicate_name') {
+      throw new DomainError('CONFLICT', HTTP_STATUS.conflict, [
+        { path: 'name', code: 'room_name_taken' },
+      ]);
+    }
+    throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
   }
 }
 

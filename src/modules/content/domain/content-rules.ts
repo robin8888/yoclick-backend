@@ -40,11 +40,13 @@ export function decideDocumentUpload(facts: DocumentUploadFacts): DocumentUpload
 export type ContentTarget =
   | { readonly kind: 'level'; readonly level: 'beginner' | 'intermediate' | 'advanced' }
   | { readonly kind: 'group'; readonly groupId: string }
-  | { readonly kind: 'client'; readonly membershipId: string };
+  | { readonly kind: 'client'; readonly membershipId: string }
+  | { readonly kind: 'everyone' };
 
 function describeTargetKey(target: ContentTarget): string {
   if (target.kind === 'level') return `level:${target.level}`;
   if (target.kind === 'group') return `group:${target.groupId}`;
+  if (target.kind === 'everyone') return 'everyone';
   return `client:${target.membershipId}`;
 }
 

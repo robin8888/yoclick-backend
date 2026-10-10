@@ -10,6 +10,8 @@ export interface SchedulableService {
   readonly durationMinutes: number;
   readonly minNoticeMinutes: number;
   readonly bookingWindowDays: number;
+  /** Sala donde se da el servicio; `null` = en cualquiera libre de quien lo da. */
+  readonly roomId: string | null;
 }
 
 export interface SchedulingFacts {

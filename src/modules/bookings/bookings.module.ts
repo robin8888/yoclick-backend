@@ -5,6 +5,10 @@ import {
   CancelBookingByTeamUseCase,
   CreateBookingUseCase,
   GetDayAgendaUseCase,
+  GetGroupOptionsUseCase,
+  GetPlacementOptionsUseCase,
+  GetRoomAgendaUseCase,
+  JoinGroupSessionUseCase,
   ListMyBookingsUseCase,
   RescheduleBookingByTeamUseCase,
   RescheduleBookingUseCase,
@@ -21,6 +25,8 @@ import {
   StartSessionUseCase,
 } from './application/session-record.use-cases';
 import { AgendaController } from './http/agenda.controller';
+import { AgendaPlacementController } from './http/agenda-placement.controller';
+import { AgendaRoomsController } from './http/agenda-rooms.controller';
 import { BookingSessionsController } from './http/booking-sessions.controller';
 import { CheckInController } from './http/check-in.controller';
 import { BookingsController } from './http/bookings.controller';
@@ -36,6 +42,8 @@ import { PrismaSessionRecordRepository } from './infrastructure/prisma-session-r
     BookingReschedulingController,
     BookingSessionsController,
     AgendaController,
+    AgendaPlacementController,
+    AgendaRoomsController,
     AgendaReschedulingController,
     SessionRecordsController,
     CheckInController,
@@ -48,6 +56,10 @@ import { PrismaSessionRecordRepository } from './infrastructure/prisma-session-r
     RescheduleBookingByTeamUseCase,
     CancelBookingByTeamUseCase,
     GetDayAgendaUseCase,
+    GetGroupOptionsUseCase,
+    GetPlacementOptionsUseCase,
+    GetRoomAgendaUseCase,
+    JoinGroupSessionUseCase,
     StartSessionUseCase,
     EndSessionUseCase,
     ListSessionRecordsUseCase,

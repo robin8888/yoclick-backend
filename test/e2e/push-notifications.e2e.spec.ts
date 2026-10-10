@@ -190,20 +190,25 @@ describe('push notifications', () => {
       expect(pushSender.tokensFor('booking_cancelled')).toEqual([TOKEN_STAFF]);
     });
 
-    it('tells the client when the instructor puts an appointment for them', async () => {
+    it('tells the client and the professional when the center puts an appointment', async () => {
       const slot = await firstFutureSlot();
 
-      const response = await world.call('POST', agendaUrl('/bookings'), staff.userId, {
+      const response = await world.call('POST', agendaUrl('/bookings'), owner, {
         centerId: center.centerId,
-        body: { serviceId, startsAt: slot.startsAt, clientMembershipId: ana.membershipId },
+        body: {
+          serviceId,
+          startsAt: slot.startsAt,
+          clientMembershipId: ana.membershipId,
+          staffMembershipId: staff.membershipId,
+        },
       });
 
       expect(response.statusCode).toBe(201);
       expect(pushSender.tokensFor('booking_created_by_team')).toEqual([TOKEN_ANA]);
-      expect(pushSender.tokensFor('booking_created')).toEqual([TOKEN_OWNER]);
+      expect(pushSender.tokensFor('booking_created')).toEqual([TOKEN_STAFF]);
     });
 
-    it('tells the client when the instructor moves their appointment', async () => {
+    it('tells the client and the professional when the center moves their appointment', async () => {
       const [current, target] = await twoFutureSlots();
       const bookingId = await anaBooks(current);
       pushSender.sent.length = 0;
@@ -211,7 +216,7 @@ describe('push notifications', () => {
       const response = await world.call(
         'POST',
         agendaUrl(`/bookings/${bookingId}/reschedule`),
-        staff.userId,
+        owner,
         { centerId: center.centerId, body: { startsAt: target.startsAt } },
       );
 
@@ -221,7 +226,7 @@ describe('push notifications', () => {
         startsAt: target.startsAt,
       });
       expect(pushSender.tokensFor('booking_rescheduled_by_team')).toEqual([TOKEN_ANA]);
-      expect(pushSender.tokensFor('booking_rescheduled')).toEqual([TOKEN_OWNER]);
+      expect(pushSender.tokensFor('booking_rescheduled')).toEqual([TOKEN_STAFF]);
     });
 
     it('lets the administration move an appointment with less notice than the client needs', async () => {
@@ -265,7 +270,7 @@ describe('push notifications', () => {
       expect(pushSender.sent).toEqual([]);
     });
 
-    it('does not let an instructor move an appointment of somebody else', async () => {
+    it('does not let an instructor move appointments: only the center moves them', async () => {
       const [current, target] = await twoFutureSlots();
       const bookingId = await anaBooks(current);
       const other = await world.addMember(center.centerId, 'other-mover', 'staff');
@@ -277,7 +282,7 @@ describe('push notifications', () => {
         { centerId: center.centerId, body: { startsAt: target.startsAt } },
       );
 
-      expect(response.statusCode).toBe(404);
+      expect(response.statusCode).toBe(403);
     });
 
     it('does not let a client use the agenda to move an appointment', async () => {

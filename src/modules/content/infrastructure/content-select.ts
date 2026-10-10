@@ -20,6 +20,7 @@ export const CONTENT_SELECT = {
       level: true,
       groupId: true,
       clientMembershipId: true,
+      forEveryone: true,
       group: { select: { name: true } },
       client: { select: { user: { select: { fullName: true } } } },
     },
@@ -42,6 +43,7 @@ interface ContentRow {
     level: StoredContent['level'];
     groupId: string | null;
     clientMembershipId: string | null;
+    forEveryone: boolean;
     group: { name: string } | null;
     client: { user: { fullName: string } } | null;
   }[];
@@ -55,14 +57,15 @@ export function toStoredContent(row: ContentRow): StoredContent {
       level: assignment.level,
       groupId: assignment.groupId,
       clientMembershipId: assignment.clientMembershipId,
+      isForEveryone: assignment.forEveryone,
       label: assignment.group?.name ?? assignment.client?.user.fullName ?? null,
     })),
   };
 }
 
 /**
- * Lo que ve un cliente: lo asignado a su nivel, a su grupo o a él, y los vídeos ya procesados.
- * Quien no tiene nivel o grupo solo recibe lo que se le asigne a él.
+ * Lo que ve un cliente: lo asignado a todos, a su nivel, a su grupo o a él, y los vídeos ya procesados.
+ * Quien no tiene nivel o grupo solo recibe lo de todos y lo que se le asigne a él.
  */
 export async function buildVisibleToClientFilter(
   client: TenantTransactionClient,
@@ -79,6 +82,7 @@ export async function buildVisibleToClientFilter(
     assignments: {
       some: {
         OR: [
+          { forEveryone: true },
           { clientMembershipId: actor.membershipId },
           ...(me.groupId ? [{ groupId: me.groupId }] : []),
           ...(me.level ? [{ level: me.level }] : []),

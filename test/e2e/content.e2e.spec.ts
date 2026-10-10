@@ -33,7 +33,13 @@ interface ContentBody {
   pageCount: number | null;
   isReady: boolean;
   thumbnailUrl: string | null;
-  assignments: { id: string; level: string | null; groupId: string | null; label: string | null }[];
+  assignments: {
+    id: string;
+    level: string | null;
+    groupId: string | null;
+    isForEveryone: boolean;
+    label: string | null;
+  }[];
 }
 
 interface DetailBody extends ContentBody {
@@ -304,6 +310,19 @@ describe('content library', () => {
 
       expect(new Set(await myContentIds(ana.userId))).toEqual(new Set([forLevel.id, forAna.id]));
       expect(await myContentIds(bea.userId)).toEqual([forGroup.id]);
+    });
+
+    it('shows a piece assigned to everyone to every client, and nothing else', async () => {
+      const forEveryone = await addPdf('title=Para%20todos');
+      await addPdf('title=Sin%20asignar');
+
+      const response = await assign(forEveryone.id, [{ kind: 'everyone' }]);
+
+      expect(response.json<{ assignments: { isForEveryone: boolean }[] }>().assignments).toEqual([
+        expect.objectContaining({ isForEveryone: true, level: null, groupId: null }),
+      ]);
+      expect(await myContentIds(ana.userId)).toEqual([forEveryone.id]);
+      expect(await myContentIds(bea.userId)).toEqual([forEveryone.id]);
     });
 
     it('replaces the previous assignments and reports who each one is for', async () => {

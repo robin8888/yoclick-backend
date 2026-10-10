@@ -5,3 +5,5 @@ export const MAX_ROOM_CAPACITY = 500;
 export const DEFAULT_ROOM_CAPACITY = 1;
 /** Un centro con más salas que esto es un error de uso, no un centro. */
 export const MAX_ROOMS_PER_CENTER = 100;
+/** Cuántos servicios se pueden dar en una misma sala. */
+export const MAX_SERVICES_PER_ROOM = 100;

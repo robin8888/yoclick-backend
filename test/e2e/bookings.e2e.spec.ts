@@ -259,12 +259,24 @@ describe('availability and bookings', () => {
           color: null,
         },
         staff: { membershipId: center.ownerMembershipId, fullName: 'owner' },
+        room: null,
+        session: {
+          id: expect.stringMatching(/^[0-9a-f-]{36}$/) as string,
+          mode: 'private',
+          capacity: 1,
+          bookedCount: 1,
+        },
         cancelledAt: null,
         cancelWithinPolicy: null,
         startedAt: null,
         endedAt: null,
         actualDurationSeconds: null,
         createdAt: expect.stringMatching(/Z$/) as string,
+        createdBy: {
+          membershipId: ana.membershipId,
+          fullName: expect.any(String) as string,
+          role: 'client',
+        },
       });
     });
 

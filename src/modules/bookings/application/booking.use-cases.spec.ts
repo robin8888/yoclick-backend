@@ -33,11 +33,14 @@ function buildBooking(overrides: Partial<BookingView> = {}): BookingView {
     endsAt: new Date(NOW.getTime() + 49 * HOUR_MS),
     service: { id: 'service-1', name: 'Sesión', durationMinutes: 60, color: null },
     staff: { membershipId: 'membership-staff', fullName: 'Ana' },
+    room: null,
+    session: { id: 'session-1', mode: 'private', capacity: 1, bookedCount: 1 },
     cancelledAt: null,
     cancelWithinPolicy: null,
     startedAt: null,
     endedAt: null,
     createdAt: NOW,
+    createdBy: null,
     ...overrides,
   };
 }
@@ -45,6 +48,10 @@ function buildBooking(overrides: Partial<BookingView> = {}): BookingView {
 function buildRepository(overrides: Partial<BookingRepository> = {}): BookingRepository {
   return {
     createBooking: jest.fn(),
+    joinGroupSession: jest.fn(),
+    listPlacementOptions: jest.fn(),
+    listGroupOptions: jest.fn(),
+    listRoomAgenda: jest.fn(),
     rescheduleBooking: jest.fn(),
     rescheduleByTeam: jest.fn(),
     listClientBookings: jest.fn(),

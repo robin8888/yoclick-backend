@@ -6,6 +6,7 @@ const MAX_STAFF_TITLE_LENGTH = 80;
 const MAX_EMAIL_LENGTH = 254;
 const MAX_INVITATION_CODE_INPUT_LENGTH = 24;
 
+const MAX_SERVICES_PER_MEMBER = 100;
 const roleSchema = z.enum(['owner', 'admin', 'staff', 'client']);
 const statusSchema = z.enum(['invited', 'active', 'blocked', 'left']);
 
@@ -33,6 +34,8 @@ const teamMemberShape = {
   status: statusSchema,
   staffTitle: z.string().nullable(),
   permissions: z.array(z.enum(TEAM_PERMISSIONS)),
+  /** Los servicios que da esta persona. */
+  services: z.array(z.strictObject({ id: z.uuid(), name: z.string() })),
   joinedAt: z.iso.datetime(),
 };
 
@@ -52,6 +55,8 @@ export class UpdateTeamMemberRequestDto extends createZodDto(
         .refine((permissions) => new Set(permissions).size === permissions.length, 'duplicated')
         .optional(),
       staffTitle: z.string().trim().min(1).max(MAX_STAFF_TITLE_LENGTH).nullable().optional(),
+      /** Los servicios que da; los que no estén dejan de darse por esta persona. */
+      serviceIds: z.array(z.uuid()).max(MAX_SERVICES_PER_MEMBER).optional(),
     })
     .refine((update) => Object.keys(update).length > 0, 'send at least one field to change'),
 ) {}

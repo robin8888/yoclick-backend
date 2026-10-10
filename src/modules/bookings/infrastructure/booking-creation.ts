@@ -9,9 +9,12 @@ import { loadSchedulingFacts } from '../../scheduling/infrastructure/scheduling-
 import {
   type CreateBookingCommand,
   type CreateBookingOutcome,
+  type JoinGroupSessionCommand,
+  type JoinGroupSessionOutcome,
 } from '../application/ports/booking.repository';
 import { recordBookingNotification } from '../../notifications/infrastructure/booking-notification.recorder';
 import { toBookingView, WITH_SESSION_DETAILS } from './booking-view.mapper';
+import { listUsableRooms, type UsableRoom } from './usable-rooms';
 
 /**
  * Serializa las reservas de una misma persona: dos peticiones suyas a la vez (por ejemplo, dos
@@ -24,6 +27,11 @@ async function lockClientBookings(
   clientMembershipId: string,
 ): Promise<void> {
   await client.$executeRaw`select pg_advisory_xact_lock(hashtextextended(${clientMembershipId}, 0))`;
+}
+
+/** Serializa el recuento de plazas de una clase grupal: nadie se pasa del aforo por llegar a la vez. */
+async function lockSessionSeats(client: TenantTransactionClient, sessionId: string): Promise<void> {
+  await client.$executeRaw`select pg_advisory_xact_lock(hashtextextended(${sessionId}, 1))`;
 }
 
 /** La RLS acota a este centro: un cliente de otro centro simplemente no se encuentra. */
@@ -63,39 +71,52 @@ interface NewSession {
   readonly staffMembershipId: string;
   readonly startsAt: Date;
   readonly endsAt: Date;
+  readonly roomId: string | null;
+  readonly mode: 'private' | 'group';
+  readonly capacity: number;
 }
 
 /**
- * Inserta la sesión; si la persona del equipo ya tiene otra programada que se solapa, la restricción
- * EXCLUDE lo impide y `ON CONFLICT DO NOTHING` lo convierte en "no se insertó nada" (sin abortar la transacción).
+ * Inserta la sesión; si la persona del equipo o la sala ya tienen otra programada que se solapa, la
+ * restricción EXCLUDE lo impide y `ON CONFLICT DO NOTHING` lo convierte en "no se insertó nada" (sin
+ * abortar la transacción).
  */
 async function tryInsertSession(
   client: TenantTransactionClient,
   session: NewSession,
 ): Promise<boolean> {
   const inserted = await client.$queryRaw<{ id: string }[]>`
-    insert into class_sessions (id, center_id, service_id, staff_membership_id, starts_at, ends_at)
+    insert into class_sessions
+      (id, center_id, service_id, staff_membership_id, starts_at, ends_at, room_id, mode, capacity)
     values (${session.id}::uuid, ${session.centerId}::uuid, ${session.serviceId}::uuid,
             ${session.staffMembershipId}::uuid, ${session.startsAt}::timestamptz,
-            ${session.endsAt}::timestamptz)
+            ${session.endsAt}::timestamptz, ${session.roomId}::uuid,
+            ${session.mode}::session_mode, ${session.capacity})
     on conflict do nothing
     returning id`;
   return inserted.length === 1;
 }
 
-/** La reserva del cliente sobre la sesión recién creada. */
-async function insertBooking(
-  client: TenantTransactionClient,
-  input: { actor: ActorContext; command: CreateBookingCommand; sessionId: string },
-) {
+interface NewBooking {
+  readonly actor: ActorContext;
+  readonly clientMembershipId: string;
+  readonly idempotencyKey: string | null;
+  readonly sessionId: string;
+}
+
+/** La reserva del cliente sobre la sesión (recién creada o la grupal a la que se apunta). */
+async function insertBooking(client: TenantTransactionClient, input: NewBooking) {
   return client.booking.create({
     data: {
       id: generateUuidV7(),
       centerId: input.actor.centerId,
       classSessionId: input.sessionId,
-      clientMembershipId: input.command.clientMembershipId ?? input.actor.membershipId,
+      clientMembershipId: input.clientMembershipId,
       status: 'confirmed',
-      idempotencyKey: input.command.idempotencyKey,
+      idempotencyKey: input.idempotencyKey,
+      // El servidor lo saca de quien hace la petición: la app nunca lo envía.
+      createdByMembershipId: input.actor.membershipId,
+      createdByRole: input.actor.role,
     },
     include: WITH_SESSION_DETAILS,
   });
@@ -103,25 +124,26 @@ async function insertBooking(
 
 interface BookingCreatedNotice {
   readonly actor: ActorContext;
-  readonly command: CreateBookingCommand;
-  readonly service: SchedulableService;
+  readonly clientMembershipId: string;
+  readonly serviceName: string;
+  readonly startsAt: Date;
   readonly booking: { readonly id: string; readonly staffMembershipId: string };
 }
 
 /** Avisa a quien da la cita y a administración de la nueva reserva. */
 async function notifyBookingCreated(
   client: TenantTransactionClient,
-  { actor, command, service, booking }: BookingCreatedNotice,
+  notice: BookingCreatedNotice,
 ): Promise<void> {
   await recordBookingNotification(client, {
-    centerId: actor.centerId,
+    centerId: notice.actor.centerId,
     change: 'created',
-    bookingId: booking.id,
-    clientMembershipId: command.clientMembershipId ?? actor.membershipId,
-    staffMembershipId: booking.staffMembershipId,
-    serviceName: service.name,
-    startsAt: command.startsAt,
-    actorMembershipId: actor.membershipId,
+    bookingId: notice.booking.id,
+    clientMembershipId: notice.clientMembershipId,
+    staffMembershipId: notice.booking.staffMembershipId,
+    serviceName: notice.serviceName,
+    startsAt: notice.startsAt,
+    actorMembershipId: notice.actor.membershipId,
   });
 }
 
@@ -135,10 +157,86 @@ export type SessionReservation =
     }
   | Exclude<CreateBookingOutcome, { readonly kind: 'created' }>;
 
+type RoomChoice =
+  | { readonly kind: 'rooms'; readonly rooms: readonly (UsableRoom | null)[] }
+  | { readonly kind: 'unavailable' };
+
 /**
- * Prueba con cada persona libre a esa hora, la preferida primero. Si otra petición se lleva a la
- * primera entre el cálculo y la inserción, se intenta con la siguiente; si no queda nadie, el hueco
- * ya no existe.
+ * Qué salas probar para una persona: la elegida si la hay (y la puede usar), si no las suyas y las
+ * de nadie, la preferida primero. Un centro sin salas para ella no exige sala en una cita privada;
+ * la grupal siempre la necesita porque su aforo es el de la sala.
+ */
+async function chooseRoomsToTry(
+  client: TenantTransactionClient,
+  input: {
+    staffMembershipId: string;
+    command: CreateBookingCommand;
+    service: SchedulableService;
+  },
+): Promise<RoomChoice> {
+  const { command } = input;
+  const usable = await listUsableRooms(client, input.staffMembershipId, {
+    serviceRoomId: input.service.roomId,
+  });
+  if (command.roomId !== undefined && command.roomId !== null) {
+    const chosen = usable.find((room) => room.id === command.roomId);
+    return chosen ? { kind: 'rooms', rooms: [chosen] } : { kind: 'unavailable' };
+  }
+  const preferred = usable.filter((room) => room.id === command.preferredRoomId);
+  const others = usable.filter((room) => room.id !== command.preferredRoomId);
+  const ordered = [...preferred, ...others];
+  if (ordered.length > 0) return { kind: 'rooms', rooms: ordered };
+  return command.mode === 'group' ? { kind: 'unavailable' } : { kind: 'rooms', rooms: [null] };
+}
+
+interface SessionAttempt {
+  readonly actor: ActorContext;
+  readonly command: CreateBookingCommand;
+  readonly service: SchedulableService;
+  readonly endsAt: Date;
+  readonly staffMembershipId: string;
+}
+
+type AttemptOutcome =
+  | { readonly kind: 'reserved'; readonly sessionId: string }
+  | { readonly kind: 'failed'; readonly hasRoomProblem: boolean };
+
+/** Prueba con cada sala posible de una persona: la primera que no choque se queda la sesión. */
+async function tryRoomsOfStaff(
+  client: TenantTransactionClient,
+  attempt: SessionAttempt,
+): Promise<AttemptOutcome> {
+  const { actor, command, service } = attempt;
+  const choice = await chooseRoomsToTry(client, {
+    staffMembershipId: attempt.staffMembershipId,
+    command,
+    service,
+  });
+  if (choice.kind === 'unavailable') return { kind: 'failed', hasRoomProblem: true };
+  const mode = command.mode ?? 'private';
+  let hasRoomProblem = false;
+  for (const room of choice.rooms) {
+    const session: NewSession = {
+      id: generateUuidV7(),
+      centerId: actor.centerId,
+      serviceId: service.id,
+      staffMembershipId: attempt.staffMembershipId,
+      startsAt: command.startsAt,
+      endsAt: attempt.endsAt,
+      roomId: room?.id ?? null,
+      mode,
+      capacity: mode === 'group' && room !== null ? room.capacity : 1,
+    };
+    if (await tryInsertSession(client, session)) return { kind: 'reserved', sessionId: session.id };
+    hasRoomProblem ||= room !== null;
+  }
+  return { kind: 'failed', hasRoomProblem };
+}
+
+/**
+ * Prueba con cada persona libre a esa hora, la preferida primero, y con cada sala posible. Si otra
+ * petición se lleva la primera entre el cálculo y la inserción, se intenta con la siguiente; si no
+ * queda nadie, el hueco (o la sala) ya no existe.
  */
 async function insertFirstFreeSession(
   client: TenantTransactionClient,
@@ -150,26 +248,24 @@ async function insertFirstFreeSession(
     freeStaff: readonly StaffCandidate[];
   },
 ): Promise<SessionReservation> {
-  const { actor, command } = input;
+  let hasRoomProblem = false;
   for (const staffMember of input.freeStaff) {
-    const session = {
-      id: generateUuidV7(),
-      centerId: actor.centerId,
-      serviceId: input.service.id,
+    const outcome = await tryRoomsOfStaff(client, {
+      ...input,
       staffMembershipId: staffMember.membershipId,
-      startsAt: command.startsAt,
-      endsAt: input.endsAt,
-    };
-    if (!(await tryInsertSession(client, session))) continue;
-    return {
-      kind: 'reserved',
-      sessionId: session.id,
-      staffMembershipId: staffMember.membershipId,
-      service: input.service,
-      endsAt: input.endsAt,
-    };
+    });
+    if (outcome.kind === 'reserved') {
+      return {
+        kind: 'reserved',
+        sessionId: outcome.sessionId,
+        staffMembershipId: staffMember.membershipId,
+        service: input.service,
+        endsAt: input.endsAt,
+      };
+    }
+    hasRoomProblem ||= outcome.hasRoomProblem;
   }
-  return { kind: 'slot_unavailable' };
+  return { kind: hasRoomProblem ? 'room_unavailable' : 'slot_unavailable' };
 }
 
 type LoadedFacts = NonNullable<Awaited<ReturnType<typeof loadSchedulingFacts>>>;
@@ -230,16 +326,82 @@ export async function createBookingInTransaction(
 ): Promise<CreateBookingOutcome> {
   const reservation = await reserveSessionInTransaction(client, actor, command);
   if (reservation.kind !== 'reserved') return reservation;
+  const clientMembershipId = command.clientMembershipId ?? actor.membershipId;
   const booking = await insertBooking(client, {
     actor,
-    command,
+    clientMembershipId,
+    idempotencyKey: command.idempotencyKey,
     sessionId: reservation.sessionId,
   });
   await notifyBookingCreated(client, {
     actor,
-    command,
-    service: reservation.service,
+    clientMembershipId,
+    serviceName: reservation.service.name,
+    startsAt: command.startsAt,
     booking: { id: booking.id, staffMembershipId: reservation.staffMembershipId },
+  });
+  return { kind: 'created', booking: toBookingView(booking) };
+}
+
+async function findJoinableSession(
+  client: TenantTransactionClient,
+  command: JoinGroupSessionCommand,
+) {
+  return client.classSession.findFirst({
+    where: {
+      id: command.classSessionId,
+      mode: 'group',
+      status: 'scheduled',
+      startsAt: { gt: command.now },
+    },
+    include: { service: { select: { name: true } } },
+  });
+}
+
+async function isSessionFull(
+  client: TenantTransactionClient,
+  session: { id: string; capacity: number },
+): Promise<boolean> {
+  const seatsTaken = await client.booking.count({
+    where: { classSessionId: session.id, status: { not: 'cancelled' } },
+  });
+  return seatsTaken >= session.capacity;
+}
+
+/** Apunta a un cliente a una clase grupal que ya existe, si quedan plazas. */
+export async function joinGroupSessionInTransaction(
+  client: TenantTransactionClient,
+  actor: ActorContext,
+  command: JoinGroupSessionCommand,
+): Promise<JoinGroupSessionOutcome> {
+  await lockClientBookings(client, command.clientMembershipId);
+  if (!(await isActiveClient(client, command.clientMembershipId))) {
+    return { kind: 'client_not_found' };
+  }
+  await lockSessionSeats(client, command.classSessionId);
+  const session = await findJoinableSession(client, command);
+  if (!session) return { kind: 'session_not_found' };
+
+  if (await isSessionFull(client, session)) return { kind: 'session_full' };
+  const isClientBusy = await hasOverlappingBooking(client, {
+    clientMembershipId: command.clientMembershipId,
+    startsAt: session.startsAt,
+    endsAt: session.endsAt,
+  });
+  if (isClientBusy) return { kind: 'already_booked' };
+
+  const booking = await insertBooking(client, {
+    actor,
+    clientMembershipId: command.clientMembershipId,
+    idempotencyKey: null,
+    sessionId: session.id,
+  });
+  await notifyBookingCreated(client, {
+    actor,
+    clientMembershipId: command.clientMembershipId,
+    serviceName: session.service.name,
+    startsAt: session.startsAt,
+    booking: { id: booking.id, staffMembershipId: session.staffMembershipId },
   });
   return { kind: 'created', booking: toBookingView(booking) };
 }

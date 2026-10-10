@@ -19,6 +19,7 @@ interface ProfileRow {
   email: string;
   fullName: string;
   phone: string | null;
+  address: string | null;
   birthDate: Date | null;
   locale: string;
   photoKey: string | null;
@@ -31,6 +32,7 @@ const PROFILE_SELECT = {
   email: true,
   fullName: true,
   phone: true,
+  address: true,
   birthDate: true,
   locale: true,
   photoKey: true,
@@ -44,6 +46,7 @@ function toProfile(row: ProfileRow): Profile {
     email: row.email,
     fullName: row.fullName,
     phone: row.phone,
+    address: row.address,
     birthDate: row.birthDate ? row.birthDate.toISOString().slice(0, ISO_DATE_LENGTH) : null,
     locale: row.locale,
     photoKey: row.photoKey,
@@ -83,6 +86,7 @@ export class PrismaProfileRepository implements ProfileRepository {
         data: {
           ...(patch.fullName !== undefined && { fullName: patch.fullName }),
           ...(patch.phone !== undefined && { phone: patch.phone }),
+          ...(patch.address !== undefined && { address: patch.address }),
           ...(patch.locale !== undefined && { locale: patch.locale }),
           ...(patch.birthDate !== undefined && {
             birthDate: patch.birthDate === null ? null : toDatabaseDate(patch.birthDate),

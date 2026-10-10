@@ -61,6 +61,14 @@ enum ServiceKind {
   @@map("service_kind")
 }
 
+/// Privada: una sola persona. Grupal: tantas como el aforo de la sala.
+enum SessionMode {
+  private
+  group
+
+  @@map("session_mode")
+}
+
 enum ClassSessionStatus {
   scheduled
   cancelled
@@ -210,6 +218,8 @@ model User {
   lockedUntil      DateTime? @map("locked_until") @db.Timestamptz
   lastLoginAt      DateTime? @map("last_login_at") @db.Timestamptz
   phone            String?
+  /// Dirección postal opcional que la persona da a su centro.
+  address          String?
   birthDate        DateTime? @map("birth_date") @db.Date
   locale           String    @default("es-ES")
   /// Ruta de su foto de perfil en el almacén de ficheros; una por persona, la misma en todos sus centros.
@@ -231,54 +241,54 @@ model User {
 
 /// Tenant raíz: un centro (gimnasio, academia...).
 model Center {
-  id            String       @id @db.Uuid
-  slug          String       @unique
-  name          String
-  sectorId      String       @map("sector_id")
-  brandColor    String       @map("brand_color") @db.Char(7)
-  timezone      String       @default("Europe/Madrid")
-  joinCode      String       @unique @map("join_code") @db.Char(6)
-  status        CenterStatus @default(trial)
+  id                        String       @id @db.Uuid
+  slug                      String       @unique
+  name                      String
+  sectorId                  String       @map("sector_id")
+  brandColor                String       @map("brand_color") @db.Char(7)
+  timezone                  String       @default("Europe/Madrid")
+  joinCode                  String       @unique @map("join_code") @db.Char(6)
+  status                    CenterStatus @default(trial)
   /// Aparece en la búsqueda pública. Por defecto un centro es privado: solo se entra con su código.
-  isListed      Boolean      @default(false) @map("is_listed")
-  city          String?
-  latitude      Float?
-  longitude     Float?
+  isListed                  Boolean      @default(false) @map("is_listed")
+  city                      String?
+  latitude                  Float?
+  longitude                 Float?
   /// Tope de clientes activos del plan. Nulo = sin tope.
-  maxClients    Int?         @map("max_clients")
-  trialEndsAt   DateTime?    @map("trial_ends_at") @db.Timestamptz
-  address       String?
+  maxClients                Int?         @map("max_clients")
+  trialEndsAt               DateTime?    @map("trial_ends_at") @db.Timestamptz
+  address                   String?
   /// Contacto que ve la clientela y datos fiscales para facturar (solo los ve la administración).
-  phone         String?
-  contactEmail  String?      @map("contact_email")
-  legalName     String?      @map("legal_name")
-  taxId         String?      @map("tax_id")
-  taxAddress    String?      @map("tax_address")
+  phone                     String?
+  contactEmail              String?      @map("contact_email")
+  legalName                 String?      @map("legal_name")
+  taxId                     String?      @map("tax_id")
+  taxAddress                String?      @map("tax_address")
   /// Horario semanal por día: { mon: [{ opensAt: "09:00", closesAt: "14:00" }], ... }
-  openingHours  Json?        @map("opening_hours")
+  openingHours              Json?        @map("opening_hours")
   /// Días de cierre: [{ date: "2026-12-25", label: "Navidad" }]
-  holidays      Json?
+  holidays                  Json?
   /// Política de cancelación: { freeCancellationHours, lateCancellationConsumesCredit }
-  cancelPolicy  Json?        @map("cancel_policy")
+  cancelPolicy              Json?        @map("cancel_policy")
   /// Cu�ndo se subi� el logo vigente; nulo = sin logo. Sirve de versi�n de cach� sin leer los bytes.
-  logoUpdatedAt DateTime?    @map("logo_updated_at") @db.Timestamptz
+  logoUpdatedAt             DateTime?    @map("logo_updated_at") @db.Timestamptz
   /// Espacio de vídeo contratado (plan Premium). Nulo = el plan no incluye vídeo. Solo lo cambia Yoclick.
-  videoStorageLimitBytes BigInt? @map("video_storage_limit_bytes")
+  videoStorageLimitBytes    BigInt?      @map("video_storage_limit_bytes")
   /// Espacio de documentos (PDF) del plan. Todos los planes incluyen PDF; solo cambia el tope. Solo lo cambia Yoclick.
-  documentStorageLimitBytes BigInt @default(1073741824) @map("document_storage_limit_bytes")
+  documentStorageLimitBytes BigInt       @default(1073741824) @map("document_storage_limit_bytes")
   /// Espacio de fotos de la galería del equipo (100 MiB por defecto). Las fotos de perfil no cuentan: hay una por persona. Solo lo cambia Yoclick.
-  photoStorageLimitBytes BigInt @default(104857600) @map("photo_storage_limit_bytes")
+  photoStorageLimitBytes    BigInt       @default(104857600) @map("photo_storage_limit_bytes")
   /// Premium: fondo de las pantallas del centro. Solo este es liso; con `backgroundColorEnd` es un degradado de dos colores. Nulo = el del tema.
-  backgroundColor        String?   @map("background_color") @db.Char(7)
-  backgroundColorEnd     String?   @map("background_color_end") @db.Char(7)
+  backgroundColor           String?      @map("background_color") @db.Char(7)
+  backgroundColorEnd        String?      @map("background_color_end") @db.Char(7)
   /// Premium: color de la colmena de fondo. Nulo = el color de marca.
-  hiveColor              String?   @map("hive_color") @db.Char(7)
+  hiveColor                 String?      @map("hive_color") @db.Char(7)
   /// Las opiniones sobre el equipo se revisan antes de publicarse.
-  reviewsNeedApproval    Boolean   @default(true) @map("reviews_need_approval")
+  reviewsNeedApproval       Boolean      @default(true) @map("reviews_need_approval")
   /// El equipo (fotos, vídeos y valoraciones) se enseña en la web de reservas.
-  showTeamOnWeb          Boolean   @default(true) @map("show_team_on_web")
-  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt     DateTime     @updatedAt @map("updated_at") @db.Timestamptz
+  showTeamOnWeb             Boolean      @default(true) @map("show_team_on_web")
+  createdAt                 DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                 DateTime     @updatedAt @map("updated_at") @db.Timestamptz
 
   videos              Video[]
   contentItems        ContentItem[]
@@ -324,58 +334,60 @@ model CenterLogo {
 
 /// Pertenencia de un usuario a un centro con un rol.
 model Membership {
-  id          String           @id @db.Uuid
-  centerId    String           @map("center_id") @db.Uuid
-  userId      String           @map("user_id") @db.Uuid
-  role        MembershipRole
-  status      MembershipStatus @default(active)
-  joinedAt    DateTime         @default(now()) @map("joined_at") @db.Timestamptz
+  id             String           @id @db.Uuid
+  centerId       String           @map("center_id") @db.Uuid
+  userId         String           @map("user_id") @db.Uuid
+  role           MembershipRole
+  status         MembershipStatus @default(active)
+  joinedAt       DateTime         @default(now()) @map("joined_at") @db.Timestamptz
   /// Cargo que ve la clientela ("Profesora de yoga"). Solo para el equipo.
-  staffTitle  String?          @map("staff_title")
+  staffTitle     String?          @map("staff_title")
   /// Solo clientes: su nivel y el grupo al que pertenece (uno como máximo).
-  level       ClientLevel?
-  groupId     String?          @map("group_id") @db.Uuid
+  level          ClientLevel?
+  groupId        String?          @map("group_id") @db.Uuid
   /// Solo clientes: cómo se unió. Nulo si entró antes de que se registrara o por invitación.
-  joinSource  JoinSource?      @map("join_source")
+  joinSource     JoinSource?      @map("join_source")
   /// Permisos extra del equipo, p. ej. ["health:read"]. Un array de cadenas validado por la API.
-  permissions Json             @default("[]")
+  permissions    Json             @default("[]")
   /// Solo equipo: su vídeo de presentación (lo ven los clientes cuando el centro lo ha aprobado).
-  profileVideoId String?       @unique @map("profile_video_id") @db.Uuid
-  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt   DateTime         @updatedAt @map("updated_at") @db.Timestamptz
+  profileVideoId String?          @unique @map("profile_video_id") @db.Uuid
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz
 
-  center Center       @relation(fields: [centerId], references: [id])
-  user   User         @relation(fields: [userId], references: [id])
-  group  ClientGroup? @relation("GroupMembers", fields: [groupId], references: [id])
-  profileVideo Video? @relation("ProfileVideo", fields: [profileVideoId], references: [id], onDelete: SetNull)
+  center       Center       @relation(fields: [centerId], references: [id])
+  user         User         @relation(fields: [userId], references: [id])
+  group        ClientGroup? @relation("GroupMembers", fields: [groupId], references: [id])
+  profileVideo Video?       @relation("ProfileVideo", fields: [profileVideoId], references: [id], onDelete: SetNull)
 
-  uploadedVideos      Video[]             @relation("VideoUploader")
-  createdContentItems ContentItem[]       @relation("ContentAuthor")
-  contentAssignments  ContentAssignment[] @relation("ContentClient")
-  assignedContent     ContentAssignment[] @relation("ContentAssigner")
-  techniqueVideos     Video[]             @relation("TechniqueVideos")
-  staffProfile        StaffProfile?       @relation("StaffProfileOwner")
-  reviewedStaffProfiles StaffProfile[]    @relation("StaffProfileReviewer")
-  verifiedCertifications StaffCertification[] @relation("CertificationVerifier")
-  receivedStaffReviews StaffReview[]      @relation("ReviewedStaff")
-  writtenStaffReviews StaffReview[]        @relation("ReviewAuthor")
-  moderatedStaffReviews StaffReview[]     @relation("ReviewModerator")
-  privacyRequests     PrivacyRequest[]    @relation("PrivacyRequester")
-  resolvedPrivacyRequests PrivacyRequest[] @relation("PrivacyResolver")
-  instructedGroups    ClientGroup[]       @relation("GroupInstructor")
-  notifications       Notification[]      @relation("NotificationRecipient")
-  serviceAssignments  ServiceStaff[]
-  taughtClassSessions ClassSession[]      @relation("StaffClassSessions")
-  bookings            Booking[]           @relation("ClientBookings")
-  availability        StaffAvailability?
-  authoredRoutines    Routine[]           @relation("RoutineAuthor")
-  receivedRoutines    RoutineAssignment[] @relation("RoutineClient")
-  routineCompletions  RoutineCompletion[] @relation("RoutineDoneBy")
-  assignedRoutines    RoutineAssignment[] @relation("RoutineAssigner")
-  absences            StaffAbsence[]
-  startedBookings     Booking[]           @relation("BookingStartedBy")
-  endedBookings       Booking[]           @relation("BookingEndedBy")
-  checkedInBookings   Booking[]           @relation("BookingCheckedInBy")
+  uploadedVideos          Video[]              @relation("VideoUploader")
+  createdContentItems     ContentItem[]        @relation("ContentAuthor")
+  contentAssignments      ContentAssignment[]  @relation("ContentClient")
+  assignedContent         ContentAssignment[]  @relation("ContentAssigner")
+  techniqueVideos         Video[]              @relation("TechniqueVideos")
+  staffProfile            StaffProfile?        @relation("StaffProfileOwner")
+  reviewedStaffProfiles   StaffProfile[]       @relation("StaffProfileReviewer")
+  verifiedCertifications  StaffCertification[] @relation("CertificationVerifier")
+  receivedStaffReviews    StaffReview[]        @relation("ReviewedStaff")
+  writtenStaffReviews     StaffReview[]        @relation("ReviewAuthor")
+  moderatedStaffReviews   StaffReview[]        @relation("ReviewModerator")
+  privacyRequests         PrivacyRequest[]     @relation("PrivacyRequester")
+  resolvedPrivacyRequests PrivacyRequest[]     @relation("PrivacyResolver")
+  instructedGroups        ClientGroup[]        @relation("GroupInstructor")
+  notifications           Notification[]       @relation("NotificationRecipient")
+  serviceAssignments      ServiceStaff[]
+  taughtClassSessions     ClassSession[]       @relation("StaffClassSessions")
+  bookings                Booking[]            @relation("ClientBookings")
+  availability            StaffAvailability?
+  authoredRoutines        Routine[]            @relation("RoutineAuthor")
+  receivedRoutines        RoutineAssignment[]  @relation("RoutineClient")
+  routineCompletions      RoutineCompletion[]  @relation("RoutineDoneBy")
+  assignedRoutines        RoutineAssignment[]  @relation("RoutineAssigner")
+  absences                StaffAbsence[]
+  startedBookings         Booking[]            @relation("BookingStartedBy")
+  endedBookings           Booking[]            @relation("BookingEndedBy")
+  checkedInBookings       Booking[]            @relation("BookingCheckedInBy")
+  createdBookings         Booking[]            @relation("BookingCreatedBy")
+  taughtRooms             Room[]               @relation("RoomTeacher")
 
   @@unique([centerId, userId])
   @@index([centerId, role])
@@ -494,21 +506,21 @@ model MfaRecoveryCode {
 
 /// Invitación a unirse a un centro con un rol. El código viaja por correo; aquí solo su hash.
 model Invitation {
-  id              String         @id @db.Uuid
-  centerId        String         @map("center_id") @db.Uuid
+  id               String         @id @db.Uuid
+  centerId         String         @map("center_id") @db.Uuid
   /// Correo al que se envió; nulo si se invitó por teléfono (entonces vale cualquier cuenta).
-  email           String?
+  email            String?
   /// Teléfono al que se compartió el código, normalizado (`+34600111222`).
-  phone           String?
-  role            MembershipRole
-  tokenHash       String         @unique @map("token_hash")
-  invitedByUserId String         @map("invited_by_user_id") @db.Uuid
-  expiresAt       DateTime       @map("expires_at") @db.Timestamptz
-  acceptedAt      DateTime?      @map("accepted_at") @db.Timestamptz
+  phone            String?
+  role             MembershipRole
+  tokenHash        String         @unique @map("token_hash")
+  invitedByUserId  String         @map("invited_by_user_id") @db.Uuid
+  expiresAt        DateTime       @map("expires_at") @db.Timestamptz
+  acceptedAt       DateTime?      @map("accepted_at") @db.Timestamptz
   /// Quién la aceptó: si la misma cuenta repite la petición, recibe lo mismo en vez de un error.
-  acceptedByUserId String?       @map("accepted_by_user_id") @db.Uuid
-  revokedAt       DateTime?      @map("revoked_at") @db.Timestamptz
-  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  acceptedByUserId String?        @map("accepted_by_user_id") @db.Uuid
+  revokedAt        DateTime?      @map("revoked_at") @db.Timestamptz
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz
 
   center Center @relation(fields: [centerId], references: [id])
 
@@ -714,18 +726,23 @@ model RoutineCompletion {
 
 /// Sala o recurso del centro (Sala 1, Tatami, Zona de peso libre). Se archiva, no se borra.
 model Room {
-  id         String    @id @db.Uuid
-  centerId   String    @map("center_id") @db.Uuid
-  name       String
+  id                String    @id @db.Uuid
+  centerId          String    @map("center_id") @db.Uuid
+  name              String
   /// Aforo máximo de la sala.
-  capacity   Int       @default(1)
-  archivedAt DateTime? @map("archived_at") @db.Timestamptz
-  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  capacity          Int       @default(1)
+  /// Quien da clase en esta sala; nulo = cualquiera del equipo.
+  staffMembershipId String?   @map("staff_membership_id") @db.Uuid
+  archivedAt        DateTime? @map("archived_at") @db.Timestamptz
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
-  center   Center    @relation(fields: [centerId], references: [id])
-  services Service[]
+  center          Center         @relation(fields: [centerId], references: [id])
+  staffMembership Membership?    @relation("RoomTeacher", fields: [staffMembershipId], references: [id])
+  services        Service[]
+  classSessions   ClassSession[]
 
   @@index([centerId])
+  @@index([staffMembershipId])
   @@map("rooms")
 }
 
@@ -785,12 +802,16 @@ model ClassSession {
   startsAt          DateTime           @map("starts_at") @db.Timestamptz
   endsAt            DateTime           @map("ends_at") @db.Timestamptz
   capacity          Int                @default(1)
+  /// Sala donde se da; nulo en las anteriores a las salas o en centros sin ellas.
+  roomId            String?            @map("room_id") @db.Uuid
+  mode              SessionMode        @default(private)
   status            ClassSessionStatus @default(scheduled)
   createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz
 
   center          Center     @relation(fields: [centerId], references: [id])
   service         Service    @relation(fields: [serviceId], references: [id])
   staffMembership Membership @relation("StaffClassSessions", fields: [staffMembershipId], references: [id])
+  room            Room?      @relation(fields: [roomId], references: [id])
   bookings        Booking[]
 
   @@index([centerId, startsAt])
@@ -818,6 +839,9 @@ model Booking {
   /// Llegada de la persona: la registra el servidor al escanear su QR de asistencia.
   checkedInAt             DateTime?           @map("checked_in_at") @db.Timestamptz
   checkedInByMembershipId String?             @map("checked_in_by_membership_id") @db.Uuid
+  /// Quién asignó la cita (la propia persona, el equipo o la administración) y con qué papel; nulo en las anteriores a este dato.
+  createdByMembershipId   String?             @map("created_by_membership_id") @db.Uuid
+  createdByRole           MembershipRole?     @map("created_by_role")
   createdAt               DateTime            @default(now()) @map("created_at") @db.Timestamptz
   updatedAt               DateTime            @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -827,6 +851,7 @@ model Booking {
   startedBy        Membership?  @relation("BookingStartedBy", fields: [startedByMembershipId], references: [id])
   endedBy          Membership?  @relation("BookingEndedBy", fields: [endedByMembershipId], references: [id])
   checkedInBy      Membership?  @relation("BookingCheckedInBy", fields: [checkedInByMembershipId], references: [id])
+  createdBy        Membership?  @relation("BookingCreatedBy", fields: [createdByMembershipId], references: [id])
   staffReview      StaffReview?
 
   @@unique([clientMembershipId, idempotencyKey])
@@ -839,29 +864,29 @@ model Booking {
 /// Un vídeo alojado en el servicio de vídeo (Bunny Stream). La base de datos solo guarda sus datos;
 /// el fichero y su reproducción adaptativa viven fuera.
 model Video {
-  id                    String            @id @db.Uuid
-  centerId              String            @map("center_id") @db.Uuid
+  id                     String            @id @db.Uuid
+  centerId               String            @map("center_id") @db.Uuid
   /// Identificador del vídeo en el servicio de vídeo.
-  providerVideoId       String            @unique @map("provider_video_id")
-  title                 String
-  status                VideoStatus       @default(uploading)
+  providerVideoId        String            @unique @map("provider_video_id")
+  title                  String
+  status                 VideoStatus       @default(uploading)
   /// Los de rutinas nacen aprobados; el de presentación del equipo espera la revisión del centro.
-  reviewStatus          VideoReviewStatus @default(approved) @map("review_status")
-  reviewNote            String?           @map("review_note")
+  reviewStatus           VideoReviewStatus @default(approved) @map("review_status")
+  reviewNote             String?           @map("review_note")
   /// Lo que el móvil dice que va a subir (para reservar espacio) y, al procesarse, lo que ocupa de verdad.
-  sizeBytes             BigInt            @default(0) @map("size_bytes")
-  durationSeconds       Int?              @map("duration_seconds")
-  uploadedByMembershipId String           @map("uploaded_by_membership_id") @db.Uuid
-  createdAt             DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  sizeBytes              BigInt            @default(0) @map("size_bytes")
+  durationSeconds        Int?              @map("duration_seconds")
+  uploadedByMembershipId String            @map("uploaded_by_membership_id") @db.Uuid
+  createdAt              DateTime          @default(now()) @map("created_at") @db.Timestamptz
 
-  center       Center        @relation(fields: [centerId], references: [id])
-  uploadedBy   Membership    @relation("VideoUploader", fields: [uploadedByMembershipId], references: [id])
+  center                  Center        @relation(fields: [centerId], references: [id])
+  uploadedBy              Membership    @relation("VideoUploader", fields: [uploadedByMembershipId], references: [id])
   /// Si es uno de los vídeos de técnica de alguien del equipo (hasta tres).
-  techniqueOfMembershipId String? @map("technique_of_membership_id") @db.Uuid
-  techniqueOf  Membership?   @relation("TechniqueVideos", fields: [techniqueOfMembershipId], references: [id], onDelete: SetNull)
-  routineItems RoutineItem[]
-  profileOf    Membership?   @relation("ProfileVideo")
-  contentItem  ContentItem?
+  techniqueOfMembershipId String?       @map("technique_of_membership_id") @db.Uuid
+  techniqueOf             Membership?   @relation("TechniqueVideos", fields: [techniqueOfMembershipId], references: [id], onDelete: SetNull)
+  routineItems            RoutineItem[]
+  profileOf               Membership?   @relation("ProfileVideo")
+  contentItem             ContentItem?
 
   @@index([centerId])
   @@map("videos")
@@ -961,22 +986,22 @@ model StaffProfilePhoto {
 
 /// Opinión de un cliente sobre quien le dio una sesión. Solo tras una sesión real, una por reserva.
 model StaffReview {
-  id                    String            @id @db.Uuid
-  centerId              String            @map("center_id") @db.Uuid
-  staffMembershipId     String            @map("staff_membership_id") @db.Uuid
-  clientMembershipId    String            @map("client_membership_id") @db.Uuid
-  bookingId             String            @unique @map("booking_id") @db.Uuid
-  rating                Int
-  comment               String?
-  status                StaffReviewStatus @default(pending)
-  createdAt             DateTime          @default(now()) @map("created_at") @db.Timestamptz
-  moderatedAt           DateTime?         @map("moderated_at") @db.Timestamptz
-  moderatedByMembershipId String?         @map("moderated_by_membership_id") @db.Uuid
+  id                      String            @id @db.Uuid
+  centerId                String            @map("center_id") @db.Uuid
+  staffMembershipId       String            @map("staff_membership_id") @db.Uuid
+  clientMembershipId      String            @map("client_membership_id") @db.Uuid
+  bookingId               String            @unique @map("booking_id") @db.Uuid
+  rating                  Int
+  comment                 String?
+  status                  StaffReviewStatus @default(pending)
+  createdAt               DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  moderatedAt             DateTime?         @map("moderated_at") @db.Timestamptz
+  moderatedByMembershipId String?           @map("moderated_by_membership_id") @db.Uuid
 
-  center    Center     @relation(fields: [centerId], references: [id])
-  booking   Booking    @relation(fields: [bookingId], references: [id])
-  staff     Membership @relation("ReviewedStaff", fields: [staffMembershipId], references: [id])
-  client    Membership @relation("ReviewAuthor", fields: [clientMembershipId], references: [id])
+  center    Center      @relation(fields: [centerId], references: [id])
+  booking   Booking     @relation(fields: [bookingId], references: [id])
+  staff     Membership  @relation("ReviewedStaff", fields: [staffMembershipId], references: [id])
+  client    Membership  @relation("ReviewAuthor", fields: [clientMembershipId], references: [id])
   moderator Membership? @relation("ReviewModerator", fields: [moderatedByMembershipId], references: [id], onDelete: Restrict)
 
   @@index([centerId, status])
@@ -996,21 +1021,21 @@ enum ContentKind {
 /// Pieza de la biblioteca del centro: un vídeo (ya alojado en el servicio de vídeo) o un PDF o una imagen (en el
 /// almacén de ficheros). Los clientes solo la ven cuando se le asigna. Borrarla libera su espacio.
 model ContentItem {
-  id                    String      @id @db.Uuid
-  centerId              String      @map("center_id") @db.Uuid
+  id                    String       @id @db.Uuid
+  centerId              String       @map("center_id") @db.Uuid
   kind                  ContentKind
   title                 String
   /// Necesidad que cubre, del vocabulario del sector («Técnica», «Fuerza»...). Nulo = sin clasificar.
   need                  String?
   /// Nivel al que va dirigido, para filtrar. No decide quién lo ve: eso lo hacen las asignaciones.
   level                 ClientLevel?
-  videoId               String?     @unique @map("video_id") @db.Uuid
+  videoId               String?      @unique @map("video_id") @db.Uuid
   /// Ruta del PDF o de la imagen en el almacén de ficheros; solo si es un PDF o una imagen.
-  documentKey           String?     @unique @map("document_key")
-  sizeBytes             BigInt      @default(0) @map("size_bytes")
-  pageCount             Int?        @map("page_count")
-  createdByMembershipId String      @map("created_by_membership_id") @db.Uuid
-  createdAt             DateTime    @default(now()) @map("created_at") @db.Timestamptz
+  documentKey           String?      @unique @map("document_key")
+  sizeBytes             BigInt       @default(0) @map("size_bytes")
+  pageCount             Int?         @map("page_count")
+  createdByMembershipId String       @map("created_by_membership_id") @db.Uuid
+  createdAt             DateTime     @default(now()) @map("created_at") @db.Timestamptz
 
   center      Center              @relation(fields: [centerId], references: [id])
   video       Video?              @relation(fields: [videoId], references: [id], onDelete: Restrict)
@@ -1029,6 +1054,8 @@ model ContentAssignment {
   level                  ClientLevel?
   groupId                String?      @map("group_id") @db.Uuid
   clientMembershipId     String?      @map("client_membership_id") @db.Uuid
+  /// Destino «para todos»: lo ve todo el alumnado del centro.
+  forEveryone            Boolean      @default(false) @map("for_everyone")
   assignedByMembershipId String       @map("assigned_by_membership_id") @db.Uuid
   assignedAt             DateTime     @default(now()) @map("assigned_at") @db.Timestamptz
 

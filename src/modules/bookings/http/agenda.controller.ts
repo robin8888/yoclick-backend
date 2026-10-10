@@ -19,8 +19,6 @@ import {
   GetDayAgendaUseCase,
 } from '../application/booking.use-cases';
 import { PushDispatcher } from '../../push/application/push-dispatcher';
-import { DomainError } from '../../../shared/errors/domain-error';
-import { HTTP_STATUS } from '../../../shared/errors/http-status';
 import {
   AgendaQueryDto,
   AgendaResponseDto,
@@ -80,12 +78,12 @@ export class AgendaController {
   }
 
   @Post('bookings')
-  @Roles('owner', 'admin', 'staff')
+  @Roles('owner', 'admin')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     operationId: 'agenda_create_booking',
     summary:
-      'Crea una cita para un cliente desde la agenda. Mismas reglas de hueco que la reserva del cliente. El personal solo puede ponerla en su propia agenda.',
+      'Asigna una cita a un cliente desde la agenda. Solo el centro (propietario o administración) asigna citas; el equipo no. Mismas reglas de hueco que la reserva del cliente.',
   })
   @ApiCreatedResponse({ type: BookingResponseDto })
   async createForClient(
@@ -94,22 +92,16 @@ export class AgendaController {
     @Body() body: CreateAgendaBookingRequestDto,
   ): Promise<Record<string, unknown>> {
     assertRouteTargetsActorCenter(actor, params.centerId);
-    if (
-      actor.role === 'staff' &&
-      body.staffMembershipId !== undefined &&
-      body.staffMembershipId !== actor.membershipId
-    ) {
-      throw new DomainError('FORBIDDEN', HTTP_STATUS.forbidden);
-    }
     const booking = await this.createBooking.execute(actor, {
       serviceId: body.serviceId,
       startsAt: new Date(body.startsAt),
-      preferredStaffMembershipId:
-        actor.role === 'staff' ? actor.membershipId : (body.staffMembershipId ?? null),
+      preferredStaffMembershipId: body.staffMembershipId ?? null,
       idempotencyKey: null,
       now: new Date(),
       clientMembershipId: body.clientMembershipId,
       slotStepMinutes: AGENDA_SLOT_STEP_MINUTES,
+      mode: body.mode,
+      roomId: body.roomId ?? null,
     });
     await this.activity.record(actor, {
       kind: 'booking_created_by_team',
