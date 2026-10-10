@@ -71,6 +71,9 @@ export const ERROR_CATALOG = {
   CHECKIN_NO_BOOKING: {
     title: 'Esta persona no tiene una cita confirmada para registrar ahora',
   },
+  PREMIUM_APPEARANCE_NOT_INCLUDED: {
+    title: 'Personalizar el fondo y la colmena es del plan Premium',
+  },
   VIDEO_NOT_INCLUDED: { title: 'El plan de este centro no incluye vídeo' },
   VIDEO_TOO_LARGE: { title: 'El vídeo es demasiado grande. Máximo 500 MB' },
   VIDEO_QUOTA_EXCEEDED: {

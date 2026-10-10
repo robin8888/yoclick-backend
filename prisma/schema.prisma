@@ -268,6 +268,11 @@ model Center {
   documentStorageLimitBytes BigInt @default(1073741824) @map("document_storage_limit_bytes")
   /// Espacio de fotos de la galería del equipo (100 MiB por defecto). Las fotos de perfil no cuentan: hay una por persona. Solo lo cambia Yoclick.
   photoStorageLimitBytes BigInt @default(104857600) @map("photo_storage_limit_bytes")
+  /// Premium: fondo de las pantallas del centro. Solo este es liso; con `backgroundColorEnd` es un degradado de dos colores. Nulo = el del tema.
+  backgroundColor        String?   @map("background_color") @db.Char(7)
+  backgroundColorEnd     String?   @map("background_color_end") @db.Char(7)
+  /// Premium: color de la colmena de fondo. Nulo = el color de marca.
+  hiveColor              String?   @map("hive_color") @db.Char(7)
   /// Las opiniones sobre el equipo se revisan antes de publicarse.
   reviewsNeedApproval    Boolean   @default(true) @map("reviews_need_approval")
   /// El equipo (fotos, vídeos y valoraciones) se enseña en la web de reservas.

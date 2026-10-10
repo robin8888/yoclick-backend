@@ -36,6 +36,11 @@ const cancelPolicySchema = z.strictObject({
   lateCancellationConsumesCredit: z.boolean(),
 });
 
+const hexColorSchema = z
+  .string()
+  .regex(/^#[0-9A-Fa-f]{6}$/)
+  .transform((color) => color.toUpperCase());
+
 const centerSettingsShape = {
   id: z.uuid(),
   slug: z.string(),
@@ -61,6 +66,11 @@ const centerSettingsShape = {
   holidays: holidaysSchema.nullable(),
   cancelPolicy: cancelPolicySchema.nullable(),
   trialEndsAt: z.iso.datetime().nullable(),
+  /** Premium: fondo (liso, o degradado con el segundo color) y colmena. Nulo = los del tema. */
+  backgroundColor: z.string().nullable(),
+  backgroundColorEnd: z.string().nullable(),
+  hiveColor: z.string().nullable(),
+  canCustomizeAppearance: z.boolean(),
   /** El mismo valor que el encabezado `ETag`: se envía en `If-Match` al editar. */
   version: z.string(),
 };
@@ -108,6 +118,10 @@ export class UpdateCenterSettingsRequestDto extends createZodDto(
       openingHours: openingHoursSchema.optional(),
       holidays: holidaysSchema.optional(),
       cancelPolicy: cancelPolicySchema.optional(),
+      /** Premium. `null` quita el color y vuelve al del tema. */
+      backgroundColor: hexColorSchema.nullable().optional(),
+      backgroundColorEnd: hexColorSchema.nullable().optional(),
+      hiveColor: hexColorSchema.nullable().optional(),
     })
     .refine((patch) => Object.keys(patch).length > 0, 'send at least one field to change')
     .refine(areCoordinatesTogether, 'latitude and longitude must be sent together'),

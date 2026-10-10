@@ -319,4 +319,103 @@ describe('center settings (ETag / If-Match)', () => {
       ).toContain('studio-norte');
     });
   });
+
+  describe('premium appearance', () => {
+    const APPEARANCE = {
+      backgroundColor: '#1B1F3B',
+      backgroundColorEnd: '#3A2A6B',
+      hiveColor: '#F2C94C',
+    };
+
+    async function readPublicAppearance(targetCenterId: string): Promise<unknown> {
+      const response = await application.inject({
+        method: 'GET',
+        url: `/v1/centers/${targetCenterId}/branding`,
+      });
+      return response.json<{ appearance: unknown }>().appearance;
+    }
+
+    async function makeCenterBasic(): Promise<void> {
+      const ownerContext = {
+        userId: owner,
+        centerId,
+        membershipId: owner,
+        role: 'owner' as const,
+        permissions: [],
+      };
+      await application
+        .get(TenantPrismaService)
+        .runInTenantContext(ownerContext, (client) =>
+          client.center.update({ where: { id: centerId }, data: { maxClients: 150 } }),
+        );
+    }
+
+    it('lets a Premium center choose a gradient background and a hive color, and publishes them', async () => {
+      const response = await call('PATCH', owner, {
+        ifMatch: await currentEtag(),
+        body: APPEARANCE,
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({ ...APPEARANCE, canCustomizeAppearance: true });
+      expect(await readPublicAppearance(centerId)).toEqual(APPEARANCE);
+    });
+
+    it('normalises the colors to upper case and clears them with null', async () => {
+      await call('PATCH', owner, {
+        ifMatch: await currentEtag(),
+        body: { backgroundColor: '#1b1f3b', hiveColor: '#f2c94c' },
+      });
+      const cleared = await call('PATCH', owner, {
+        ifMatch: await currentEtag(),
+        body: { backgroundColor: null, hiveColor: null },
+      });
+
+      expect(cleared.json()).toMatchObject({ backgroundColor: null, hiveColor: null });
+    });
+
+    it('answers 403 PREMIUM_APPEARANCE_NOT_INCLUDED when the plan is not Premium', async () => {
+      await makeCenterBasic();
+
+      const response = await call('PATCH', owner, {
+        ifMatch: await currentEtag(),
+        body: APPEARANCE,
+      });
+
+      expect(response.statusCode).toBe(403);
+      expect(response.json()).toMatchObject({ code: 'PREMIUM_APPEARANCE_NOT_INCLUDED' });
+    });
+
+    it('stops showing what was saved when the plan drops below Premium, and keeps it for later', async () => {
+      await call('PATCH', owner, { ifMatch: await currentEtag(), body: APPEARANCE });
+      await makeCenterBasic();
+
+      const settings = await call('GET', owner);
+
+      expect(await readPublicAppearance(centerId)).toEqual({
+        backgroundColor: null,
+        backgroundColorEnd: null,
+        hiveColor: null,
+      });
+      expect(settings.json()).toMatchObject({ ...APPEARANCE, canCustomizeAppearance: false });
+    });
+
+    it('refuses a gradient end color without a start color', async () => {
+      const response = await call('PATCH', owner, {
+        ifMatch: await currentEtag(),
+        body: { backgroundColorEnd: '#3A2A6B' },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('refuses a malformed color', async () => {
+      const response = await call('PATCH', owner, {
+        ifMatch: await currentEtag(),
+        body: { hiveColor: 'gold' },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+  });
 });

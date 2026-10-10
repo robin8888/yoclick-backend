@@ -37,6 +37,12 @@ export interface CenterSettings {
   readonly holidays: readonly Holiday[] | null;
   readonly cancelPolicy: CancelPolicy | null;
   readonly trialEndsAt: Date | null;
+  /** Personalización Premium guardada (puede haber quedado de un plan anterior). */
+  readonly backgroundColor: string | null;
+  readonly backgroundColorEnd: string | null;
+  readonly hiveColor: string | null;
+  /** Solo el plan Premium puede cambiar el fondo y la colmena. */
+  readonly canCustomizeAppearance: boolean;
 }
 
 /** Solo lo que la administración puede cambiar. El slug, el código, el estado y el plan no están aquí. */
@@ -58,6 +64,9 @@ export interface CenterSettingsPatch {
   readonly openingHours?: OpeningHours | undefined;
   readonly holidays?: readonly Holiday[] | undefined;
   readonly cancelPolicy?: CancelPolicy | undefined;
+  readonly backgroundColor?: string | null | undefined;
+  readonly backgroundColorEnd?: string | null | undefined;
+  readonly hiveColor?: string | null | undefined;
 }
 
 export interface CenterSettingsRepository {

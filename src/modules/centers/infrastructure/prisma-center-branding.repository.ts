@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { resolveVisibleAppearance } from '../../../shared/centers/center-appearance';
 import { buildCenterLogoUrl } from '../../../shared/media/center-logo-url';
 import { TenantPrismaService } from '../../../shared/database/tenant-prisma.service';
 import {
@@ -21,6 +22,10 @@ export class PrismaCenterBrandingRepository implements CenterBrandingRepository 
           brandColor: true,
           logoUpdatedAt: true,
           status: true,
+          maxClients: true,
+          backgroundColor: true,
+          backgroundColorEnd: true,
+          hiveColor: true,
         },
       }),
     );
@@ -31,6 +36,7 @@ export class PrismaCenterBrandingRepository implements CenterBrandingRepository 
       sectorId: center.sectorId,
       brandColor: center.brandColor,
       logoUrl: buildCenterLogoUrl(center.id, center.logoUpdatedAt),
+      appearance: resolveVisibleAppearance(center),
     };
   }
 }

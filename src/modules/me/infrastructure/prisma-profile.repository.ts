@@ -1,3 +1,4 @@
+import { resolveVisibleAppearance } from '../../../shared/centers/center-appearance';
 import { Injectable } from '@nestjs/common';
 import { buildCenterLogoUrl } from '../../../shared/media/center-logo-url';
 import { v7 as generateUuidV7 } from 'uuid';
@@ -106,6 +107,10 @@ export class PrismaProfileRepository implements ProfileRepository {
               sectorId: true,
               brandColor: true,
               logoUpdatedAt: true,
+              maxClients: true,
+              backgroundColor: true,
+              backgroundColorEnd: true,
+              hiveColor: true,
             },
           },
         },
@@ -124,6 +129,7 @@ export class PrismaProfileRepository implements ProfileRepository {
         sectorId: row.center.sectorId,
         brandColor: row.center.brandColor,
         logoUrl: buildCenterLogoUrl(row.centerId, row.center.logoUpdatedAt),
+        appearance: resolveVisibleAppearance(row.center),
       },
     }));
   }

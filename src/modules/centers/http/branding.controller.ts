@@ -17,6 +17,11 @@ class CenterBrandingResponseDto extends createZodDto(
     sectorId: z.string(),
     brandColor: z.string(),
     logoUrl: z.string().nullable(),
+    appearance: z.strictObject({
+      backgroundColor: z.string().nullable(),
+      backgroundColorEnd: z.string().nullable(),
+      hiveColor: z.string().nullable(),
+    }),
   }),
 ) {}
 

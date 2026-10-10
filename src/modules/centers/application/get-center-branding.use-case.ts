@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { type CenterAppearance } from '../../../shared/centers/center-appearance';
 import { DomainError } from '../../../shared/errors/domain-error';
 import { HTTP_STATUS } from '../../../shared/errors/http-status';
 
@@ -8,6 +9,8 @@ export interface CenterBranding {
   readonly sectorId: string;
   readonly brandColor: string;
   readonly logoUrl: string | null;
+  /** Personalización Premium; todo nulo si el plan no la incluye. */
+  readonly appearance: CenterAppearance;
 }
 
 export interface CenterBrandingRepository {

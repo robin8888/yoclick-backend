@@ -19,6 +19,37 @@ function withEtag(settings: CenterSettings): VersionedCenterSettings {
   return { settings, etag: buildEtag(settings) };
 }
 
+const APPEARANCE_FIELDS = ['backgroundColor', 'backgroundColorEnd', 'hiveColor'] as const;
+
+/** Quitar un color siempre se puede; elegir uno exige el plan Premium. */
+function assertPremiumForAppearanceChange(
+  current: CenterSettings,
+  patch: CenterSettingsPatch,
+): void {
+  const isSettingAColor = APPEARANCE_FIELDS.some(
+    (field) => patch[field] !== undefined && patch[field] !== null,
+  );
+  if (isSettingAColor && !current.canCustomizeAppearance) {
+    throw new DomainError('PREMIUM_APPEARANCE_NOT_INCLUDED', HTTP_STATUS.forbidden);
+  }
+}
+
+/** El segundo color de un degradado no tiene sentido sin el primero. */
+function assertGradientKeepsItsStartColor(
+  current: CenterSettings,
+  patch: CenterSettingsPatch,
+): void {
+  const startColor =
+    patch.backgroundColor === undefined ? current.backgroundColor : patch.backgroundColor;
+  const endColor =
+    patch.backgroundColorEnd === undefined ? current.backgroundColorEnd : patch.backgroundColorEnd;
+  if (endColor !== null && startColor === null) {
+    throw new DomainError('VALIDATION_FAILED', HTTP_STATUS.badRequest, [
+      { path: 'backgroundColorEnd', code: 'requires_background_color' },
+    ]);
+  }
+}
+
 /** Un centro ajeno y uno inexistente son lo mismo para quien pregunta: 404. */
 function assertRouteTargetsActorCenter(actor: ActorContext, routeCenterId: string): void {
   if (routeCenterId !== actor.centerId) throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
@@ -62,6 +93,8 @@ export class UpdateCenterSettingsUseCase {
     const current = await this.settings.find(actor);
     if (!current) throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
     assertIfMatchPrecondition(ifMatchHeader, buildEtag(current));
+    assertPremiumForAppearanceChange(current, patch);
+    assertGradientKeepsItsStartColor(current, patch);
 
     const updated = await this.settings.updateIfUnchanged(actor, current.updatedAt, patch);
     if (!updated) throw new DomainError('PRECONDITION_FAILED', HTTP_STATUS.preconditionFailed);

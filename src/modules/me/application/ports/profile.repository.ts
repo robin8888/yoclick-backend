@@ -1,3 +1,5 @@
+import { type CenterAppearance } from '../../../../shared/centers/center-appearance';
+
 export interface Profile {
   readonly id: string;
   readonly email: string;
@@ -35,6 +37,8 @@ export interface MyMembership {
     readonly sectorId: string;
     readonly brandColor: string;
     readonly logoUrl: string | null;
+    /** Personalización Premium; todo nulo si el plan del centro no la incluye. */
+    readonly appearance: CenterAppearance;
   };
 }
 

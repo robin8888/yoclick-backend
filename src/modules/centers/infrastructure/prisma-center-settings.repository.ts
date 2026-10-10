@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { type Center, type Prisma } from '../../../generated/prisma/client';
+import { isPremiumPlan } from '../../../shared/centers/center-appearance';
 import { TenantPrismaService } from '../../../shared/database/tenant-prisma.service';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
 import {
@@ -37,6 +38,10 @@ function toSettings(center: Center): CenterSettings {
     holidays: center.holidays as Holiday[] | null,
     cancelPolicy: center.cancelPolicy as CancelPolicy | null,
     trialEndsAt: center.trialEndsAt,
+    backgroundColor: center.backgroundColor,
+    backgroundColorEnd: center.backgroundColorEnd,
+    hiveColor: center.hiveColor,
+    canCustomizeAppearance: isPremiumPlan(center.maxClients),
   };
 }
 

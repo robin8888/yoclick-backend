@@ -5717,12 +5717,30 @@ components:
                   logoUrl:
                     type: string
                     nullable: true
+                  appearance:
+                    type: object
+                    properties:
+                      backgroundColor:
+                        type: string
+                        nullable: true
+                      backgroundColorEnd:
+                        type: string
+                        nullable: true
+                      hiveColor:
+                        type: string
+                        nullable: true
+                    required:
+                      - backgroundColor
+                      - backgroundColorEnd
+                      - hiveColor
+                    additionalProperties: false
                 required:
                   - name
                   - slug
                   - sectorId
                   - brandColor
                   - logoUrl
+                  - appearance
                 additionalProperties: false
             required:
               - membershipId
@@ -5905,12 +5923,30 @@ components:
                   logoUrl:
                     type: string
                     nullable: true
+                  appearance:
+                    type: object
+                    properties:
+                      backgroundColor:
+                        type: string
+                        nullable: true
+                      backgroundColorEnd:
+                        type: string
+                        nullable: true
+                      hiveColor:
+                        type: string
+                        nullable: true
+                    required:
+                      - backgroundColor
+                      - backgroundColorEnd
+                      - hiveColor
+                    additionalProperties: false
                 required:
                   - name
                   - slug
                   - sectorId
                   - brandColor
                   - logoUrl
+                  - appearance
                 additionalProperties: false
             required:
               - membershipId
@@ -6873,12 +6909,30 @@ components:
         logoUrl:
           type: string
           nullable: true
+        appearance:
+          type: object
+          properties:
+            backgroundColor:
+              type: string
+              nullable: true
+            backgroundColorEnd:
+              type: string
+              nullable: true
+            hiveColor:
+              type: string
+              nullable: true
+          required:
+            - backgroundColor
+            - backgroundColorEnd
+            - hiveColor
+          additionalProperties: false
       required:
         - centerId
         - name
         - sectorId
         - brandColor
         - logoUrl
+        - appearance
       additionalProperties: false
     CenterSettingsResponseDto:
       type: object
@@ -7076,6 +7130,17 @@ components:
           format: date-time
           pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
           nullable: true
+        backgroundColor:
+          type: string
+          nullable: true
+        backgroundColorEnd:
+          type: string
+          nullable: true
+        hiveColor:
+          type: string
+          nullable: true
+        canCustomizeAppearance:
+          type: boolean
         version:
           type: string
       required:
@@ -7101,6 +7166,10 @@ components:
         - holidays
         - cancelPolicy
         - trialEndsAt
+        - backgroundColor
+        - backgroundColorEnd
+        - hiveColor
+        - canCustomizeAppearance
         - version
       additionalProperties: false
     UpdateCenterSettingsRequestDto:
@@ -7309,6 +7378,18 @@ components:
             - freeCancellationHours
             - lateCancellationConsumesCredit
           additionalProperties: false
+        backgroundColor:
+          type: string
+          pattern: ^#[0-9A-Fa-f]{6}$
+          nullable: true
+        backgroundColorEnd:
+          type: string
+          pattern: ^#[0-9A-Fa-f]{6}$
+          nullable: true
+        hiveColor:
+          type: string
+          pattern: ^#[0-9A-Fa-f]{6}$
+          nullable: true
       additionalProperties: false
     JoinStatsResponseDto:
       type: object
