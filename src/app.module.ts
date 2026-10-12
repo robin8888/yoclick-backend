@@ -21,6 +21,7 @@ import { ActivityModule } from './modules/activity/activity.module';
 import { PrivacyModule } from './modules/privacy/privacy.module';
 import { ClientsModule } from './modules/clients/clients.module';
 import { RoomsModule } from './modules/rooms/rooms.module';
+import { SchedulesModule } from './modules/schedules/schedules.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { MeModule } from './modules/me/me.module';
@@ -61,6 +62,7 @@ import { buildLoggerOptions } from './shared/logging/build-logger-options';
     BookingsModule,
     ReportsModule,
     RoomsModule,
+    SchedulesModule,
     ClientsModule,
     NotificationsModule,
     PushModule,

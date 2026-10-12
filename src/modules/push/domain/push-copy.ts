@@ -32,6 +32,9 @@ const COPY_BY_KIND: Readonly<Record<string, PushCopy>> = {
   staff_profile_reviewed: { title: 'Han revisado tu perfil', body: OPEN_APP_BODY },
   staff_review_received: { title: 'Tienes una opinión nueva', body: OPEN_APP_BODY },
   privacy_request_resolved: { title: 'Han respondido a tu solicitud', body: OPEN_APP_BODY },
+  session_cancelled: { title: 'Han cancelado una clase', body: OPEN_APP_BODY },
+  schedule_enrolled: { title: 'Tienes un horario fijo nuevo', body: OPEN_APP_BODY },
+  schedule_unenrolled: { title: 'Cambio en tu horario fijo', body: OPEN_APP_BODY },
 };
 
 const FALLBACK_COPY: PushCopy = { title: 'Tienes un aviso nuevo', body: OPEN_APP_BODY };

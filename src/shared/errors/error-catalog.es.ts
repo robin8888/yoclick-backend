@@ -57,6 +57,16 @@ export const ERROR_CATALOG = {
     title: 'Esa sala no está libre a esa hora o no la da esa persona. Elige otra',
   },
   SESSION_FULL: { title: 'Esta clase grupal ya no tiene plazas' },
+  SESSION_MODE_NOT_ALLOWED: {
+    title: 'Este servicio no se da de esa forma (privada o en grupo). Cámbialo en el servicio',
+  },
+  SCHEDULE_HAS_BOOKINGS: {
+    title: 'Hay citas sueltas en sesiones futuras de este horario. Cancélalas o muévelas antes',
+  },
+  SESSION_NOT_CANCELLABLE: { title: 'Esta sesión ya ha empezado o ya estaba cancelada' },
+  ROOM_HAS_BOOKINGS: {
+    title: 'Hay citas en ese tramo. Cancélalas o muévelas antes de bloquear la sala',
+  },
   BOOKING_NOT_CANCELLABLE: { title: 'Esta reserva ya no se puede cancelar' },
   BOOKING_NOT_RESCHEDULABLE: { title: 'Esta reserva ya no se puede cambiar de hora' },
   RESCHEDULE_TOO_LATE: {

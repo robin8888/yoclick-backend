@@ -18,6 +18,9 @@ export const NOTIFICATION_KINDS = [
   'routine_updated',
   'content_assigned',
   'member_joined',
+  'session_cancelled',
+  'schedule_enrolled',
+  'schedule_unenrolled',
 ] as const;
 export type NotificationKindName = (typeof NOTIFICATION_KINDS)[number];
 
@@ -142,6 +145,25 @@ export type ProfileNotificationData = {
 export type ReviewNotificationData = {
   readonly authorLabel: string;
   readonly rating: string;
+};
+
+/** Los datos del aviso de un día cancelado: qué clase, cuándo, dónde y por qué. */
+export type SessionCancelledNotificationData = {
+  readonly serviceName: string;
+  /** Inicio de la sesión (UTC, ISO). */
+  readonly startsAt: string;
+  readonly roomName: string;
+  readonly reason: string;
+  readonly actorName: string;
+};
+
+/** Los datos del aviso de entrar en (o salir de) un grupo fijo. */
+export type EnrollmentNotificationData = {
+  readonly serviceName: string;
+  readonly label: string;
+  readonly staffName: string;
+  readonly roomName: string;
+  readonly actorName: string;
 };
 
 /** Los datos del aviso de un vídeo de presentación: quién lo subió y quién hizo el cambio. */
