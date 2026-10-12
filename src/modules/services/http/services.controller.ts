@@ -96,6 +96,7 @@ export class ServicesController {
       service: {
         name: body.name,
         description: body.description ?? null,
+        mode: body.mode,
         durationMinutes: body.durationMinutes,
         priceCents: body.priceCents ?? null,
         color: body.color ?? null,

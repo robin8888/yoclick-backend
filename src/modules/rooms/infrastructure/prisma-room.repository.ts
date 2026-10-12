@@ -21,6 +21,7 @@ const ROOM_VIEW_FIELDS = {
   name: true,
   capacity: true,
   staffMembership: { select: { id: true, user: { select: { fullName: true } } } },
+  fixedService: { select: { id: true, name: true } },
   services: {
     where: { archivedAt: null },
     select: { id: true, name: true },
@@ -33,6 +34,7 @@ interface StoredRoom {
   readonly name: string;
   readonly capacity: number;
   readonly staffMembership: { id: string; user: { fullName: string } } | null;
+  readonly fixedService: { id: string; name: string } | null;
   readonly services: readonly { id: string; name: string }[];
 }
 
@@ -45,6 +47,7 @@ function toRoomView(room: StoredRoom): RoomView {
       room.staffMembership === null
         ? null
         : { membershipId: room.staffMembership.id, fullName: room.staffMembership.user.fullName },
+    fixedService: room.fixedService,
     services: room.services.map(({ id, name }) => ({ id, name })),
   };
 }
@@ -121,7 +124,7 @@ async function findPatchRefusal(
   if (patch.name !== undefined && (await isNameTaken(client, patch.name, roomId))) {
     return { kind: 'duplicate_name' };
   }
-  const { staffMembershipId, serviceIds } = patch;
+  const { staffMembershipId } = patch;
   if (
     staffMembershipId !== undefined &&
     staffMembershipId !== null &&
@@ -129,10 +132,46 @@ async function findPatchRefusal(
   ) {
     return { kind: 'staff_not_found' };
   }
-  if (serviceIds !== undefined && !(await doServicesExist(client, serviceIds))) {
-    return { kind: 'service_not_found' };
-  }
+  if (!(await doPatchServicesExist(client, patch))) return { kind: 'service_not_found' };
   return null;
+}
+
+/** Los servicios de la sala y su servicio fijo, si se envían, tienen que existir. */
+async function doPatchServicesExist(
+  client: TenantTransactionClient,
+  patch: RoomPatch,
+): Promise<boolean> {
+  const { serviceId, serviceIds } = patch;
+  if (serviceIds !== undefined && !(await doServicesExist(client, serviceIds))) return false;
+  if (serviceId === undefined || serviceId === null) return true;
+  return doServicesExist(client, [serviceId]);
+}
+
+/** La lista de servicios de la sala, si se envió; si solo llegó el servicio fijo, este pasa a darse en ella. */
+async function applyServicePatch(
+  client: TenantTransactionClient,
+  roomId: string,
+  patch: RoomPatch,
+): Promise<void> {
+  if (patch.serviceIds !== undefined) {
+    await assignServicesToRoom(client, roomId, withFixedService(patch.serviceIds, patch.serviceId));
+    return;
+  }
+  if (typeof patch.serviceId !== 'string') return;
+  await client.service.updateMany({
+    where: { id: patch.serviceId, archivedAt: null },
+    data: { roomId },
+  });
+}
+
+/** El servicio fijo de la sala también se da en ella: entra en su lista aunque no se enviara. */
+function withFixedService(
+  serviceIds: readonly string[],
+  serviceId: string | null | undefined,
+): readonly string[] {
+  if (serviceId === undefined || serviceId === null || serviceIds.includes(serviceId))
+    return serviceIds;
+  return [...serviceIds, serviceId];
 }
 
 @Injectable()
@@ -160,13 +199,20 @@ export class PrismaRoomRepository implements RoomRepository {
         return { kind: 'staff_not_found' };
       }
 
-      if (!(await doServicesExist(client, newRoom.serviceIds))) {
+      const serviceIds = withFixedService(newRoom.serviceIds, newRoom.serviceId);
+      if (!(await doServicesExist(client, serviceIds))) {
         return { kind: 'service_not_found' };
       }
 
-      const { serviceIds, ...roomData } = newRoom;
       const created = await client.room.create({
-        data: { id: generateUuidV7(), centerId: actor.centerId, ...roomData },
+        data: {
+          id: generateUuidV7(),
+          centerId: actor.centerId,
+          name: newRoom.name,
+          capacity: newRoom.capacity,
+          staffMembershipId,
+          serviceId: newRoom.serviceId,
+        },
         select: { id: true },
       });
       await assignServicesToRoom(client, created.id, serviceIds);
@@ -199,11 +245,10 @@ export class PrismaRoomRepository implements RoomRepository {
           ...(patch.name !== undefined && { name: patch.name }),
           ...(patch.capacity !== undefined && { capacity: patch.capacity }),
           ...(staffMembershipId !== undefined && { staffMembershipId }),
+          ...(patch.serviceId !== undefined && { serviceId: patch.serviceId }),
         },
       });
-      if (patch.serviceIds !== undefined) {
-        await assignServicesToRoom(client, roomId, patch.serviceIds);
-      }
+      await applyServicePatch(client, roomId, patch);
       const room = await client.room.findUniqueOrThrow({
         where: { id: roomId },
         select: ROOM_VIEW_FIELDS,

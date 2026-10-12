@@ -27,6 +27,8 @@ export interface BookingView {
   readonly cancelWithinPolicy: boolean | null;
   readonly startedAt: Date | null;
   readonly endedAt: Date | null;
+  /** Cita suelta o plaza de un grupo fijo (matrícula, no gasta bono). */
+  readonly source: 'single' | 'enrollment';
   readonly createdAt: Date;
   /** Quién asignó la cita; `null` en las anteriores a este dato. */
   readonly createdBy: {
@@ -70,7 +72,9 @@ export type CreateBookingOutcome =
   | { readonly kind: 'slot_unavailable' }
   | { readonly kind: 'already_booked' }
   /** La sala no existe, está ocupada a esa hora o no la da esa persona. */
-  | { readonly kind: 'room_unavailable' };
+  | { readonly kind: 'room_unavailable' }
+  /** El servicio no se da en ese modo (solo privado o solo en grupo). */
+  | { readonly kind: 'mode_not_allowed' };
 
 export type JoinGroupSessionOutcome =
   | { readonly kind: 'created'; readonly booking: BookingView }
@@ -108,7 +112,8 @@ export type RescheduleOutcome =
   | { readonly kind: 'already_booked' }
   | { readonly kind: 'service_not_found' }
   | { readonly kind: 'client_not_found' }
-  | { readonly kind: 'room_unavailable' };
+  | { readonly kind: 'room_unavailable' }
+  | { readonly kind: 'mode_not_allowed' };
 
 export type BookingListScope = 'upcoming' | 'past';
 
@@ -190,12 +195,27 @@ export interface RoomSessionView {
   readonly bookedCount: number;
   readonly service: { readonly id: string; readonly name: string; readonly color: string | null };
   readonly teacher: { readonly membershipId: string; readonly fullName: string };
+  /** Horario del que nació la sesión (con su etiqueta); `null` si se creó al dar una cita. */
+  readonly schedule: { readonly seriesId: string; readonly label: string | null } | null;
+  /** Cancelada por el centro ese día (festivo, profesor enfermo…) y por qué; `null` si sigue en pie. */
+  readonly cancelledReason: string | null;
   readonly attendees: readonly {
     readonly bookingId: string;
     readonly clientMembershipId: string;
     readonly fullName: string;
     readonly status: BookingStatusName;
+    /** Plaza de grupo fijo (matrícula) o cita suelta. */
+    readonly source: 'single' | 'enrollment';
   }[];
+}
+
+/** Un tramo en que la sala no está disponible: alquiler, mantenimiento, evento. */
+export interface RoomBlockSummary {
+  readonly id: string;
+  readonly startsAt: Date;
+  readonly endsAt: Date;
+  readonly reason: 'rental' | 'maintenance' | 'event' | 'other';
+  readonly note: string | null;
 }
 
 export interface RoomDayView {
@@ -205,6 +225,7 @@ export interface RoomDayView {
   /** Profesor fijo de la sala; `null` si la usa cualquiera. */
   readonly staff: { readonly membershipId: string; readonly fullName: string } | null;
   readonly sessions: readonly RoomSessionView[];
+  readonly blocks: readonly RoomBlockSummary[];
 }
 
 export interface RoomAgenda {

@@ -55,6 +55,7 @@ export function toBookingView(booking: BookingWithSessionDetails): BookingView {
     cancelWithinPolicy: booking.cancelWithinPolicy,
     startedAt: booking.startedAt,
     endedAt: booking.endedAt,
+    source: booking.source,
     createdAt: booking.createdAt,
     createdBy:
       booking.createdBy === null || booking.createdByRole === null

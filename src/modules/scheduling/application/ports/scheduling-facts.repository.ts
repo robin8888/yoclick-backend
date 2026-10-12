@@ -12,6 +12,8 @@ export interface SchedulableService {
   readonly bookingWindowDays: number;
   /** Sala donde se da el servicio; `null` = en cualquiera libre de quien lo da. */
   readonly roomId: string | null;
+  /** Solo en privado, solo en grupo o de las dos formas. */
+  readonly mode: 'private' | 'group' | 'both';
 }
 
 export interface SchedulingFacts {

@@ -39,6 +39,7 @@ function buildBooking(overrides: Partial<BookingView> = {}): BookingView {
     cancelWithinPolicy: null,
     startedAt: null,
     endedAt: null,
+    source: 'single',
     createdAt: NOW,
     createdBy: null,
     ...overrides,

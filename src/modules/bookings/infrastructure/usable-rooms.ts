@@ -8,13 +8,13 @@ export interface UsableRoom {
 
 /**
  * Las salas que puede usar una persona del equipo: las suyas y las que no tienen profesor fijo, las
- * suyas primero; si el servicio tiene sala fija, solo esa. La RLS acota al centro; las archivadas
- * no cuentan.
+ * suyas primero; si el servicio tiene sala fija, solo esa; una sala con servicio fijo solo sirve
+ * para ese servicio. La RLS acota al centro; las archivadas no cuentan.
  */
 export async function listUsableRooms(
   client: TenantTransactionClient,
   staffMembershipId: string,
-  options: { serviceRoomId?: string | null } = {},
+  options: { serviceRoomId?: string | null; serviceId?: string | undefined } = {},
 ): Promise<UsableRoom[]> {
   const rooms = await client.room.findMany({
     where: {
@@ -23,6 +23,10 @@ export async function listUsableRooms(
       // Un servicio con sala fija solo se da en esa sala.
       ...(options.serviceRoomId !== undefined &&
         options.serviceRoomId !== null && { id: options.serviceRoomId }),
+      // Una sala con servicio fijo no se usa para otra cosa.
+      ...(options.serviceId !== undefined && {
+        AND: [{ OR: [{ serviceId: null }, { serviceId: options.serviceId }] }],
+      }),
     },
     select: { id: true, name: true, capacity: true, staffMembershipId: true },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],

@@ -107,6 +107,7 @@ export async function listPlacementOptionsInTransaction(
   );
   const usableRooms = await listUsableRooms(client, query.staffMembershipId, {
     serviceRoomId: facts.service.roomId,
+    serviceId: facts.service.id,
   });
 
   return {

@@ -22,6 +22,8 @@ const roomShape = {
   capacity: z.number().int(),
   /** Quien da clase en la sala; `null` si la puede usar cualquiera del equipo. */
   staff: z.strictObject({ membershipId: z.uuid(), fullName: z.string() }).nullable(),
+  /** Servicio fijo: la sala solo da este; `null` = cualquiera de los suyos. */
+  fixedService: z.strictObject({ id: z.uuid(), name: z.string() }).nullable(),
   /** Los servicios que se dan en esta sala. */
   services: z.array(z.strictObject({ id: z.uuid(), name: z.string() })),
 };
@@ -42,6 +44,8 @@ export class CreateRoomRequestDto extends createZodDto(
       .default(DEFAULT_ROOM_CAPACITY),
     /** La persona del equipo que da clase en la sala; sin ella, la puede usar cualquiera. */
     staffMembershipId: z.uuid().nullable().default(null),
+    /** Servicio fijo: la sala solo dará este. Sin él, cualquiera de sus servicios. */
+    serviceId: z.uuid().nullable().default(null),
     /** Los servicios que se darán en la sala (cada servicio tiene una sola sala fija). */
     serviceIds: z.array(z.uuid()).max(MAX_SERVICES_PER_ROOM).default([]),
   }),
@@ -53,6 +57,8 @@ export class UpdateRoomRequestDto extends createZodDto(
     capacity: z.number().int().min(MIN_ROOM_CAPACITY).max(MAX_ROOM_CAPACITY).optional(),
     /** `null` quita al profesor de la sala. */
     staffMembershipId: z.uuid().nullable().optional(),
+    /** `null` quita el servicio fijo de la sala. */
+    serviceId: z.uuid().nullable().optional(),
     /** Los servicios que se dan en la sala; los que no estén dejan de darse en ella. */
     serviceIds: z.array(z.uuid()).max(MAX_SERVICES_PER_ROOM).optional(),
   }),

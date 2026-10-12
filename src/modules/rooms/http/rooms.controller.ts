@@ -96,7 +96,7 @@ export class RoomsController {
   @ApiOperation({
     operationId: 'rooms_update',
     summary:
-      'Cambia el nombre, el aforo o el profesor de una sala. Las citas ya puestas conservan su sala.',
+      'Cambia el nombre, el aforo, el profesor o el servicio fijo de una sala. Las citas ya puestas conservan su sala.',
   })
   @ApiOkResponse({ type: RoomResponseDto })
   async update(

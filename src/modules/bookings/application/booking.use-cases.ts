@@ -37,6 +37,7 @@ const REFUSALS_BY_OUTCOME: Readonly<
   slot_unavailable: ['SLOT_UNAVAILABLE', HTTP_STATUS.conflict],
   already_booked: ['ALREADY_BOOKED', HTTP_STATUS.conflict],
   room_unavailable: ['ROOM_UNAVAILABLE', HTTP_STATUS.conflict],
+  mode_not_allowed: ['SESSION_MODE_NOT_ALLOWED', HTTP_STATUS.conflict],
 };
 
 /** Reservar un hueco individual. La hora se vuelve a comprobar en el servidor, nunca se confía en la app. */

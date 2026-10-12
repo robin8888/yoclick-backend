@@ -82,14 +82,28 @@ const roomSessionShape = z.strictObject({
   bookedCount: z.number().int(),
   service: z.strictObject({ id: z.uuid(), name: z.string(), color: z.string().nullable() }),
   teacher: z.strictObject({ membershipId: z.uuid(), fullName: z.string() }),
+  /** Horario del que nació la sesión; `null` si se creó al dar una cita. */
+  schedule: z.strictObject({ seriesId: z.uuid(), label: z.string().nullable() }).nullable(),
+  /** Cancelada por el centro ese día y por qué (festivo, ausencia, bloqueo…); `null` si sigue en pie. */
+  cancelledReason: z.string().nullable(),
   attendees: z.array(
     z.strictObject({
       bookingId: z.uuid(),
       clientMembershipId: z.uuid(),
       fullName: z.string(),
       status: z.enum(['confirmed', 'cancelled', 'attended', 'no_show']),
+      /** Plaza de grupo fijo (matrícula) o cita suelta. */
+      source: z.enum(['single', 'enrollment']),
     }),
   ),
+});
+
+const roomBlockSummaryShape = z.strictObject({
+  id: z.uuid(),
+  startsAt: z.iso.datetime(),
+  endsAt: z.iso.datetime(),
+  reason: z.enum(['rental', 'maintenance', 'event', 'other']),
+  note: z.string().nullable(),
 });
 
 export class RoomAgendaQueryDto extends createZodDto(z.strictObject({ date: z.iso.date() })) {}
@@ -109,6 +123,8 @@ export class RoomAgendaResponseDto extends createZodDto(
         /** Profesor fijo de la sala; `null` si la usa cualquiera. */
         staff: z.strictObject({ membershipId: z.uuid(), fullName: z.string() }).nullable(),
         sessions: z.array(roomSessionShape),
+        /** Tramos en que la sala no está disponible ese día (alquiler, mantenimiento, evento). */
+        blocks: z.array(roomBlockSummaryShape),
       }),
     ),
     /** Citas de ese día que no tienen sala. */
@@ -224,6 +240,8 @@ export const bookingShape = {
   endedAt: z.iso.datetime().nullable(),
   /** Fin menos inicio en segundos enteros; `null` mientras no haya terminado. */
   actualDurationSeconds: z.number().int().nullable(),
+  /** Cita suelta o plaza de un grupo fijo (matrícula, no gasta bono). */
+  source: z.enum(['single', 'enrollment']),
   createdAt: z.iso.datetime(),
   /** Quién asignó la cita y con qué papel; `null` en las anteriores a este dato. */
   createdBy: z

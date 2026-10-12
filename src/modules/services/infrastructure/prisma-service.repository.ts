@@ -50,6 +50,7 @@ function toServiceView(service: ServiceWithStaff): ServiceView {
     name: service.name,
     description: service.description,
     kind: 'individual',
+    mode: service.mode,
     durationMinutes: service.durationMinutes,
     priceCents: service.priceCents,
     color: service.color,
@@ -154,6 +155,7 @@ export class PrismaServiceRepository implements ServiceRepository {
           color: newService.color,
           roomId: newService.roomId,
           // Lo no enviado toma el valor por defecto de la tabla.
+          ...(newService.mode !== undefined && { mode: newService.mode }),
           ...(newService.bookingWindowDays !== undefined && {
             bookingWindowDays: newService.bookingWindowDays,
           }),

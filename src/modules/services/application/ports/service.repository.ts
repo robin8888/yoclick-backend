@@ -16,6 +16,8 @@ export interface ServiceView {
   readonly name: string;
   readonly description: string | null;
   readonly kind: 'individual';
+  /** Solo en privado, solo en grupo o de las dos formas. La clientela no elige el modo. */
+  readonly mode: 'private' | 'group' | 'both';
   readonly durationMinutes: number;
   readonly priceCents: number | null;
   readonly color: string | null;
@@ -30,6 +32,7 @@ export interface ServiceView {
 export interface NewService {
   readonly name: string;
   readonly description: string | null;
+  readonly mode: 'private' | 'group' | 'both' | undefined;
   readonly durationMinutes: number;
   readonly priceCents: number | null;
   readonly color: string | null;
@@ -44,6 +47,7 @@ export interface NewService {
 export interface ServicePatch {
   readonly name?: string | undefined;
   readonly description?: string | null | undefined;
+  readonly mode?: 'private' | 'group' | 'both' | undefined;
   readonly durationMinutes?: number | undefined;
   readonly priceCents?: number | null | undefined;
   readonly color?: string | null | undefined;

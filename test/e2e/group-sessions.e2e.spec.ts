@@ -95,6 +95,7 @@ describe('rooms and group appointments', () => {
     serviceId = (
       await world.createService(owner, center.centerId, {
         name: 'Salsa',
+        mode: 'both',
         durationMinutes: 60,
         minNoticeMinutes: 0,
         staffMembershipIds: [teacherAna.membershipId, teacherBen.membershipId],

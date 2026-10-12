@@ -2646,7 +2646,7 @@ paths:
                 $ref: "#/components/schemas/ProblemDetailsDto"
       security:
         - bearer: []
-      summary: Cambia el nombre, el aforo o el profesor de una sala. Las citas ya puestas conservan su sala.
+      summary: Cambia el nombre, el aforo, el profesor o el servicio fijo de una sala. Las citas ya puestas conservan su sala.
       tags:
         - rooms
     delete:
@@ -2683,6 +2683,542 @@ paths:
       security:
         - bearer: []
       summary: "Quita la sala: deja de ofrecerse y los servicios que la usaban quedan sin sala fija."
+      tags:
+        - rooms
+  /v1/centers/{centerId}/schedules:
+    get:
+      operationId: schedules_list
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduleSeriesListResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Los horarios del centro (activos primero), cada uno con sus días de la semana, sala, profesor, modo, aforo y matriculados. De paso crea las sesiones que falten hasta 8 semanas por delante.
+      tags:
+        - schedules
+    post:
+      operationId: schedules_create
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateScheduleSeriesRequestDto"
+      responses:
+        "201":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduleSeriesWriteResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Crea un horario (uno o varios días de la semana a la misma hora) y sus sesiones de las próximas 8 semanas. Devuelve las fechas que no se pudieron crear (festivo, ausencia, sala o profesor ocupados, sala bloqueada). 409 SESSION_MODE_NOT_ALLOWED si el servicio no admite ese modo; ROOM_UNAVAILABLE si la sala no sirve para ese servicio o esa persona.
+      tags:
+        - schedules
+  /v1/centers/{centerId}/schedules/{seriesId}:
+    patch:
+      operationId: schedules_update
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: seriesId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateScheduleSeriesRequestDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduleSeriesWriteResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Cambia un horario. Cambiar la hora, la sala o el profesor rehace las sesiones futuras; 409 SCHEDULE_HAS_BOOKINGS si alguna tiene citas sueltas. El aforo y la etiqueta se cambian sin tocar nada; acortar el periodo cancela lo que queda después.
+      tags:
+        - schedules
+  /v1/centers/{centerId}/schedules/{seriesId}/end:
+    post:
+      operationId: schedules_end
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: seriesId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EndSeriesResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: "Termina un horario: cancela sus sesiones futuras (salvo las que tengan citas sueltas), da de baja a los matriculados y les avisa. Las sesiones pasadas se conservan."
+      tags:
+        - schedules
+  /v1/centers/{centerId}/schedules/{seriesId}/enrollments:
+    get:
+      operationId: schedules_list_enrollments
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: seriesId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnrollmentListResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Las personas matriculadas (activas) en un horario, por nombre.
+      tags:
+        - schedules
+    post:
+      operationId: schedules_enroll
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: seriesId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnrollRequestDto"
+      responses:
+        "201":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnrollResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: "Matricula a varias personas en el horario: tendrán plaza en todas sus sesiones futuras sin reservar nada (y sin gastar bono). Quien ya tiene otra cita un día concreto se salta ese día. Las que no caben o ya estaban salen en `skipped`."
+      tags:
+        - schedules
+  /v1/centers/{centerId}/schedules/{seriesId}/enrollments/{enrollmentId}:
+    delete:
+      operationId: schedules_unenroll
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: seriesId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: enrollmentId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnenrollResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: "Da de baja a una persona del horario: se cancelan sus plazas futuras (sin gastar bono) y se le avisa."
+      tags:
+        - schedules
+  /v1/centers/{centerId}/sessions/{sessionId}/cancel:
+    post:
+      operationId: sessions_cancel
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: sessionId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CancelSessionRequestDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CancelSessionResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Cancela una sesión que no ha empezado (festivo, profesor enfermo…) con todas sus plazas, sin gastar bono a nadie, y avisa a cada persona y a quien la daba. 409 SESSION_NOT_CANCELLABLE si ya empezó.
+      tags:
+        - schedules
+  /v1/centers/{centerId}/room-blocks:
+    get:
+      operationId: room_blocks_list
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: from
+          required: true
+          in: query
+          schema:
+            format: date
+            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+            type: string
+        - name: to
+          required: true
+          in: query
+          schema:
+            format: date
+            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoomBlockListResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Los bloqueos de todas las salas entre dos fechas (ambas incluidas).
+      tags:
+        - rooms
+  /v1/centers/{centerId}/rooms/{roomId}/blocks:
+    get:
+      operationId: room_blocks_list_of_room
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: roomId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: from
+          required: true
+          in: query
+          schema:
+            format: date
+            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+            type: string
+        - name: to
+          required: true
+          in: query
+          schema:
+            format: date
+            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoomBlockListResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Los bloqueos de una sala entre dos fechas (ambas incluidas).
+      tags:
+        - rooms
+    post:
+      operationId: room_blocks_create
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: roomId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRoomBlockRequestDto"
+      responses:
+        "201":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoomBlockResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Bloquea la sala en un tramo (alquiler, mantenimiento, evento). Las sesiones de horario sin citas sueltas que caigan dentro se cancelan y se avisa a sus matriculados. 409 ROOM_HAS_BOOKINGS si hay citas sueltas en ese tramo; CONFLICT si se solapa con otro bloqueo.
+      tags:
+        - rooms
+  /v1/centers/{centerId}/rooms/{roomId}/blocks/{blockId}:
+    delete:
+      operationId: room_blocks_delete
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: roomId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: blockId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "204":
+          description: ""
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: "Quita un bloqueo: la sala vuelve a estar disponible en ese tramo."
       tags:
         - rooms
   /v1/centers/{centerId}/clients:
@@ -7605,6 +8141,12 @@ components:
                 type: string
                 enum:
                   - individual
+              mode:
+                type: string
+                enum:
+                  - private
+                  - group
+                  - both
               durationMinutes:
                 type: integer
                 minimum: -9007199254740991
@@ -7685,6 +8227,7 @@ components:
               - name
               - description
               - kind
+              - mode
               - durationMinutes
               - priceCents
               - currency
@@ -7709,6 +8252,12 @@ components:
           type: string
           minLength: 1
           maxLength: 500
+        mode:
+          type: string
+          enum:
+            - private
+            - group
+            - both
         durationMinutes:
           type: integer
           minimum: -9007199254740991
@@ -7762,6 +8311,12 @@ components:
           type: string
           enum:
             - individual
+        mode:
+          type: string
+          enum:
+            - private
+            - group
+            - both
         durationMinutes:
           type: integer
           minimum: -9007199254740991
@@ -7842,6 +8397,7 @@ components:
         - name
         - description
         - kind
+        - mode
         - durationMinutes
         - priceCents
         - currency
@@ -7864,6 +8420,12 @@ components:
           minLength: 1
           maxLength: 500
           nullable: true
+        mode:
+          type: string
+          enum:
+            - private
+            - group
+            - both
         durationMinutes:
           type: integer
           minimum: -9007199254740991
@@ -8087,6 +8649,11 @@ components:
           minimum: -9007199254740991
           maximum: 9007199254740991
           nullable: true
+        source:
+          type: string
+          enum:
+            - single
+            - enrollment
         createdAt:
           type: string
           format: date-time
@@ -8127,6 +8694,7 @@ components:
         - startedAt
         - endedAt
         - actualDurationSeconds
+        - source
         - createdAt
         - createdBy
       additionalProperties: false
@@ -8255,6 +8823,11 @@ components:
                 minimum: -9007199254740991
                 maximum: 9007199254740991
                 nullable: true
+              source:
+                type: string
+                enum:
+                  - single
+                  - enrollment
               createdAt:
                 type: string
                 format: date-time
@@ -8295,6 +8868,7 @@ components:
               - startedAt
               - endedAt
               - actualDurationSeconds
+              - source
               - createdAt
               - createdBy
             additionalProperties: false
@@ -8424,6 +8998,11 @@ components:
               minimum: -9007199254740991
               maximum: 9007199254740991
               nullable: true
+            source:
+              type: string
+              enum:
+                - single
+                - enrollment
             createdAt:
               type: string
               format: date-time
@@ -8464,6 +9043,7 @@ components:
             - startedAt
             - endedAt
             - actualDurationSeconds
+            - source
             - createdAt
             - createdBy
           additionalProperties: false
@@ -8638,6 +9218,11 @@ components:
                     minimum: -9007199254740991
                     maximum: 9007199254740991
                     nullable: true
+                  source:
+                    type: string
+                    enum:
+                      - single
+                      - enrollment
                   createdAt:
                     type: string
                     format: date-time
@@ -8678,6 +9263,7 @@ components:
                   - startedAt
                   - endedAt
                   - actualDurationSeconds
+                  - source
                   - createdAt
                   - createdBy
                 additionalProperties: false
@@ -9081,6 +9667,24 @@ components:
                         - membershipId
                         - fullName
                       additionalProperties: false
+                    schedule:
+                      type: object
+                      properties:
+                        seriesId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        label:
+                          type: string
+                          nullable: true
+                      required:
+                        - seriesId
+                        - label
+                      additionalProperties: false
+                      nullable: true
+                    cancelledReason:
+                      type: string
+                      nullable: true
                     attendees:
                       type: array
                       items:
@@ -9103,11 +9707,17 @@ components:
                               - cancelled
                               - attended
                               - no_show
+                          source:
+                            type: string
+                            enum:
+                              - single
+                              - enrollment
                         required:
                           - bookingId
                           - clientMembershipId
                           - fullName
                           - status
+                          - source
                         additionalProperties: false
                   required:
                     - id
@@ -9118,7 +9728,43 @@ components:
                     - bookedCount
                     - service
                     - teacher
+                    - schedule
+                    - cancelledReason
                     - attendees
+                  additionalProperties: false
+              blocks:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                    startsAt:
+                      type: string
+                      format: date-time
+                      pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                    endsAt:
+                      type: string
+                      format: date-time
+                      pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                    reason:
+                      type: string
+                      enum:
+                        - rental
+                        - maintenance
+                        - event
+                        - other
+                    note:
+                      type: string
+                      nullable: true
+                  required:
+                    - id
+                    - startsAt
+                    - endsAt
+                    - reason
+                    - note
                   additionalProperties: false
             required:
               - id
@@ -9126,6 +9772,7 @@ components:
               - capacity
               - staff
               - sessions
+              - blocks
             additionalProperties: false
         sessionsWithoutRoom:
           type: array
@@ -9187,6 +9834,24 @@ components:
                   - membershipId
                   - fullName
                 additionalProperties: false
+              schedule:
+                type: object
+                properties:
+                  seriesId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  label:
+                    type: string
+                    nullable: true
+                required:
+                  - seriesId
+                  - label
+                additionalProperties: false
+                nullable: true
+              cancelledReason:
+                type: string
+                nullable: true
               attendees:
                 type: array
                 items:
@@ -9209,11 +9874,17 @@ components:
                         - cancelled
                         - attended
                         - no_show
+                    source:
+                      type: string
+                      enum:
+                        - single
+                        - enrollment
                   required:
                     - bookingId
                     - clientMembershipId
                     - fullName
                     - status
+                    - source
                   additionalProperties: false
             required:
               - id
@@ -9224,6 +9895,8 @@ components:
               - bookedCount
               - service
               - teacher
+              - schedule
+              - cancelledReason
               - attendees
             additionalProperties: false
       required:
@@ -9377,6 +10050,11 @@ components:
                     minimum: -9007199254740991
                     maximum: 9007199254740991
                     nullable: true
+                  source:
+                    type: string
+                    enum:
+                      - single
+                      - enrollment
                   createdAt:
                     type: string
                     format: date-time
@@ -9417,6 +10095,7 @@ components:
                   - startedAt
                   - endedAt
                   - actualDurationSeconds
+                  - source
                   - createdAt
                   - createdBy
                 additionalProperties: false
@@ -9663,6 +10342,11 @@ components:
               minimum: -9007199254740991
               maximum: 9007199254740991
               nullable: true
+            source:
+              type: string
+              enum:
+                - single
+                - enrollment
             createdAt:
               type: string
               format: date-time
@@ -9703,6 +10387,7 @@ components:
             - startedAt
             - endedAt
             - actualDurationSeconds
+            - source
             - createdAt
             - createdBy
           additionalProperties: false
@@ -9925,6 +10610,20 @@ components:
                   - fullName
                 additionalProperties: false
                 nullable: true
+              fixedService:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  name:
+                    type: string
+                required:
+                  - id
+                  - name
+                additionalProperties: false
+                nullable: true
               services:
                 type: array
                 items:
@@ -9945,6 +10644,7 @@ components:
               - name
               - capacity
               - staff
+              - fixedService
               - services
             additionalProperties: false
       required:
@@ -9963,6 +10663,12 @@ components:
           minimum: 1
           maximum: 500
         staffMembershipId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          default: null
+          nullable: true
+        serviceId:
           type: string
           format: uuid
           pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
@@ -10006,6 +10712,20 @@ components:
             - fullName
           additionalProperties: false
           nullable: true
+        fixedService:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            name:
+              type: string
+          required:
+            - id
+            - name
+          additionalProperties: false
+          nullable: true
         services:
           type: array
           items:
@@ -10026,6 +10746,7 @@ components:
         - name
         - capacity
         - staff
+        - fixedService
         - services
       additionalProperties: false
     UpdateRoomRequestDto:
@@ -10044,6 +10765,11 @@ components:
           format: uuid
           pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
           nullable: true
+        serviceId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          nullable: true
         serviceIds:
           maxItems: 100
           type: array
@@ -10051,6 +10777,726 @@ components:
             type: string
             format: uuid
             pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+      additionalProperties: false
+    ScheduleSeriesListResponseDto:
+      type: object
+      properties:
+        series:
+          type: array
+          items:
+            type: object
+            properties:
+              seriesId:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              label:
+                type: string
+                nullable: true
+              mode:
+                type: string
+                enum:
+                  - private
+                  - group
+              capacity:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+              status:
+                type: string
+                enum:
+                  - active
+                  - ended
+              startsOn:
+                type: string
+                format: date
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+              endsOn:
+                type: string
+                format: date
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+                nullable: true
+              service:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  name:
+                    type: string
+                  color:
+                    type: string
+                    nullable: true
+                required:
+                  - id
+                  - name
+                  - color
+                additionalProperties: false
+              staff:
+                type: object
+                properties:
+                  membershipId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  fullName:
+                    type: string
+                required:
+                  - membershipId
+                  - fullName
+                additionalProperties: false
+              room:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  name:
+                    type: string
+                required:
+                  - id
+                  - name
+                additionalProperties: false
+                nullable: true
+              days:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    scheduleId:
+                      type: string
+                      format: uuid
+                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                    weekday:
+                      type: integer
+                      minimum: 1
+                      maximum: 7
+                    startsAtTime:
+                      type: string
+                    endsAtTime:
+                      type: string
+                  required:
+                    - scheduleId
+                    - weekday
+                    - startsAtTime
+                    - endsAtTime
+                  additionalProperties: false
+              enrolledCount:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+            required:
+              - seriesId
+              - label
+              - mode
+              - capacity
+              - status
+              - startsOn
+              - endsOn
+              - service
+              - staff
+              - room
+              - days
+              - enrolledCount
+            additionalProperties: false
+      required:
+        - series
+      additionalProperties: false
+    CreateScheduleSeriesRequestDto:
+      type: object
+      properties:
+        serviceId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        staffMembershipId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        roomId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        mode:
+          default: group
+          type: string
+          enum:
+            - private
+            - group
+        capacity:
+          type: integer
+          minimum: 1
+          maximum: 500
+        weekdays:
+          minItems: 1
+          maxItems: 7
+          type: array
+          items:
+            type: integer
+            minimum: 1
+            maximum: 7
+        startsAtTime:
+          type: string
+        endsAtTime:
+          type: string
+        startsOn:
+          type: string
+          format: date
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+        endsOn:
+          type: string
+          format: date
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+          default: null
+          nullable: true
+        label:
+          type: string
+          minLength: 1
+          maxLength: 80
+      required:
+        - serviceId
+        - weekdays
+        - startsAtTime
+        - endsAtTime
+        - startsOn
+      additionalProperties: false
+    ScheduleSeriesWriteResponseDto:
+      type: object
+      properties:
+        series:
+          type: object
+          properties:
+            seriesId:
+              type: string
+              format: uuid
+              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            label:
+              type: string
+              nullable: true
+            mode:
+              type: string
+              enum:
+                - private
+                - group
+            capacity:
+              type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+            status:
+              type: string
+              enum:
+                - active
+                - ended
+            startsOn:
+              type: string
+              format: date
+              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+            endsOn:
+              type: string
+              format: date
+              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+              nullable: true
+            service:
+              type: object
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                  pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                name:
+                  type: string
+                color:
+                  type: string
+                  nullable: true
+              required:
+                - id
+                - name
+                - color
+              additionalProperties: false
+            staff:
+              type: object
+              properties:
+                membershipId:
+                  type: string
+                  format: uuid
+                  pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                fullName:
+                  type: string
+              required:
+                - membershipId
+                - fullName
+              additionalProperties: false
+            room:
+              type: object
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                  pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                name:
+                  type: string
+              required:
+                - id
+                - name
+              additionalProperties: false
+              nullable: true
+            days:
+              type: array
+              items:
+                type: object
+                properties:
+                  scheduleId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  weekday:
+                    type: integer
+                    minimum: 1
+                    maximum: 7
+                  startsAtTime:
+                    type: string
+                  endsAtTime:
+                    type: string
+                required:
+                  - scheduleId
+                  - weekday
+                  - startsAtTime
+                  - endsAtTime
+                additionalProperties: false
+            enrolledCount:
+              type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+          required:
+            - seriesId
+            - label
+            - mode
+            - capacity
+            - status
+            - startsOn
+            - endsOn
+            - service
+            - staff
+            - room
+            - days
+            - enrolledCount
+          additionalProperties: false
+        skipped:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+              startsAtTime:
+                type: string
+              reason:
+                type: string
+                enum:
+                  - holiday
+                  - absence
+                  - conflict
+                  - blocked
+            required:
+              - date
+              - startsAtTime
+              - reason
+            additionalProperties: false
+      required:
+        - series
+        - skipped
+      additionalProperties: false
+    UpdateScheduleSeriesRequestDto:
+      type: object
+      properties:
+        label:
+          type: string
+          minLength: 1
+          maxLength: 80
+          nullable: true
+        capacity:
+          type: integer
+          minimum: 1
+          maximum: 500
+        endsOn:
+          type: string
+          format: date
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+          nullable: true
+        staffMembershipId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        roomId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          nullable: true
+        startsAtTime:
+          type: string
+        endsAtTime:
+          type: string
+      additionalProperties: false
+    EndSeriesResponseDto:
+      type: object
+      properties:
+        keptSessionCount:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+      required:
+        - keptSessionCount
+      additionalProperties: false
+    EnrollmentListResponseDto:
+      type: object
+      properties:
+        enrollments:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              client:
+                type: object
+                properties:
+                  membershipId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  fullName:
+                    type: string
+                required:
+                  - membershipId
+                  - fullName
+                additionalProperties: false
+              startsOn:
+                type: string
+                format: date
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+              endsOn:
+                type: string
+                format: date
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+                nullable: true
+              status:
+                type: string
+                enum:
+                  - active
+                  - ended
+              createdAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+            required:
+              - id
+              - client
+              - startsOn
+              - endsOn
+              - status
+              - createdAt
+            additionalProperties: false
+      required:
+        - enrollments
+      additionalProperties: false
+    EnrollRequestDto:
+      type: object
+      properties:
+        clientMembershipIds:
+          minItems: 1
+          maxItems: 100
+          type: array
+          items:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        startsOn:
+          type: string
+          format: date
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+        endsOn:
+          type: string
+          format: date
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+          nullable: true
+      required:
+        - clientMembershipIds
+      additionalProperties: false
+    EnrollResponseDto:
+      type: object
+      properties:
+        enrollments:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              client:
+                type: object
+                properties:
+                  membershipId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  fullName:
+                    type: string
+                required:
+                  - membershipId
+                  - fullName
+                additionalProperties: false
+              startsOn:
+                type: string
+                format: date
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+              endsOn:
+                type: string
+                format: date
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+                nullable: true
+              status:
+                type: string
+                enum:
+                  - active
+                  - ended
+              createdAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+            required:
+              - id
+              - client
+              - startsOn
+              - endsOn
+              - status
+              - createdAt
+            additionalProperties: false
+        skipped:
+          type: array
+          items:
+            type: object
+            properties:
+              clientMembershipId:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              reason:
+                type: string
+                enum:
+                  - client_not_found
+                  - already_enrolled
+                  - series_full
+            required:
+              - clientMembershipId
+              - reason
+            additionalProperties: false
+        skippedDates:
+          type: array
+          items:
+            type: object
+            properties:
+              clientMembershipId:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              date:
+                type: string
+                format: date
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+            required:
+              - clientMembershipId
+              - date
+            additionalProperties: false
+      required:
+        - enrollments
+        - skipped
+        - skippedDates
+      additionalProperties: false
+    UnenrollResponseDto:
+      type: object
+      properties:
+        cancelledBookingCount:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+      required:
+        - cancelledBookingCount
+      additionalProperties: false
+    CancelSessionRequestDto:
+      type: object
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 200
+      required:
+        - reason
+      additionalProperties: false
+    CancelSessionResponseDto:
+      type: object
+      properties:
+        affectedBookingCount:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+      required:
+        - affectedBookingCount
+      additionalProperties: false
+    RoomBlockListResponseDto:
+      type: object
+      properties:
+        blocks:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              roomId:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              startsAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+              endsAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+              reason:
+                type: string
+                enum:
+                  - rental
+                  - maintenance
+                  - event
+                  - other
+              note:
+                type: string
+                nullable: true
+              createdBy:
+                type: object
+                properties:
+                  membershipId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  fullName:
+                    type: string
+                required:
+                  - membershipId
+                  - fullName
+                additionalProperties: false
+            required:
+              - id
+              - roomId
+              - startsAt
+              - endsAt
+              - reason
+              - note
+              - createdBy
+            additionalProperties: false
+      required:
+        - blocks
+      additionalProperties: false
+    CreateRoomBlockRequestDto:
+      type: object
+      properties:
+        startsAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+        endsAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+        reason:
+          type: string
+          enum:
+            - rental
+            - maintenance
+            - event
+            - other
+        note:
+          type: string
+          minLength: 1
+          maxLength: 200
+      required:
+        - startsAt
+        - endsAt
+        - reason
+      additionalProperties: false
+    RoomBlockResponseDto:
+      type: object
+      properties:
+        block:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            roomId:
+              type: string
+              format: uuid
+              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            startsAt:
+              type: string
+              format: date-time
+              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+            endsAt:
+              type: string
+              format: date-time
+              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+            reason:
+              type: string
+              enum:
+                - rental
+                - maintenance
+                - event
+                - other
+            note:
+              type: string
+              nullable: true
+            createdBy:
+              type: object
+              properties:
+                membershipId:
+                  type: string
+                  format: uuid
+                  pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                fullName:
+                  type: string
+              required:
+                - membershipId
+                - fullName
+              additionalProperties: false
+          required:
+            - id
+            - roomId
+            - startsAt
+            - endsAt
+            - reason
+            - note
+            - createdBy
+          additionalProperties: false
+        cancelledSessionCount:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+      required:
+        - block
+        - cancelledSessionCount
       additionalProperties: false
     ClientListResponseDto:
       type: object
@@ -10477,6 +11923,9 @@ components:
                   - routine_updated
                   - content_assigned
                   - member_joined
+                  - session_cancelled
+                  - schedule_enrolled
+                  - schedule_unenrolled
               data:
                 type: object
                 additionalProperties:

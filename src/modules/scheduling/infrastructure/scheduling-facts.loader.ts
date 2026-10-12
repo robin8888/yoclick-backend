@@ -133,6 +133,7 @@ export async function loadSchedulingFacts(
       minNoticeMinutes: service.minNoticeMinutes,
       bookingWindowDays: service.bookingWindowDays,
       roomId: service.roomId,
+      mode: service.mode,
     },
     timeZone: center.timezone,
     // Escrito por esta API tras validarlo con zod (ajustes del centro).

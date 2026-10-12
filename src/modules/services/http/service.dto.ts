@@ -33,6 +33,8 @@ const serviceShape = {
   name: z.string(),
   description: z.string().nullable(),
   kind: z.literal('individual'),
+  /** Solo en privado, solo en grupo o de las dos formas. Lo fija el centro; la clientela no elige. */
+  mode: z.enum(['private', 'group', 'both']),
   durationMinutes: z.number().int(),
   /** En céntimos; `null` = «a consultar». */
   priceCents: z.number().int().nullable(),
@@ -78,6 +80,8 @@ export class CreateServiceRequestDto extends createZodDto(
   z.strictObject({
     name: nameSchema,
     description: descriptionSchema.optional(),
+    /** Por defecto, privado (una persona por sesión). */
+    mode: z.enum(['private', 'group', 'both']).optional(),
     durationMinutes: durationSchema,
     priceCents: priceSchema.optional(),
     color: colorSchema.optional(),
@@ -95,6 +99,7 @@ export class UpdateServiceRequestDto extends createZodDto(
     .strictObject({
       name: nameSchema.optional(),
       description: descriptionSchema.nullable().optional(),
+      mode: z.enum(['private', 'group', 'both']).optional(),
       durationMinutes: durationSchema.optional(),
       priceCents: priceSchema.nullable().optional(),
       color: colorSchema.nullable().optional(),

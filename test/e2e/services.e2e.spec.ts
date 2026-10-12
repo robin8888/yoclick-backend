@@ -44,6 +44,7 @@ describe('services', () => {
       for (const service of services) {
         expect(service).toMatchObject({
           kind: 'individual',
+          mode: 'private',
           currency: 'EUR',
           priceCents: null,
           description: null,
@@ -87,6 +88,7 @@ describe('services', () => {
         name: 'Masaje deportivo',
         description: null,
         kind: 'individual',
+        mode: 'private',
         durationMinutes: 45,
         priceCents: 3500,
         currency: 'EUR',

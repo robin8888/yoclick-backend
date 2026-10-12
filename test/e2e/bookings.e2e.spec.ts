@@ -271,6 +271,7 @@ describe('availability and bookings', () => {
         startedAt: null,
         endedAt: null,
         actualDurationSeconds: null,
+        source: 'single',
         createdAt: expect.stringMatching(/Z$/) as string,
         createdBy: {
           membershipId: ana.membershipId,

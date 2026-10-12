@@ -16,6 +16,7 @@ export function serializeBooking(booking: BookingView): Record<string, unknown> 
     startedAt: booking.startedAt?.toISOString() ?? null,
     endedAt: booking.endedAt?.toISOString() ?? null,
     actualDurationSeconds: calculateActualDurationSeconds(booking),
+    source: booking.source,
     createdAt: booking.createdAt.toISOString(),
     createdBy: booking.createdBy,
   };

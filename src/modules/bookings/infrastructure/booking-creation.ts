@@ -13,7 +13,10 @@ import {
   type JoinGroupSessionOutcome,
 } from '../application/ports/booking.repository';
 import { recordBookingNotification } from '../../notifications/infrastructure/booking-notification.recorder';
+import { isRoomBlocked } from '../../schedules/infrastructure/room-block-queries';
+import { isModeAllowedByService } from '../../schedules/domain/schedule-rules';
 import { toBookingView, WITH_SESSION_DETAILS } from './booking-view.mapper';
+import { hasOverlappingBooking } from './client-overlap';
 import { listUsableRooms, type UsableRoom } from './usable-rooms';
 
 /**
@@ -45,25 +48,6 @@ async function isActiveClient(
   return count === 1;
 }
 
-async function hasOverlappingBooking(
-  client: TenantTransactionClient,
-  input: { clientMembershipId: string; startsAt: Date; endsAt: Date },
-): Promise<boolean> {
-  const overlappingBooking = await client.booking.findFirst({
-    where: {
-      clientMembershipId: input.clientMembershipId,
-      status: 'confirmed',
-      classSession: {
-        status: 'scheduled',
-        startsAt: { lt: input.endsAt },
-        endsAt: { gt: input.startsAt },
-      },
-    },
-    select: { id: true },
-  });
-  return overlappingBooking !== null;
-}
-
 interface NewSession {
   readonly id: string;
   readonly centerId: string;
@@ -79,12 +63,22 @@ interface NewSession {
 /**
  * Inserta la sesión; si la persona del equipo o la sala ya tienen otra programada que se solapa, la
  * restricción EXCLUDE lo impide y `ON CONFLICT DO NOTHING` lo convierte en "no se insertó nada" (sin
- * abortar la transacción).
+ * abortar la transacción). Una sala bloqueada (alquiler, mantenimiento) tampoco admite la sesión.
  */
 async function tryInsertSession(
   client: TenantTransactionClient,
   session: NewSession,
 ): Promise<boolean> {
+  if (
+    session.roomId !== null &&
+    (await isRoomBlocked(client, {
+      roomId: session.roomId,
+      startsAt: session.startsAt,
+      endsAt: session.endsAt,
+    }))
+  ) {
+    return false;
+  }
   const inserted = await client.$queryRaw<{ id: string }[]>`
     insert into class_sessions
       (id, center_id, service_id, staff_membership_id, starts_at, ends_at, room_id, mode, capacity)
@@ -177,6 +171,7 @@ async function chooseRoomsToTry(
   const { command } = input;
   const usable = await listUsableRooms(client, input.staffMembershipId, {
     serviceRoomId: input.service.roomId,
+    serviceId: input.service.id,
   });
   if (command.roomId !== undefined && command.roomId !== null) {
     const chosen = usable.find((room) => room.id === command.roomId);
@@ -293,6 +288,9 @@ export async function reserveSessionInTransaction(
     dateRange: { aroundInstant: command.startsAt },
   });
   if (!facts) return { kind: 'service_not_found' };
+  if (!isModeAllowedByService(facts.service.mode, command.mode ?? 'private')) {
+    return { kind: 'mode_not_allowed' };
+  }
 
   const decision = findBookableSlot({
     scheduling: buildSchedulingInput(facts, command),
