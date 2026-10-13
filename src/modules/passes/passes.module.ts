@@ -4,6 +4,7 @@ import {
   AssignPassUseCase,
   CreateRateUseCase,
   DecidePassUseCase,
+  ListEligibleClientsUseCase,
   ListPassesUseCase,
   ListRatesUseCase,
   RequestPassUseCase,
@@ -24,6 +25,7 @@ import { PrismaPassRepository } from './infrastructure/prisma-pass.repository';
     AssignPassUseCase,
     ListPassesUseCase,
     DecidePassUseCase,
+    ListEligibleClientsUseCase,
     { provide: PASS_REPOSITORY, useClass: PrismaPassRepository },
   ],
 })

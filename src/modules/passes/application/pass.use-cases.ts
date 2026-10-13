@@ -5,6 +5,7 @@ import { type ActorContext } from '../../../shared/tenancy/actor-context';
 import { type PassStatusName } from '../domain/pass-rules';
 import {
   PASS_REPOSITORY,
+  type EligibleClientView,
   type NewRate,
   type PassRepository,
   type PassRequestOutcome,
@@ -120,5 +121,15 @@ export class DecidePassUseCase {
       ]);
     }
     throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
+  }
+}
+
+/** A quién puede apuntar el centro a una clase de ese servicio: personas con bono y clases. */
+@Injectable()
+export class ListEligibleClientsUseCase {
+  constructor(@Inject(PASS_REPOSITORY) private readonly passes: PassRepository) {}
+
+  async execute(actor: ActorContext, serviceId: string): Promise<EligibleClientView[]> {
+    return this.passes.listEligibleClients(actor, { serviceId, now: new Date() });
   }
 }

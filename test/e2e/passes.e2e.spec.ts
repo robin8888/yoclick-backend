@@ -69,9 +69,18 @@ describe('passes (bonos)', () => {
     return assigned.json<PassBody>();
   }
 
-  /** Una cita que acaba de empezar, imposible de crear por la API (huecos muy próximos). */
-  async function insertBooking(client: Person, forService = serviceId): Promise<string> {
-    const startsAt = new Date(Date.now() + 5 * MILLISECONDS_PER_MINUTE);
+  /** Una cita a la hora que se quiera, imposible de crear por la API (huecos pasados o muy próximos). */
+  async function insertBooking(
+    client: Person,
+    options: {
+      forService?: string;
+      startsInMinutes?: number;
+      status?: 'confirmed' | 'cancelled';
+    } = {},
+  ): Promise<string> {
+    const startsAt = new Date(
+      Date.now() + (options.startsInMinutes ?? 5) * MILLISECONDS_PER_MINUTE,
+    );
     const sessionId = generateUuidV7();
     const bookingId = generateUuidV7();
     await world.tenantPrismaService.runInTenantContext(ownerActor(), async (prisma) => {
@@ -79,7 +88,7 @@ describe('passes (bonos)', () => {
         data: {
           id: sessionId,
           centerId,
-          serviceId: forService,
+          serviceId: options.forService ?? serviceId,
           staffMembershipId: staff.membershipId,
           startsAt,
           endsAt: new Date(startsAt.getTime() + 60 * MILLISECONDS_PER_MINUTE),
@@ -91,6 +100,7 @@ describe('passes (bonos)', () => {
           centerId,
           classSessionId: sessionId,
           clientMembershipId: client.membershipId,
+          status: options.status ?? 'confirmed',
         },
       });
     });
@@ -245,9 +255,93 @@ describe('passes (bonos)', () => {
       expect(after).toMatchObject({ id: pass.id, remainingSessions: 9, status: 'active' });
     });
 
+    it('takes one class off the pass when the teacher confirms attendance, and only once', async () => {
+      const pass = await createActivePass(ana);
+      const bookingId = await insertBooking(ana);
+
+      const first = await world.call(
+        'POST',
+        url(`/bookings/${bookingId}/attendance`),
+        staff.userId,
+        {
+          centerId,
+        },
+      );
+      const second = await world.call(
+        'POST',
+        url(`/bookings/${bookingId}/attendance`),
+        staff.userId,
+        {
+          centerId,
+        },
+      );
+
+      expect(first.statusCode).toBe(200);
+      expect(first.json<{ checkedInAt: string | null }>().checkedInAt).not.toBeNull();
+      expect(second.json<{ checkedInAt: string }>().checkedInAt).toBe(
+        first.json<{ checkedInAt: string }>().checkedInAt,
+      );
+      const [after] = await passesOf(ana);
+      expect(after).toMatchObject({ id: pass.id, remainingSessions: 9 });
+      await attendClass(bookingId);
+      expect((await passesOf(ana))[0]?.remainingSessions).toBe(9);
+    });
+
+    it('does not let another teacher confirm the attendance of a class that is not theirs', async () => {
+      await createActivePass(ana);
+      const bookingId = await insertBooking(ana);
+      const otherTeacher = await world.addMember(centerId, 'other', 'staff');
+
+      const response = await world.call(
+        'POST',
+        url(`/bookings/${bookingId}/attendance`),
+        otherTeacher.userId,
+        { centerId },
+      );
+
+      expect(response.statusCode).toBe(404);
+      expect((await passesOf(ana))[0]?.remainingSessions).toBe(10);
+    });
+
+    it('takes the class off when the person did not come and did not cancel, once the class ended', async () => {
+      await createActivePass(ana);
+      await insertBooking(ana, { startsInMinutes: -180 });
+
+      const [after] = await passesOf(ana);
+
+      expect(after?.remainingSessions).toBe(9);
+      expect((await passesOf(ana))[0]?.remainingSessions).toBe(9);
+    });
+
+    it('does not take a class off for a cancelled appointment', async () => {
+      await createActivePass(ana);
+      await insertBooking(ana, { startsInMinutes: -180, status: 'cancelled' });
+
+      const [after] = await passesOf(ana);
+
+      expect(after?.remainingSessions).toBe(10);
+    });
+
+    it('does not take a second class off when the teacher confirms a no-show afterwards', async () => {
+      await createActivePass(ana);
+      const bookingId = await insertBooking(ana, { startsInMinutes: -180 });
+      expect((await passesOf(ana))[0]?.remainingSessions).toBe(9);
+
+      const confirmed = await world.call(
+        'POST',
+        url(`/bookings/${bookingId}/attendance`),
+        staff.userId,
+        { centerId },
+      );
+
+      expect(confirmed.statusCode).toBe(200);
+      expect(confirmed.json<{ status: string }>().status).toBe('attended');
+      expect((await passesOf(ana))[0]?.remainingSessions).toBe(9);
+    });
+
     it('does not take a class off a pass that is for another service', async () => {
       await createActivePass(ana, [otherServiceId]);
-      const bookingId = await insertBooking(ana, serviceId);
+      const bookingId = await insertBooking(ana, { forService: serviceId });
 
       await attendClass(bookingId);
 

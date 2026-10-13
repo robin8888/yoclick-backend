@@ -22,6 +22,7 @@ import { CHECK_IN_REPOSITORY } from './application/ports/check-in.repository';
 import { BOOKING_REPOSITORY } from './application/ports/booking.repository';
 import { SESSION_RECORD_REPOSITORY } from './application/ports/session-record.repository';
 import {
+  ConfirmAttendanceUseCase,
   EndSessionUseCase,
   ListSessionRecordsUseCase,
   StartSessionUseCase,
@@ -70,6 +71,7 @@ import { PrismaSessionRecordRepository } from './infrastructure/prisma-session-r
     JoinGroupSessionUseCase,
     StartSessionUseCase,
     EndSessionUseCase,
+    ConfirmAttendanceUseCase,
     ListSessionRecordsUseCase,
     IssueCheckInCodeUseCase,
     CheckInClientUseCase,

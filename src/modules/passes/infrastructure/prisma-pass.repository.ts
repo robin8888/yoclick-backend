@@ -6,6 +6,7 @@ import {
 } from '../../../shared/database/tenant-prisma.service';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
 import {
+  type EligibleClientView,
   type NewRate,
   type PassDecisionOutcome,
   type PassListQuery,
@@ -17,6 +18,8 @@ import {
   type RateView,
 } from '../application/ports/pass.repository';
 import { computePassExpiry, MAX_RATES_PER_CENTER, resolvePassStatus } from '../domain/pass-rules';
+import { countBookableClasses } from './pass-availability';
+import { settleEndedBookings } from './no-show-settlement';
 
 interface StoredRate {
   readonly id: string;
@@ -314,8 +317,44 @@ export class PrismaPassRepository implements PassRepository {
     });
   }
 
+  async listEligibleClients(
+    actor: ActorContext,
+    query: { serviceId: string; now: Date },
+  ): Promise<EligibleClientView[]> {
+    return this.tenantPrismaService.runInTenantContext(actor, async (client) => {
+      const holders = await client.clientPass.findMany({
+        where: { status: 'active', remainingSessions: { gt: 0 } },
+        distinct: ['clientMembershipId'],
+        select: {
+          clientMembershipId: true,
+          clientMembership: { select: { user: { select: { fullName: true } } } },
+        },
+      });
+      const eligible: EligibleClientView[] = [];
+      for (const holder of holders) {
+        const bookableSessions = await countBookableClasses(client, {
+          clientMembershipId: holder.clientMembershipId,
+          serviceId: query.serviceId,
+          now: query.now,
+        });
+        if (bookableSessions === null || bookableSessions <= 0) continue;
+        eligible.push({
+          membershipId: holder.clientMembershipId,
+          fullName: holder.clientMembership.user.fullName,
+          bookableSessions,
+        });
+      }
+      return eligible.sort((left, right) => left.fullName.localeCompare(right.fullName));
+    });
+  }
+
   async listPasses(actor: ActorContext, query: PassListQuery): Promise<PassView[]> {
     return this.tenantPrismaService.runInTenantContext(actor, async (client) => {
+      // Antes de contar lo que queda: las clases ya pasadas sin venir ni cancelar se descuentan.
+      await settleEndedBookings(client, {
+        now: query.now,
+        clientMembershipId: query.clientMembershipId,
+      });
       const passes = await client.clientPass.findMany({
         where: {
           ...(query.clientMembershipId !== null && {

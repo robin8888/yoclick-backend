@@ -19,6 +19,8 @@ import { isModeAllowedByService } from '../../schedules/domain/schedule-rules';
 import { toBookingView, WITH_SESSION_DETAILS } from './booking-view.mapper';
 import { hasOverlappingBooking } from './client-overlap';
 import { listUsableRooms, type UsableRoom } from './usable-rooms';
+import { countBookableClasses } from '../../passes/infrastructure/pass-availability';
+import { consumePassForBooking } from '../../passes/infrastructure/pass-consumption';
 
 /**
  * Serializa las reservas de una misma persona: dos peticiones suyas a la vez (por ejemplo, dos
@@ -409,6 +411,57 @@ async function isSessionFull(
   return seatsTaken >= session.capacity;
 }
 
+/**
+ * Lo que dice el bono sobre apuntar a esta persona a la clase:
+ * - la propia persona con bono: solo tantas clases como le queden menos las ya agendadas;
+ * - el centro: la persona tiene que tener un bono en vigor con clases (sin bono no se apunta).
+ */
+async function checkPassForJoin(
+  client: TenantTransactionClient,
+  command: JoinGroupSessionCommand,
+  session: { serviceId: string },
+): Promise<'ok' | 'pass_fully_booked' | 'client_has_no_pass'> {
+  const bookable = await countBookableClasses(client, {
+    clientMembershipId: command.clientMembershipId,
+    serviceId: session.serviceId,
+    now: command.now,
+  });
+  if (command.isClientBooking === true) {
+    return bookable !== null && bookable <= 0 ? 'pass_fully_booked' : 'ok';
+  }
+  return bookable === null || bookable <= 0 ? 'client_has_no_pass' : 'ok';
+}
+
+/** La reserva de la persona en la clase, el aviso y, si la apunta el centro, el descuento del bono. */
+async function createJoinedBooking(
+  client: TenantTransactionClient,
+  input: {
+    actor: ActorContext;
+    command: JoinGroupSessionCommand;
+    session: NonNullable<Awaited<ReturnType<typeof findJoinableSession>>>;
+  },
+) {
+  const { actor, command, session } = input;
+  const booking = await insertBooking(client, {
+    actor,
+    clientMembershipId: command.clientMembershipId,
+    idempotencyKey: null,
+    sessionId: session.id,
+  });
+  await notifyBookingCreated(client, {
+    actor,
+    clientMembershipId: command.clientMembershipId,
+    serviceName: session.service.name,
+    startsAt: session.startsAt,
+    booking: { id: booking.id, staffMembershipId: session.staffMembershipId },
+  });
+  // El centro apunta a la persona: la clase se descuenta ya (y se devuelve si se cancela).
+  if (command.isClientBooking !== true) {
+    await consumePassForBooking(client, { bookingId: booking.id, now: command.now });
+  }
+  return booking;
+}
+
 /** Apunta a un cliente a una clase grupal que ya existe, si quedan plazas. */
 export async function joinGroupSessionInTransaction(
   client: TenantTransactionClient,
@@ -426,6 +479,9 @@ export async function joinGroupSessionInTransaction(
     return { kind: 'outside_window' };
   }
 
+  const passCheck = await checkPassForJoin(client, command, session);
+  if (passCheck !== 'ok') return { kind: passCheck };
+
   if (await isSessionFull(client, session)) return { kind: 'session_full' };
   const isClientBusy = await hasOverlappingBooking(client, {
     clientMembershipId: command.clientMembershipId,
@@ -434,18 +490,6 @@ export async function joinGroupSessionInTransaction(
   });
   if (isClientBusy) return { kind: 'already_booked' };
 
-  const booking = await insertBooking(client, {
-    actor,
-    clientMembershipId: command.clientMembershipId,
-    idempotencyKey: null,
-    sessionId: session.id,
-  });
-  await notifyBookingCreated(client, {
-    actor,
-    clientMembershipId: command.clientMembershipId,
-    serviceName: session.service.name,
-    startsAt: session.startsAt,
-    booking: { id: booking.id, staffMembershipId: session.staffMembershipId },
-  });
+  const booking = await createJoinedBooking(client, { actor, command, session });
   return { kind: 'created', booking: toBookingView(booking) };
 }

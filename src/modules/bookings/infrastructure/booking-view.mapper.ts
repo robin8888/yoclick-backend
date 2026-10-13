@@ -27,6 +27,15 @@ export type BookingWithSessionDetails = Prisma.BookingGetPayload<{
   include: typeof WITH_SESSION_DETAILS;
 }>;
 
+function toCreatedByView(booking: BookingWithSessionDetails): BookingView['createdBy'] {
+  if (booking.createdBy === null || booking.createdByRole === null) return null;
+  return {
+    membershipId: booking.createdBy.id,
+    fullName: booking.createdBy.user.fullName,
+    role: booking.createdByRole,
+  };
+}
+
 export function toBookingView(booking: BookingWithSessionDetails): BookingView {
   const { classSession } = booking;
   return {
@@ -55,15 +64,9 @@ export function toBookingView(booking: BookingWithSessionDetails): BookingView {
     cancelWithinPolicy: booking.cancelWithinPolicy,
     startedAt: booking.startedAt,
     endedAt: booking.endedAt,
+    checkedInAt: booking.checkedInAt,
     source: booking.source,
     createdAt: booking.createdAt,
-    createdBy:
-      booking.createdBy === null || booking.createdByRole === null
-        ? null
-        : {
-            membershipId: booking.createdBy.id,
-            fullName: booking.createdBy.user.fullName,
-            role: booking.createdByRole,
-          },
+    createdBy: toCreatedByView(booking),
   };
 }

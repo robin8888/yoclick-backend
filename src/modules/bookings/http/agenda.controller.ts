@@ -74,6 +74,11 @@ export class AgendaController {
         booking: serializeBooking(entry.booking),
         client: entry.client,
       })),
+      emptySessions: agenda.emptySessions.map((session) => ({
+        ...session,
+        startsAt: session.startsAt.toISOString(),
+        endsAt: session.endsAt.toISOString(),
+      })),
     };
   }
 

@@ -6,6 +6,8 @@ interface ConsumableBooking {
   readonly centerId: string;
   readonly clientMembershipId: string;
   readonly serviceId: string;
+  /** Cuándo empezaba la clase: el bono tiene que seguir en vigor entonces. */
+  readonly classStartsAt: Date;
 }
 
 /** La reserva que va a gastar bono: null si no existe, es de matrícula o ya descontó. */
@@ -19,7 +21,7 @@ async function findBookingToConsume(
       centerId: true,
       clientMembershipId: true,
       source: true,
-      classSession: { select: { serviceId: true } },
+      classSession: { select: { serviceId: true, startsAt: true } },
       passMovement: { select: { id: true } },
     },
   });
@@ -29,6 +31,7 @@ async function findBookingToConsume(
     centerId: booking.centerId,
     clientMembershipId: booking.clientMembershipId,
     serviceId: booking.classSession.serviceId,
+    classStartsAt: booking.classSession.startsAt,
   };
 }
 
@@ -51,7 +54,12 @@ export async function consumePassForBooking(
     },
     select: { id: true, status: true, remainingSessions: true, expiresAt: true, serviceIds: true },
   });
-  const passId = pickPassToConsume(candidates, { serviceId: booking.serviceId, now: input.now });
+  // Vale el bono que estaba en vigor cuando empezaba la clase (o ahora, si es una clase futura).
+  const referenceTime = booking.classStartsAt < input.now ? booking.classStartsAt : input.now;
+  const passId = pickPassToConsume(candidates, {
+    serviceId: booking.serviceId,
+    now: referenceTime,
+  });
   if (passId === null) return;
 
   // Condicionado a «aún quedan»: dos clases a la vez nunca dejan el bono por debajo de cero.

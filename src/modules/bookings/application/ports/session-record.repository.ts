@@ -16,6 +16,14 @@ export type EndSessionOutcome =
   | { readonly kind: 'not_found' }
   | { readonly kind: 'not_started' };
 
+export type ConfirmAttendanceOutcome =
+  | { readonly kind: 'confirmed'; readonly booking: BookingView }
+  /** Ya estaba confirmada: se devuelve tal cual, sin tocar la hora ni el bono. */
+  | { readonly kind: 'already_confirmed'; readonly booking: BookingView }
+  | { readonly kind: 'not_found' }
+  /** Está cancelada o falta más de una hora para que empiece. */
+  | { readonly kind: 'not_confirmable' };
+
 export interface SessionRecordEntry {
   readonly booking: BookingView;
   readonly client: { readonly membershipId: string; readonly fullName: string };
@@ -47,6 +55,11 @@ export interface SessionRecordRepository {
     actor: ActorContext,
     command: { bookingId: string; now: Date; notes: string | null },
   ): Promise<EndSessionOutcome>;
+  /** Confirma que la persona vino a esa cita y descuenta la clase de su bono (una sola vez). */
+  confirmAttendance(
+    actor: ActorContext,
+    command: { bookingId: string; now: Date },
+  ): Promise<ConfirmAttendanceOutcome>;
   listSessionRecords(actor: ActorContext, query: SessionRecordsQuery): Promise<SessionRecordsFound>;
 }
 

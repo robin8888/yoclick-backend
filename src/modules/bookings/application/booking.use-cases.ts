@@ -10,6 +10,7 @@ import {
 } from '../domain/cancellation-policy';
 import {
   BOOKING_REPOSITORY,
+  type AgendaEntryView,
   type BookingListScope,
   type BookingRepository,
   type BookingView,
@@ -75,6 +76,12 @@ export class JoinGroupSessionUseCase {
     }
     if (outcome.kind === 'outside_window') {
       throw new DomainError('OUTSIDE_BOOKING_WINDOW', HTTP_STATUS.conflict);
+    }
+    if (outcome.kind === 'pass_fully_booked') {
+      throw new DomainError('PASS_FULLY_BOOKED', HTTP_STATUS.conflict);
+    }
+    if (outcome.kind === 'client_has_no_pass') {
+      throw new DomainError('CLIENT_HAS_NO_PASS', HTTP_STATUS.conflict);
     }
     throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
   }
@@ -293,16 +300,33 @@ export interface DayAgendaRequest {
   readonly requestedStaffMembershipId: string | null;
 }
 
+type SignedDayAgenda = Omit<DayAgenda, 'entries'> & {
+  readonly entries: readonly {
+    readonly booking: BookingView;
+    readonly client: WithPhotoUrl<AgendaEntryView['client']>;
+  }[];
+};
+
 /** El personal solo ve su propia agenda aunque pida otra; administración ve todas o filtra por persona. */
 @Injectable()
 export class GetDayAgendaUseCase {
-  constructor(@Inject(BOOKING_REPOSITORY) private readonly bookings: BookingRepository) {}
+  constructor(
+    @Inject(BOOKING_REPOSITORY) private readonly bookings: BookingRepository,
+    private readonly urlSigner: PhotoUrlSigner,
+  ) {}
 
-  async execute(request: DayAgendaRequest): Promise<DayAgenda> {
+  async execute(request: DayAgendaRequest): Promise<SignedDayAgenda> {
     const { actor, date, requestedStaffMembershipId } = request;
     const staffMembershipId =
       actor.role === 'staff' ? actor.membershipId : requestedStaffMembershipId;
-    return this.bookings.listDayAgenda(actor, { date, staffMembershipId });
+    const agenda = await this.bookings.listDayAgenda(actor, { date, staffMembershipId });
+    return {
+      ...agenda,
+      entries: agenda.entries.map(({ booking, client }) => ({
+        booking,
+        client: this.urlSigner.attachPhotoUrl(client),
+      })),
+    };
   }
 }
 

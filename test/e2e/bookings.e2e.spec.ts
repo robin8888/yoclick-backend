@@ -270,6 +270,7 @@ describe('availability and bookings', () => {
         cancelWithinPolicy: null,
         startedAt: null,
         endedAt: null,
+        checkedInAt: null,
         actualDurationSeconds: null,
         source: 'single',
         createdAt: expect.stringMatching(/Z$/) as string,
@@ -926,7 +927,11 @@ describe('availability and bookings', () => {
         startTimes,
       );
       const mine = body.entries.find(({ booking }) => booking.id === ownBooking.id);
-      expect(mine?.client).toEqual({ membershipId: ana.membershipId, fullName: 'ana' });
+      expect(mine?.client).toEqual({
+        membershipId: ana.membershipId,
+        fullName: 'ana',
+        photoUrl: null,
+      });
       expect(mine?.booking.status).toBe('confirmed');
     });
 

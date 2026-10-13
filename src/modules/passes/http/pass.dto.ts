@@ -92,6 +92,23 @@ export class PassListQueryDto extends createZodDto(
   }),
 ) {}
 
+export class EligibleClientsQueryDto extends createZodDto(
+  z.strictObject({ serviceId: z.uuid() }),
+) {}
+
+export class EligibleClientsResponseDto extends createZodDto(
+  z.strictObject({
+    clients: z.array(
+      z.strictObject({
+        membershipId: z.uuid(),
+        fullName: z.string(),
+        /** Clases que aún se le pueden apuntar: lo que le queda menos lo ya agendado. */
+        bookableSessions: z.number().int(),
+      }),
+    ),
+  }),
+) {}
+
 export class AssignPassRequestDto extends createZodDto(
   z.strictObject({ rateId: z.uuid(), clientMembershipId: z.uuid() }),
 ) {}

@@ -68,6 +68,14 @@ export const ERROR_CATALOG = {
     title:
       'Esa persona ya da otra clase a esa hora en esos días. Elige otra hora, otra fecha u otra persona',
   },
+  CLIENT_HAS_NO_PASS: {
+    title:
+      'Esa persona no tiene un bono en vigor con clases. Dale un bono desde su ficha para apuntarla',
+  },
+  PASS_FULLY_BOOKED: {
+    title:
+      'Ya tienes agendadas todas las clases de tu bono. Cancela alguna o pide otro bono para agendar más',
+  },
   SERVICE_ONLY_IN_SCHEDULE: {
     title: 'Este servicio solo se da en sus horarios. Elige una de sus clases con plazas',
   },

@@ -75,6 +75,22 @@ describe('rooms and group appointments', () => {
       classSessionId: sessionId,
     });
 
+  /** Un bono grande (para todos los servicios) entregado por el centro a cada persona. */
+  async function giveEveryoneAPass(people: Person[]): Promise<void> {
+    const rate = (
+      await world.call('POST', url('/rates'), owner, {
+        centerId: center.centerId,
+        body: { name: 'Bono de pruebas', sessionsCount: 50, validDays: 365, priceCents: 0 },
+      })
+    ).json<{ id: string }>();
+    for (const person of people) {
+      await world.call('POST', url('/passes/assign'), owner, {
+        centerId: center.centerId,
+        body: { rateId: rate.id, clientMembershipId: person.membershipId },
+      });
+    }
+  }
+
   beforeAll(async () => {
     application = await createTestApplication();
     world = new BookingWorld(application);
@@ -92,6 +108,8 @@ describe('rooms and group appointments', () => {
       await world.addMember(center.centerId, 'c2', 'client'),
       await world.addMember(center.centerId, 'c3', 'client'),
     ];
+    // El centro solo apunta a quien tiene un bono en vigor con clases.
+    await giveEveryoneAPass(clients);
     serviceId = (
       await world.createService(owner, center.centerId, {
         name: 'Salsa',
@@ -255,6 +273,60 @@ describe('rooms and group appointments', () => {
 
     expect(response.statusCode).toBe(409);
     expect(response.json<{ code: string }>().code).toBe('ALREADY_BOOKED');
+  });
+
+  describe('passes when the center adds people to a group', () => {
+    const remainingOf = async (person: Person): Promise<number> => {
+      const response = await world.call('GET', url('/passes/mine'), person.userId, {
+        centerId: center.centerId,
+      });
+      return (
+        response.json<{ passes: { remainingSessions: number }[] }>().passes[0]?.remainingSessions ??
+        -1
+      );
+    };
+
+    const openGroup = async (): Promise<string> => {
+      const first = await assignGroup(clients[0] as Person, teacherAna, roomOfAna);
+      return first.json<BookingBody>().session.id;
+    };
+
+    it('only lets the center add a person who has a pass in force with classes left', async () => {
+      const sessionId = await openGroup();
+      const withoutPass = await world.addMember(center.centerId, 'nopass', 'client');
+
+      const response = await joinGroup(withoutPass, sessionId);
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json<{ code: string }>().code).toBe('CLIENT_HAS_NO_PASS');
+    });
+
+    it('lists as eligible only the people with a pass and classes', async () => {
+      await world.addMember(center.centerId, 'nopass', 'client');
+
+      const response = await call('GET', `/passes/eligible?serviceId=${serviceId}`);
+
+      expect(response.statusCode).toBe(200);
+      const names = response
+        .json<{ clients: { fullName: string }[] }>()
+        .clients.map(({ fullName }) => fullName)
+        .sort((first, second) => first.localeCompare(second));
+      expect(names).toEqual(['c1', 'c2', 'c3']);
+    });
+
+    it('takes a class off the pass when they are added, and gives it back when the booking is cancelled', async () => {
+      const sessionId = await openGroup();
+      const before = await remainingOf(clients[1] as Person);
+
+      const joined = await joinGroup(clients[1] as Person, sessionId);
+      const afterJoining = await remainingOf(clients[1] as Person);
+      await call('POST', `/agenda/bookings/${joined.json<BookingBody>().id}/cancel`);
+      const afterCancelling = await remainingOf(clients[1] as Person);
+
+      expect(joined.statusCode).toBe(201);
+      expect(afterJoining).toBe(before - 1);
+      expect(afterCancelling).toBe(before);
+    });
   });
 
   it('does not let a group booking be moved: it is cancelled and assigned again', async () => {

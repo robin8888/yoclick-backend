@@ -27,6 +27,8 @@ export interface BookingView {
   readonly cancelWithinPolicy: boolean | null;
   readonly startedAt: Date | null;
   readonly endedAt: Date | null;
+  /** Cuándo se confirmó que la persona vino (QR o check del profesional); `null` si aún no. */
+  readonly checkedInAt: Date | null;
   /** Cita suelta o plaza de un grupo fijo (matrícula, no gasta bono). */
   readonly source: 'single' | 'enrollment';
   readonly createdAt: Date;
@@ -91,7 +93,11 @@ export type JoinGroupSessionOutcome =
   | { readonly kind: 'session_full' }
   | { readonly kind: 'already_booked' }
   /** El propio cliente pide una clase demasiado pronto o demasiado lejos, o de un servicio oculto. */
-  | { readonly kind: 'outside_window' };
+  | { readonly kind: 'outside_window' }
+  /** Ya tiene agendadas todas las clases que le quedan en su bono. */
+  | { readonly kind: 'pass_fully_booked' }
+  /** El centro intenta apuntar a alguien sin bono en vigor con clases. */
+  | { readonly kind: 'client_has_no_pass' };
 
 export interface RescheduleBookingCommand {
   readonly bookingId: string;
@@ -290,7 +296,24 @@ export interface RoomAgenda {
 
 export interface AgendaEntryView {
   readonly booking: BookingView;
-  readonly client: { readonly membershipId: string; readonly fullName: string };
+  readonly client: {
+    readonly membershipId: string;
+    readonly fullName: string;
+    /** Ruta de su foto en el almacén; la API la convierte en un enlace firmado. */
+    readonly photoKey: string | null;
+  };
+}
+
+/** Una clase del horario a la que aún no se ha apuntado nadie: existe, pero no tiene reservas. */
+export interface EmptySessionView {
+  readonly id: string;
+  readonly startsAt: Date;
+  readonly endsAt: Date;
+  readonly mode: 'private' | 'group';
+  readonly capacity: number;
+  readonly service: { readonly id: string; readonly name: string };
+  readonly room: { readonly id: string; readonly name: string } | null;
+  readonly staff: { readonly membershipId: string; readonly fullName: string };
 }
 
 export interface DayAgenda {
@@ -298,6 +321,8 @@ export interface DayAgenda {
   /** Cuándo abre el centro ese día (hora local): el profesional ve de un vistazo sus huecos. */
   readonly openingRanges: readonly { readonly opensAt: string; readonly closesAt: string }[];
   readonly entries: readonly AgendaEntryView[];
+  /** Las clases del día sin nadie apuntado, para que el profesional vea que existen. */
+  readonly emptySessions: readonly EmptySessionView[];
 }
 
 export type TeamCancellationOutcome =

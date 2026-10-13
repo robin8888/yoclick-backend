@@ -13,6 +13,7 @@ import {
 } from '../../centers/domain/opening-hours';
 import {
   type AgendaEntryView,
+  type EmptySessionView,
   type BookingListScope,
   type BookingRepository,
   type BookingView,
@@ -53,6 +54,7 @@ import {
   WITH_SESSION_DETAILS,
   type BookingWithSessionDetails,
 } from './booking-view.mapper';
+import { restorePassForBooking } from '../../passes/infrastructure/pass-restoration';
 
 interface StoredCancelPolicy {
   readonly freeCancellationHours: number;
@@ -103,6 +105,55 @@ async function recordCancellationNotice(
  */
 function withTeamVisibility(actor: ActorContext): ActorContext {
   return { ...actor, role: 'staff' };
+}
+
+type StoredAgendaBooking = BookingWithSessionDetails & {
+  clientMembership: { id: string; user: { fullName: string; photoKey: string | null } };
+};
+
+/** Las clases programadas del día en las que nadie está apuntado (las canceladas no cuentan). */
+async function listEmptySessions(
+  client: TenantTransactionClient,
+  input: { range: { startsAt: Date; endsAt: Date }; staffMembershipId: string | null },
+): Promise<EmptySessionView[]> {
+  const sessions = await client.classSession.findMany({
+    where: {
+      status: 'scheduled',
+      startsAt: { gte: input.range.startsAt, lt: input.range.endsAt },
+      bookings: { none: { status: { not: 'cancelled' } } },
+      ...(input.staffMembershipId !== null && { staffMembershipId: input.staffMembershipId }),
+    },
+    include: {
+      service: { select: { id: true, name: true } },
+      room: { select: { id: true, name: true } },
+      staffMembership: { select: { id: true, user: { select: { fullName: true } } } },
+    },
+    orderBy: [{ startsAt: 'asc' }, { id: 'asc' }],
+  });
+  return sessions.map((session) => ({
+    id: session.id,
+    startsAt: session.startsAt,
+    endsAt: session.endsAt,
+    mode: session.mode,
+    capacity: session.capacity,
+    service: session.service,
+    room: session.room,
+    staff: {
+      membershipId: session.staffMembership.id,
+      fullName: session.staffMembership.user.fullName,
+    },
+  }));
+}
+
+function toAgendaEntry(booking: StoredAgendaBooking): AgendaEntryView {
+  return {
+    booking: toBookingView(booking),
+    client: {
+      membershipId: booking.clientMembership.id,
+      fullName: booking.clientMembership.user.fullName,
+      photoKey: booking.clientMembership.user.photoKey,
+    },
+  };
 }
 
 @Injectable()
@@ -262,6 +313,7 @@ export class PrismaBookingRepository implements BookingRepository {
       // Libera el hueco de la persona y de la sala (la restricción EXCLUDE solo mira sesiones
       // programadas), salvo que en una clase grupal quede alguien más apuntado.
       await releaseSessionIfEmpty(client, booking.classSessionId);
+      await restorePassForBooking(client, { bookingId: booking.id });
       await recordCancellationNotice(client, actor, booking);
       return toBookingView(booking);
     });
@@ -293,6 +345,7 @@ export class PrismaBookingRepository implements BookingRepository {
         data: { status: 'cancelled', cancelledAt: request.now, cancelledBy: 'staff' },
       });
       await releaseSessionIfEmpty(client, booking.classSessionId);
+      await restorePassForBooking(client, { bookingId: booking.id });
       await recordCancellationNotice(client, actor, booking);
       const cancelled = await client.booking.findUniqueOrThrow({
         where: { id: booking.id },
@@ -322,21 +375,22 @@ export class PrismaBookingRepository implements BookingRepository {
         },
         include: {
           ...WITH_SESSION_DETAILS,
-          clientMembership: { select: { id: true, user: { select: { fullName: true } } } },
+          clientMembership: {
+            select: { id: true, user: { select: { fullName: true, photoKey: true } } },
+          },
         },
         orderBy: [{ classSession: { startsAt: 'asc' } }, { id: 'asc' }],
       });
-      const entries: AgendaEntryView[] = bookings.map((booking) => ({
-        booking: toBookingView(booking),
-        client: {
-          membershipId: booking.clientMembership.id,
-          fullName: booking.clientMembership.user.fullName,
-        },
-      }));
+      const entries = bookings.map(toAgendaEntry);
+      const emptySessions = await listEmptySessions(client, {
+        range,
+        staffMembershipId: query.staffMembershipId,
+      });
       return {
         timeZone: center.timezone,
         openingRanges: listOpeningRangesOfCenterDate(center, query.date),
         entries,
+        emptySessions,
       };
     });
   }

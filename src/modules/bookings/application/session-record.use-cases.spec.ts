@@ -35,6 +35,7 @@ function buildBooking(overrides: Partial<BookingView> = {}): BookingView {
     cancelWithinPolicy: null,
     startedAt: null,
     endedAt: null,
+    checkedInAt: null,
     source: 'single',
     createdAt: NOW,
     createdBy: null,
@@ -46,6 +47,7 @@ function buildRepository(overrides: Partial<SessionRecordRepository>): SessionRe
   return {
     startSession: jest.fn(),
     endSession: jest.fn(),
+    confirmAttendance: jest.fn(),
     listSessionRecords: jest.fn(),
     ...overrides,
   };

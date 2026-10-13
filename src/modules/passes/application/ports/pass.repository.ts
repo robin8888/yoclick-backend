@@ -71,7 +71,19 @@ export interface PassListQuery {
   readonly statuses: readonly PassStatusName[] | null;
 }
 
+/** Una persona a la que se puede apuntar a una clase: tiene bono en vigor con clases por agendar. */
+export interface EligibleClientView {
+  readonly membershipId: string;
+  readonly fullName: string;
+  readonly bookableSessions: number;
+}
+
 export interface PassRepository {
+  /** Las personas con un bono en vigor y clases por agendar que valga para ese servicio. */
+  listEligibleClients(
+    actor: ActorContext,
+    query: { serviceId: string; now: Date },
+  ): Promise<EligibleClientView[]>;
   /** Bonos no archivados, por orden de creación. */
   listRates(actor: ActorContext): Promise<RateView[]>;
   createRate(actor: ActorContext, newRate: NewRate): Promise<RateChangeOutcome>;

@@ -64,6 +64,29 @@ export class EndSessionUseCase {
   }
 }
 
+/** Quien atiende marca con un check que la persona vino: queda guardado y se descuenta del bono. */
+@Injectable()
+export class ConfirmAttendanceUseCase {
+  constructor(
+    @Inject(SESSION_RECORD_REPOSITORY) private readonly sessionRecords: SessionRecordRepository,
+  ) {}
+
+  async execute(input: {
+    actor: ActorContext;
+    bookingId: string;
+    now: Date;
+  }): Promise<BookingView> {
+    const outcome = await this.sessionRecords.confirmAttendance(input.actor, {
+      bookingId: input.bookingId,
+      now: input.now,
+    });
+    if (outcome.kind === 'confirmed' || outcome.kind === 'already_confirmed')
+      return outcome.booking;
+    if (outcome.kind === 'not_found') throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
+    throw new DomainError('CHECKIN_NO_BOOKING', HTTP_STATUS.conflict);
+  }
+}
+
 export interface SessionRecordItem {
   readonly booking: BookingView;
   readonly client: { readonly membershipId: string; readonly fullName: string };

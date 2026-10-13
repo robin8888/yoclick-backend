@@ -4,8 +4,10 @@ import {
   type TenantTransactionClient,
 } from '../../../shared/database/tenant-prisma.service';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
+import { MILLISECONDS_PER_MINUTE } from '../../../shared/time/time-units';
 import { getUtcRangeOfLocalDates } from '../../../shared/time/zoned-time';
 import {
+  type ConfirmAttendanceOutcome,
   type EndSessionOutcome,
   type SessionRecordEntry,
   type SessionRecordRepository,
@@ -13,6 +15,7 @@ import {
   type SessionRecordsQuery,
   type StartSessionOutcome,
 } from '../application/ports/session-record.repository';
+import { CHECKIN_EARLY_MINUTES } from '../domain/check-in';
 import { decideSessionEnd, decideSessionStart } from '../domain/session-record';
 import {
   toBookingView,
@@ -123,6 +126,36 @@ export class PrismaSessionRecordRepository implements SessionRecordRepository {
       return decideSessionEnd(booking) === 'already_ended'
         ? { kind: 'already_ended', booking }
         : { kind: 'not_started' };
+    });
+  }
+
+  async confirmAttendance(
+    actor: ActorContext,
+    command: { bookingId: string; now: Date },
+  ): Promise<ConfirmAttendanceOutcome> {
+    return this.tenantPrismaService.runInTenantContext(actor, async (client) => {
+      const visible = await findManageableBooking(client, actor, command.bookingId);
+      if (!visible) return { kind: 'not_found' };
+      const opensAt =
+        visible.classSession.startsAt.getTime() - CHECKIN_EARLY_MINUTES * MILLISECONDS_PER_MINUTE;
+      const isConfirmable = visible.status !== 'cancelled' && command.now.getTime() >= opensAt;
+      if (!isConfirmable) return { kind: 'not_confirmable' };
+
+      // UPDATE condicionado a «aún sin confirmar»: dos checks a la vez no descuentan dos veces.
+      const confirmed = await client.booking.updateMany({
+        where: { id: command.bookingId, checkedInAt: null },
+        data: {
+          checkedInAt: command.now,
+          checkedInByMembershipId: actor.membershipId,
+          // Si ya se había dado por «no se presentó», vino: la confirmación lo corrige.
+          ...(visible.status === 'no_show' && { status: 'attended' as const }),
+        },
+      });
+      if (confirmed.count === 1) {
+        await consumePassForBooking(client, { bookingId: command.bookingId, now: command.now });
+      }
+      const booking = toBookingView(await reloadBooking(client, command.bookingId));
+      return { kind: confirmed.count === 1 ? 'confirmed' : 'already_confirmed', booking };
     });
   }
 

@@ -13,7 +13,11 @@ import { Roles } from '../../../shared/auth/decorators/roles.decorator';
 import { ProblemDetailsDto } from '../../../shared/errors/problem-details.dto';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
 import { assertRouteTargetsActorCenter } from '../../../shared/tenancy/assert-route-targets-actor-center';
-import { EndSessionUseCase, StartSessionUseCase } from '../application/session-record.use-cases';
+import {
+  ConfirmAttendanceUseCase,
+  EndSessionUseCase,
+  StartSessionUseCase,
+} from '../application/session-record.use-cases';
 import { BookingResponseDto, BookingRouteParamsDto } from './booking.dto';
 import { serializeBooking } from './serialize-booking';
 import { EndSessionRequestDto } from './session-record.dto';
@@ -28,6 +32,7 @@ export class BookingSessionsController {
   constructor(
     private readonly startSession: StartSessionUseCase,
     private readonly endSession: EndSessionUseCase,
+    private readonly confirmAttendance: ConfirmAttendanceUseCase,
   ) {}
 
   @Post(':bookingId/start')
@@ -72,6 +77,28 @@ export class BookingSessionsController {
       actor,
       bookingId: params.bookingId,
       notes: body.notes ? body.notes : null,
+      now: new Date(),
+    });
+    return serializeBooking(booking);
+  }
+
+  @Post(':bookingId/attendance')
+  @Roles('owner', 'admin', 'staff')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    operationId: 'bookings_confirm_attendance',
+    summary:
+      'Confirma con un check que la persona vino a la cita: guarda checkedInAt y descuenta una clase de su bono en vigor (una sola vez). Quien atiende la reserva (o administración); para el resto, 404. 409 CHECKIN_NO_BOOKING si está cancelada o falta más de una hora para que empiece. Repetirlo devuelve la misma reserva.',
+  })
+  @ApiOkResponse({ type: BookingResponseDto })
+  async confirm(
+    @CurrentActor() actor: ActorContext,
+    @Param() params: BookingRouteParamsDto,
+  ): Promise<Record<string, unknown>> {
+    assertRouteTargetsActorCenter(actor, params.centerId);
+    const booking = await this.confirmAttendance.execute({
+      actor,
+      bookingId: params.bookingId,
       now: new Date(),
     });
     return serializeBooking(booking);

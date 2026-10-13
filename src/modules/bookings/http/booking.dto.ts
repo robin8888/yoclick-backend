@@ -246,6 +246,8 @@ export const bookingShape = {
   /** Cuándo empezó la clase en el servidor; la app calcula el temporizador a partir de aquí. */
   startedAt: z.iso.datetime().nullable(),
   endedAt: z.iso.datetime().nullable(),
+  /** Cuándo se confirmó su asistencia (QR o check del profesional); `null` si aún no. */
+  checkedInAt: z.iso.datetime().nullable(),
   /** Fin menos inicio en segundos enteros; `null` mientras no haya terminado. */
   actualDurationSeconds: z.number().int().nullable(),
   /** Cita suelta o plaza de un grupo fijo (matrícula, no gasta bono). */
@@ -284,7 +286,25 @@ export class AgendaResponseDto extends createZodDto(
     entries: z.array(
       z.strictObject({
         booking: z.strictObject(bookingShape),
-        client: z.strictObject({ membershipId: z.uuid(), fullName: z.string() }),
+        client: z.strictObject({
+          membershipId: z.uuid(),
+          fullName: z.string(),
+          /** Enlace firmado de su foto de perfil; `null` si no tiene. */
+          photoUrl: z.string().nullable(),
+        }),
+      }),
+    ),
+    /** Clases del día sin nadie apuntado: existen en el horario pero aún no tienen reservas. */
+    emptySessions: z.array(
+      z.strictObject({
+        id: z.uuid(),
+        startsAt: z.iso.datetime(),
+        endsAt: z.iso.datetime(),
+        mode: z.enum(['private', 'group']),
+        capacity: z.number().int(),
+        service: z.strictObject({ id: z.uuid(), name: z.string() }),
+        room: z.strictObject({ id: z.uuid(), name: z.string() }).nullable(),
+        staff: z.strictObject({ membershipId: z.uuid(), fullName: z.string() }),
       }),
     ),
   }),

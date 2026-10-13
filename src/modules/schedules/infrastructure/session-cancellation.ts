@@ -1,6 +1,7 @@
 import { type TenantTransactionClient } from '../../../shared/database/tenant-prisma.service';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
 import { recordSessionCancelledNotices } from './schedule-notices';
+import { restorePassForBooking } from '../../passes/infrastructure/pass-restoration';
 
 const SESSION_CANCELLATION_INCLUDE = {
   service: { select: { name: true } },
@@ -84,6 +85,10 @@ export async function cancelSessionWithBookings(
         cancelWithinPolicy: true,
       },
     });
+    // El centro cancela el día: a quien ya se le había descontado la clase, se le devuelve.
+    for (const bookingId of bookingIds) {
+      await restorePassForBooking(client, { bookingId });
+    }
   }
   if (request.shouldNotify) {
     await recordSessionCancelledNotices(client, actor, {

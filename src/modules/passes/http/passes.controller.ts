@@ -30,6 +30,7 @@ import {
   AssignPassUseCase,
   CreateRateUseCase,
   DecidePassUseCase,
+  ListEligibleClientsUseCase,
   ListPassesUseCase,
   ListRatesUseCase,
   RequestPassUseCase,
@@ -40,6 +41,8 @@ import {
   AssignPassRequestDto,
   CenterRouteParamsDto,
   CreateRateRequestDto,
+  EligibleClientsQueryDto,
+  EligibleClientsResponseDto,
   PassListQueryDto,
   PassListResponseDto,
   PassResponseDto,
@@ -164,7 +167,25 @@ export class PassesController {
     private readonly assignPass: AssignPassUseCase,
     private readonly listPasses: ListPassesUseCase,
     private readonly decidePass: DecidePassUseCase,
+    private readonly listEligible: ListEligibleClientsUseCase,
   ) {}
+
+  @Get('eligible')
+  @Roles('owner', 'admin')
+  @ApiOperation({
+    operationId: 'passes_eligible',
+    summary:
+      'Las personas a las que el centro puede apuntar a una clase de ese servicio: con un bono en vigor y clases por agendar.',
+  })
+  @ApiOkResponse({ type: EligibleClientsResponseDto })
+  async eligible(
+    @CurrentActor() actor: ActorContext,
+    @Param() params: CenterRouteParamsDto,
+    @Query() query: EligibleClientsQueryDto,
+  ): Promise<Record<string, unknown>> {
+    assertRouteTargetsActorCenter(actor, params.centerId);
+    return { clients: await this.listEligible.execute(actor, query.serviceId) };
+  }
 
   @Get('mine')
   @Roles('client')

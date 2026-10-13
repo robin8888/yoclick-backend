@@ -1,3 +1,4 @@
+import { type PhotoUrlSigner } from '../../photos/application/photo-url-signer';
 import { DomainError } from '../../../shared/errors/domain-error';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
 import {
@@ -39,6 +40,7 @@ function buildBooking(overrides: Partial<BookingView> = {}): BookingView {
     cancelWithinPolicy: null,
     startedAt: null,
     endedAt: null,
+    checkedInAt: null,
     source: 'single',
     createdAt: NOW,
     createdBy: null,
@@ -275,7 +277,10 @@ describe('GetDayAgendaUseCase', () => {
 
   it('keeps staff on their own agenda whatever they ask for, and lets admins filter', async () => {
     const listDayAgenda = jest.fn().mockResolvedValue({ timeZone: 'Europe/Madrid', entries: [] });
-    const useCase = new GetDayAgendaUseCase(buildRepository({ listDayAgenda }));
+    const useCase = new GetDayAgendaUseCase(buildRepository({ listDayAgenda }), {
+      attachPhotoUrl: jest.fn(),
+      sign: jest.fn(),
+    } as unknown as PhotoUrlSigner);
     const date = '2026-10-05';
 
     await useCase.execute({ actor: STAFF, date, requestedStaffMembershipId: 'membership-owner' });

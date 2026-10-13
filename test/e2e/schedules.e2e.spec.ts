@@ -107,6 +107,22 @@ describe('room schedules, fixed groups and room blocks', () => {
     return agenda.rooms.find((room) => room.id === roomId)?.sessions ?? [];
   }
 
+  /** Un bono grande (para todos los servicios) entregado por el centro a cada persona. */
+  async function giveEveryoneAPass(people: Person[]): Promise<void> {
+    const rate = (
+      await world.call('POST', url('/rates'), owner, {
+        centerId: center.centerId,
+        body: { name: 'Bono de pruebas', sessionsCount: 50, validDays: 365, priceCents: 0 },
+      })
+    ).json<{ id: string }>();
+    for (const person of people) {
+      await world.call('POST', url('/passes/assign'), owner, {
+        centerId: center.centerId,
+        body: { rateId: rate.id, clientMembershipId: person.membershipId },
+      });
+    }
+  }
+
   beforeAll(async () => {
     application = await createTestApplication();
     world = new BookingWorld(application);
@@ -124,6 +140,8 @@ describe('room schedules, fixed groups and room blocks', () => {
       await world.addMember(center.centerId, 'c2', 'client'),
       await world.addMember(center.centerId, 'c3', 'client'),
     ];
+    // El centro solo apunta a quien tiene un bono en vigor con clases.
+    await giveEveryoneAPass(clients);
     groupServiceId = (
       await world.createService(owner, center.centerId, {
         name: 'Salsa',
@@ -148,7 +166,7 @@ describe('room schedules, fixed groups and room blocks', () => {
         staffMembershipId: teacherAna.membershipId,
       })
     ).json<{ id: string }>().id;
-    firstDate = addDaysToLocalDate(toLocalDate(new Date(), MADRID), 1);
+    firstDate = addDaysToLocalDate(toLocalDate(new Date(), MADRID), 3);
   });
 
   afterAll(async () => {
@@ -383,6 +401,48 @@ describe('room schedules, fixed groups and room blocks', () => {
     });
   });
 
+  describe('the agenda of the teacher', () => {
+    it('shows the classes of the schedule that nobody has joined yet', async () => {
+      await createSeries();
+
+      const response = await call('GET', `/agenda?date=${firstDate}`, undefined, teacherAna.userId);
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json<{
+        entries: unknown[];
+        emptySessions: { service: { id: string }; staff: { membershipId: string } }[];
+      }>();
+      expect(body.entries).toEqual([]);
+      expect(body.emptySessions).toHaveLength(1);
+      expect(body.emptySessions[0]).toMatchObject({
+        service: { id: groupServiceId },
+        staff: { membershipId: teacherAna.membershipId },
+      });
+    });
+
+    it('stops listing the class as empty once someone joins it', async () => {
+      await createSeries();
+      const sessions = await call(
+        'GET',
+        `/services/${groupServiceId}/open-sessions?from=${firstDate}&to=${firstDate}`,
+        undefined,
+        clients[0]?.userId,
+      );
+      const sessionId = sessions.json<{ sessions: { id: string }[] }>().sessions[0]?.id ?? '';
+      await world.call('POST', url('/bookings/join-session'), clients[0]?.userId, {
+        centerId: center.centerId,
+        headers: { 'idempotency-key': randomUUID() },
+        body: { classSessionId: sessionId },
+      });
+
+      const response = await call('GET', `/agenda?date=${firstDate}`, undefined, teacherAna.userId);
+
+      const body = response.json<{ entries: unknown[]; emptySessions: unknown[] }>();
+      expect(body.entries).toHaveLength(1);
+      expect(body.emptySessions).toEqual([]);
+    });
+  });
+
   describe('a client books a class of a service with a room schedule', () => {
     async function firstOpenSessionId(): Promise<string> {
       await createSeries();
@@ -532,6 +592,48 @@ describe('room schedules, fixed groups and room blocks', () => {
 
       expect(moved.statusCode).toBe(409);
       expect(moved.json<{ code: string }>().code).toBe('SESSION_FULL');
+    });
+
+    it('does not let a client with a pass book more classes than the pass has left', async () => {
+      const limited = await world.addMember(center.centerId, 'limited', 'client');
+      await createSeries({
+        weekdays: [0, 1, 2].map((offset) =>
+          getScheduleWeekdayOfLocalDate(addDaysToLocalDate(firstDate, offset)),
+        ),
+      });
+      const rate = (
+        await call('POST', '/rates', {
+          name: 'Bono 2',
+          sessionsCount: 2,
+          validDays: 30,
+          priceCents: 2000,
+          serviceIds: [],
+        })
+      ).json<{ id: string }>();
+      await call('POST', '/passes/assign', {
+        rateId: rate.id,
+        clientMembershipId: limited.membershipId,
+      });
+      const sessions = await openSessions(limited.userId);
+      expect(sessions.length).toBeGreaterThanOrEqual(3);
+      const joinNth = (index: number) => joinAsClient(sessions[index]?.id ?? '', limited);
+
+      const first = await joinNth(0);
+      const second = await joinNth(1);
+      const third = await joinNth(2);
+
+      expect(first.statusCode).toBe(201);
+      expect(second.statusCode).toBe(201);
+      expect(third.statusCode).toBe(409);
+      expect(third.json<{ code: string }>().code).toBe('PASS_FULLY_BOOKED');
+
+      await world.call(
+        'POST',
+        url(`/bookings/${first.json<{ id: string }>().id}/cancel`),
+        limited.userId,
+        { centerId: center.centerId },
+      );
+      expect((await joinNth(2)).statusCode).toBe(201);
     });
 
     it('is only for clients: the team assigns through the agenda', async () => {
