@@ -28,7 +28,7 @@ export class PrismaNotificationRepository implements NotificationRepository {
     actor: ActorContext,
     query: { limit: number },
   ): Promise<NotificationList> {
-    const mine = { recipientMembershipId: actor.membershipId };
+    const mine = { recipientMembershipId: actor.membershipId, deletedAt: null };
     return this.tenantPrismaService.runInTenantContext(actor, async (client) => {
       const [unreadCount, notifications] = await Promise.all([
         client.notification.count({ where: { ...mine, readAt: null } }),
@@ -49,6 +49,7 @@ export class PrismaNotificationRepository implements NotificationRepository {
     return this.tenantPrismaService.runInTenantContext(actor, async (client) => {
       const target = {
         recipientMembershipId: actor.membershipId,
+        deletedAt: null,
         ...(change.notificationId !== null && { id: change.notificationId }),
       };
       const isFound =
@@ -60,6 +61,25 @@ export class PrismaNotificationRepository implements NotificationRepository {
         data: { readAt: change.readAt },
       });
       return true;
+    });
+  }
+
+  async deleteNotifications(
+    actor: ActorContext,
+    change: { notificationId: string | null; deletedAt: Date },
+  ): Promise<boolean> {
+    return this.tenantPrismaService.runInTenantContext(actor, async (client) => {
+      // Solo los propios y aún visibles: el aviso de otra persona es indistinguible de uno inexistente.
+      const target = {
+        recipientMembershipId: actor.membershipId,
+        deletedAt: null,
+        ...(change.notificationId !== null && { id: change.notificationId }),
+      };
+      const deleted = await client.notification.updateMany({
+        where: target,
+        data: { deletedAt: change.deletedAt },
+      });
+      return change.notificationId === null || deleted.count === 1;
     });
   }
 }

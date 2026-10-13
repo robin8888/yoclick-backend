@@ -63,7 +63,7 @@ export class PushDispatcher {
     const since = new Date(Date.now() - MAX_PUSH_DELAY_HOURS * MILLISECONDS_PER_HOUR);
     const pending = await this.tenantPrismaService.runInTenantContext(actor, (client) =>
       client.notification.findMany({
-        where: { pushedAt: null, createdAt: { gte: since } },
+        where: { pushedAt: null, deletedAt: null, createdAt: { gte: since } },
         orderBy: { createdAt: 'asc' },
         take: MAX_NOTIFICATIONS_PER_FLUSH,
         select: { id: true, kind: true, recipient: { select: { userId: true } } },

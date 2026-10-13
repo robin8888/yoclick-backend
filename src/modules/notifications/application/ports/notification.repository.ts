@@ -24,6 +24,14 @@ export interface NotificationRepository {
     actor: ActorContext,
     change: { notificationId: string | null; readAt: Date },
   ): Promise<boolean>;
+  /**
+   * Quita de la lista (borrado lógico) todos (`notificationId` = `null`) o uno. `false` si ese uno
+   * no existe, ya estaba borrado o es de otra persona.
+   */
+  deleteNotifications(
+    actor: ActorContext,
+    change: { notificationId: string | null; deletedAt: Date },
+  ): Promise<boolean>;
 }
 
 export const NOTIFICATION_REPOSITORY = Symbol('NOTIFICATION_REPOSITORY');

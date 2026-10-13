@@ -20,6 +20,22 @@ export class ListNotificationsUseCase {
 }
 
 @Injectable()
+export class DeleteNotificationsUseCase {
+  constructor(
+    @Inject(NOTIFICATION_REPOSITORY) private readonly notifications: NotificationRepository,
+  ) {}
+
+  /** `notificationId` = `null` borra todos los avisos de quien pregunta (borrado lógico). */
+  async execute(actor: ActorContext, notificationId: string | null): Promise<void> {
+    const wasFound = await this.notifications.deleteNotifications(actor, {
+      notificationId,
+      deletedAt: new Date(),
+    });
+    if (!wasFound) throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
+  }
+}
+
+@Injectable()
 export class MarkNotificationsReadUseCase {
   constructor(
     @Inject(NOTIFICATION_REPOSITORY) private readonly notifications: NotificationRepository,

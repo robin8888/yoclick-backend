@@ -1,4 +1,4 @@
-import { Controller, Get, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common';
+import { Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiDefaultResponse,
@@ -14,6 +14,7 @@ import { ProblemDetailsDto } from '../../../shared/errors/problem-details.dto';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
 import { assertRouteTargetsActorCenter } from '../../../shared/tenancy/assert-route-targets-actor-center';
 import {
+  DeleteNotificationsUseCase,
   ListNotificationsUseCase,
   MarkNotificationsReadUseCase,
 } from '../application/notification.use-cases';
@@ -33,6 +34,7 @@ export class NotificationsController {
   constructor(
     private readonly listNotifications: ListNotificationsUseCase,
     private readonly markRead: MarkNotificationsReadUseCase,
+    private readonly deleteNotifications: DeleteNotificationsUseCase,
   ) {}
 
   @Get()
@@ -89,5 +91,39 @@ export class NotificationsController {
   ): Promise<void> {
     assertRouteTargetsActorCenter(actor, params.centerId);
     await this.markRead.execute(actor, params.notificationId);
+  }
+
+  @Delete()
+  @Roles('owner', 'admin', 'staff', 'client')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    operationId: 'notifications_delete_all',
+    summary:
+      'Quita de la lista todos los avisos de quien pregunta. Es un borrado lógico: la fila se conserva.',
+  })
+  @ApiNoContentResponse()
+  async deleteAll(
+    @CurrentActor() actor: ActorContext,
+    @Param() params: CenterRouteParamsDto,
+  ): Promise<void> {
+    assertRouteTargetsActorCenter(actor, params.centerId);
+    await this.deleteNotifications.execute(actor, null);
+  }
+
+  @Delete(':notificationId')
+  @Roles('owner', 'admin', 'staff', 'client')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    operationId: 'notifications_delete',
+    summary:
+      'Quita de la lista un aviso propio (borrado lógico). 404 si no existe, ya estaba borrado o es de otra persona.',
+  })
+  @ApiNoContentResponse()
+  async delete(
+    @CurrentActor() actor: ActorContext,
+    @Param() params: NotificationRouteParamsDto,
+  ): Promise<void> {
+    assertRouteTargetsActorCenter(actor, params.centerId);
+    await this.deleteNotifications.execute(actor, params.notificationId);
   }
 }

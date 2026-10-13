@@ -1,6 +1,6 @@
 import { type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { BookingWorld, type CreatedTestCenter, type TestSlot } from '../support/booking-world';
-import { resetTestDatabase } from '../support/test-database';
+import { resetTestDatabase, runStatementAsOwnerForUser } from '../support/test-database';
 import { createTestApplication } from './create-test-application';
 
 interface NotificationBody {
@@ -113,6 +113,64 @@ describe('notifications', () => {
       'booking_cancelled',
       'booking_created',
     ]);
+  });
+
+  describe('deleting notices (logical delete)', () => {
+    const remove = (userId: string, path = '') =>
+      world.call('DELETE', notificationsUrl(path), userId, { centerId: center.centerId });
+
+    it('removes one notice from the list of its owner, and only from theirs', async () => {
+      const [notice] = (await listFor(staff.userId)).notifications as [NotificationBody];
+
+      const deleted = await remove(staff.userId, `/${notice.id}`);
+
+      expect(deleted.statusCode).toBe(204);
+      const forStaff = await listFor(staff.userId);
+      expect(forStaff.notifications).toHaveLength(0);
+      expect(forStaff.unreadCount).toBe(0);
+      // El del dueño es otro aviso (su propia fila): sigue ahí.
+      expect((await listFor(owner)).notifications).toHaveLength(1);
+    });
+
+    it('does not let another person delete a notice, and says 404 when it was already deleted', async () => {
+      const [notice] = (await listFor(staff.userId)).notifications as [NotificationBody];
+
+      const intruder = await remove(owner, `/${notice.id}`);
+      await remove(staff.userId, `/${notice.id}`);
+      const again = await remove(staff.userId, `/${notice.id}`);
+
+      expect(intruder.statusCode).toBe(404);
+      expect(again.statusCode).toBe(404);
+    });
+
+    it('clears all the notices of a person, and new ones still arrive afterwards', async () => {
+      await world.call(
+        'POST',
+        `/v1/centers/${center.centerId}/bookings/${bookingId}/cancel`,
+        ana.userId,
+        { centerId: center.centerId },
+      );
+      expect((await listFor(staff.userId)).notifications).toHaveLength(2);
+
+      const cleared = await remove(staff.userId);
+
+      expect(cleared.statusCode).toBe(204);
+      expect((await listFor(staff.userId)).notifications).toHaveLength(0);
+      expect((await listFor(owner)).notifications).toHaveLength(2);
+    });
+
+    it('keeps the row in the database: the delete is logical', async () => {
+      const [notice] = (await listFor(staff.userId)).notifications as [NotificationBody];
+      await remove(staff.userId, `/${notice.id}`);
+
+      await expect(
+        runStatementAsOwnerForUser(
+          staff.userId,
+          `UPDATE "notifications" SET "deleted_at" = "deleted_at" WHERE "id" = '${notice.id}' AND "deleted_at" IS NOT NULL`,
+          center.centerId,
+        ),
+      ).resolves.toBeUndefined();
+    });
   });
 
   it('marks one notice as read, only for its owner', async () => {
