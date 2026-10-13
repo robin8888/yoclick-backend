@@ -159,6 +159,8 @@ enum NotificationKind {
   session_cancelled
   schedule_enrolled
   schedule_unenrolled
+  pass_requested
+  pass_activated
 
   @@map("notification_kind")
 }
@@ -342,6 +344,9 @@ model Center {
   classSessions       ClassSession[]
   bookings            Booking[]
   rooms               Room[]
+  rates               Rate[]
+  clientPasses        ClientPass[]
+  balanceMovements    BalanceMovement[]
   staffAvailabilities StaffAvailability[]
   routines            Routine[]
   routineAssignments  RoutineAssignment[]
@@ -414,6 +419,8 @@ model Membership {
   resolvedPrivacyRequests PrivacyRequest[]     @relation("PrivacyResolver")
   instructedGroups        ClientGroup[]        @relation("GroupInstructor")
   notifications           Notification[]       @relation("NotificationRecipient")
+  clientPasses            ClientPass[]         @relation("ClientPasses")
+  decidedPasses           ClientPass[]         @relation("PassDecidedBy")
   serviceAssignments      ServiceStaff[]
   taughtClassSessions     ClassSession[]       @relation("StaffClassSessions")
   bookings                Booking[]            @relation("ClientBookings")
@@ -603,13 +610,13 @@ model Service {
   createdAt           DateTime    @default(now()) @map("created_at") @db.Timestamptz
   updatedAt           DateTime    @updatedAt @map("updated_at") @db.Timestamptz
 
-  center        Center         @relation(fields: [centerId], references: [id])
-  room          Room?          @relation(fields: [roomId], references: [id])
-  staff         ServiceStaff[]
-  classSessions ClassSession[]
-  schedules     SessionSchedule[]
+  center         Center            @relation(fields: [centerId], references: [id])
+  room           Room?             @relation(fields: [roomId], references: [id])
+  staff          ServiceStaff[]
+  classSessions  ClassSession[]
+  schedules      SessionSchedule[]
   /// Salas que solo dan este servicio.
-  dedicatedRooms Room[]        @relation("RoomFixedService")
+  dedicatedRooms Room[]            @relation("RoomFixedService")
 
   @@index([centerId, sortOrder])
   @@map("services")
@@ -627,6 +634,8 @@ model Notification {
   readAt                DateTime?        @map("read_at") @db.Timestamptz
   /// Cuándo se envió el aviso al móvil; nulo mientras no se haya enviado (o no haya móvil registrado).
   pushedAt              DateTime?        @map("pushed_at") @db.Timestamptz
+  /// Borrado lógico: quien lo recibió lo quitó de su lista; la fila se conserva (rastro y auditoría).
+  deletedAt             DateTime?        @map("deleted_at") @db.Timestamptz
   createdAt             DateTime         @default(now()) @map("created_at") @db.Timestamptz
 
   center    Center     @relation(fields: [centerId], references: [id])
@@ -789,9 +798,9 @@ model Room {
   archivedAt        DateTime? @map("archived_at") @db.Timestamptz
   createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
-  center          Center         @relation(fields: [centerId], references: [id])
-  staffMembership Membership?    @relation("RoomTeacher", fields: [staffMembershipId], references: [id])
-  fixedService    Service?       @relation("RoomFixedService", fields: [serviceId], references: [id])
+  center          Center            @relation(fields: [centerId], references: [id])
+  staffMembership Membership?       @relation("RoomTeacher", fields: [staffMembershipId], references: [id])
+  fixedService    Service?          @relation("RoomFixedService", fields: [serviceId], references: [id])
   services        Service[]
   classSessions   ClassSession[]
   schedules       SessionSchedule[]
@@ -851,23 +860,23 @@ model ServiceStaff {
 /// Una restricción EXCLUDE (en el SQL de la migración) impide que una misma persona del equipo
 /// tenga dos sesiones programadas solapadas.
 model ClassSession {
-  id                String             @id @db.Uuid
-  centerId          String             @map("center_id") @db.Uuid
-  serviceId         String             @map("service_id") @db.Uuid
-  staffMembershipId String             @map("staff_membership_id") @db.Uuid
-  startsAt          DateTime           @map("starts_at") @db.Timestamptz
-  endsAt            DateTime           @map("ends_at") @db.Timestamptz
-  capacity          Int                @default(1)
+  id                      String             @id @db.Uuid
+  centerId                String             @map("center_id") @db.Uuid
+  serviceId               String             @map("service_id") @db.Uuid
+  staffMembershipId       String             @map("staff_membership_id") @db.Uuid
+  startsAt                DateTime           @map("starts_at") @db.Timestamptz
+  endsAt                  DateTime           @map("ends_at") @db.Timestamptz
+  capacity                Int                @default(1)
   /// Sala donde se da; nulo en las anteriores a las salas o en centros sin ellas.
-  roomId            String?            @map("room_id") @db.Uuid
-  mode              SessionMode        @default(private)
-  status            ClassSessionStatus @default(scheduled)
+  roomId                  String?            @map("room_id") @db.Uuid
+  mode                    SessionMode        @default(private)
+  status                  ClassSessionStatus @default(scheduled)
   /// Horario del que nació; nulo si se creó al dar una cita.
-  scheduleId        String?            @map("schedule_id") @db.Uuid
+  scheduleId              String?            @map("schedule_id") @db.Uuid
   /// Por qué se canceló el día (festivo, profesor enfermo…), si lo canceló el centro.
-  cancelledReason   String?            @map("cancelled_reason")
-  cancelledByMembershipId String?      @map("cancelled_by_membership_id") @db.Uuid
-  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  cancelledReason         String?            @map("cancelled_reason")
+  cancelledByMembershipId String?            @map("cancelled_by_membership_id") @db.Uuid
+  createdAt               DateTime           @default(now()) @map("created_at") @db.Timestamptz
 
   center          Center           @relation(fields: [centerId], references: [id])
   service         Service          @relation(fields: [serviceId], references: [id])
@@ -1001,11 +1010,12 @@ model Booking {
   classSession     ClassSession        @relation(fields: [classSessionId], references: [id])
   clientMembership Membership          @relation("ClientBookings", fields: [clientMembershipId], references: [id])
   enrollment       ScheduleEnrollment? @relation(fields: [enrollmentId], references: [id])
-  startedBy        Membership?  @relation("BookingStartedBy", fields: [startedByMembershipId], references: [id])
-  endedBy          Membership?  @relation("BookingEndedBy", fields: [endedByMembershipId], references: [id])
-  checkedInBy      Membership?  @relation("BookingCheckedInBy", fields: [checkedInByMembershipId], references: [id])
-  createdBy        Membership?  @relation("BookingCreatedBy", fields: [createdByMembershipId], references: [id])
+  startedBy        Membership?         @relation("BookingStartedBy", fields: [startedByMembershipId], references: [id])
+  endedBy          Membership?         @relation("BookingEndedBy", fields: [endedByMembershipId], references: [id])
+  checkedInBy      Membership?         @relation("BookingCheckedInBy", fields: [checkedInByMembershipId], references: [id])
+  createdBy        Membership?         @relation("BookingCreatedBy", fields: [createdByMembershipId], references: [id])
   staffReview      StaffReview?
+  passMovement     BalanceMovement?
 
   @@unique([clientMembershipId, idempotencyKey])
   @@index([centerId, classSessionId])
@@ -1222,4 +1232,89 @@ model ContentAssignment {
   @@index([groupId])
   @@index([clientMembershipId])
   @@map("content_assignments")
+}
+
+/// Estado guardado de un bono; «agotado» y «caducado» se deducen de las sesiones y la fecha.
+enum PassStatus {
+  pending
+  active
+  rejected
+
+  @@map("pass_status")
+}
+
+enum BalanceMovementReason {
+  consumed
+  restored
+
+  @@map("balance_movement_reason")
+}
+
+/// Un bono a la venta: tantas clases, durante tantos días, para estos servicios (vacío = todos).
+model Rate {
+  id            String    @id @db.Uuid
+  centerId      String    @map("center_id") @db.Uuid
+  name          String
+  sessionsCount Int       @map("sessions_count")
+  validDays     Int       @map("valid_days")
+  priceCents    Int       @map("price_cents")
+  serviceIds    String[]  @map("service_ids") @db.Uuid
+  archivedAt    DateTime? @map("archived_at") @db.Timestamptz
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  center       Center       @relation(fields: [centerId], references: [id])
+  clientPasses ClientPass[]
+
+  @@index([centerId])
+  @@map("rates")
+}
+
+/// Un bono de una persona: copia de las condiciones al pedirlo, para que cambiar la tarifa no lo toque.
+model ClientPass {
+  id                    String     @id @db.Uuid
+  centerId              String     @map("center_id") @db.Uuid
+  clientMembershipId    String     @map("client_membership_id") @db.Uuid
+  rateId                String     @map("rate_id") @db.Uuid
+  name                  String
+  totalSessions         Int        @map("total_sessions")
+  remainingSessions     Int        @map("remaining_sessions")
+  priceCents            Int        @map("price_cents")
+  serviceIds            String[]   @map("service_ids") @db.Uuid
+  status                PassStatus @default(pending)
+  /// La persona lo pidió desde la app (true) o el centro se lo asignó (false).
+  isRequestedByClient   Boolean    @map("is_requested_by_client")
+  startsAt              DateTime?  @map("starts_at") @db.Timestamptz
+  expiresAt             DateTime?  @map("expires_at") @db.Timestamptz
+  decidedByMembershipId String?    @map("decided_by_membership_id") @db.Uuid
+  decidedAt             DateTime?  @map("decided_at") @db.Timestamptz
+  createdAt             DateTime   @default(now()) @map("created_at") @db.Timestamptz
+
+  center           Center            @relation(fields: [centerId], references: [id])
+  clientMembership Membership        @relation("ClientPasses", fields: [clientMembershipId], references: [id])
+  rate             Rate              @relation(fields: [rateId], references: [id])
+  decidedBy        Membership?       @relation("PassDecidedBy", fields: [decidedByMembershipId], references: [id])
+  movements        BalanceMovement[]
+
+  @@index([centerId, clientMembershipId, status])
+  @@index([centerId, status])
+  @@map("client_passes")
+}
+
+/// Libro del bono: solo se inserta. Una clase descuenta una vez (bookingId es único).
+model BalanceMovement {
+  id                 String                @id @db.Uuid
+  centerId           String                @map("center_id") @db.Uuid
+  clientPassId       String                @map("client_pass_id") @db.Uuid
+  clientMembershipId String                @map("client_membership_id") @db.Uuid
+  bookingId          String?               @unique @map("booking_id") @db.Uuid
+  delta              Int
+  reason             BalanceMovementReason
+  createdAt          DateTime              @default(now()) @map("created_at") @db.Timestamptz
+
+  center     Center     @relation(fields: [centerId], references: [id])
+  clientPass ClientPass @relation(fields: [clientPassId], references: [id])
+  booking    Booking?   @relation(fields: [bookingId], references: [id])
+
+  @@index([centerId, clientPassId])
+  @@map("balance_movements")
 }
