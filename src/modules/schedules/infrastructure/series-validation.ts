@@ -22,6 +22,7 @@ export type SeriesRefusal =
   | 'staff_not_found'
   | 'room_not_found'
   | 'staff_required'
+  | 'staff_not_for_service'
   | 'mode_not_allowed'
   | 'room_not_for_service';
 
@@ -103,6 +104,22 @@ type StaffResolution =
   | { readonly kind: 'resolved'; readonly staffMembershipId: string }
   | { readonly kind: 'staff_required' | 'staff_not_found' };
 
+/**
+ * Si el servicio tiene profesores asignados, solo ellos pueden darlo: el centro elige entre los
+ * que dan ese servicio. Un servicio sin ninguno asignado admite a cualquiera del equipo.
+ */
+async function teachesService(
+  client: TenantTransactionClient,
+  input: { serviceId: string; membershipId: string },
+): Promise<boolean> {
+  const assignedCount = await client.serviceStaff.count({ where: { serviceId: input.serviceId } });
+  if (assignedCount === 0) return true;
+  const matchCount = await client.serviceStaff.count({
+    where: { serviceId: input.serviceId, membershipId: input.membershipId },
+  });
+  return matchCount === 1;
+}
+
 /** La persona pedida o, si no, la fija de la sala; tiene que ser del equipo activo. */
 async function resolveStaff(
   client: TenantTransactionClient,
@@ -137,6 +154,9 @@ export async function resolveSeriesParts(
   });
   if (staffResolution.kind !== 'resolved') return staffResolution;
   const { staffMembershipId } = staffResolution;
+  if (!(await teachesService(client, { serviceId: service.id, membershipId: staffMembershipId }))) {
+    return { kind: 'staff_not_for_service' };
+  }
 
   if (room !== null && !isRoomUsable(room, { service, staffMembershipId })) {
     return { kind: 'room_not_for_service' };

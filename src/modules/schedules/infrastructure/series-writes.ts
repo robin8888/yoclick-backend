@@ -10,8 +10,13 @@ import {
   type ScheduleSeriesUpdateOutcome,
 } from '../application/ports/schedule.repository';
 import { MAX_ACTIVE_SCHEDULES_PER_CENTER, resolveSessionCapacity } from '../domain/schedule-rules';
-import { materializeSchedulesInTransaction, toDateColumn } from './schedule-materialization';
+import {
+  materializeSchedulesInTransaction,
+  toDateColumn,
+  toDateOnly,
+} from './schedule-materialization';
 import { recordEnrollmentNotices } from './schedule-notices';
+import { findScheduleOverlap, type ScheduleCandidate } from './schedule-overlap';
 import { findSeriesView } from './schedule-view.mapper';
 import { resolveSeriesParts, type ResolvedSeriesParts } from './series-validation';
 import { cancelSessionWithBookings, listFutureSessionsOfSchedules } from './session-cancellation';
@@ -63,6 +68,17 @@ export async function createSeriesInTransaction(
   const parts = await resolveSeriesParts(client, newSeries);
   if (parts.kind !== 'resolved') return { kind: parts.kind };
 
+  const overlap = await findScheduleOverlap(client, {
+    roomId: parts.room?.id ?? null,
+    staffMembershipId: parts.staffMembershipId,
+    weekdays: newSeries.weekdays,
+    startsAtTime: newSeries.startsAtTime,
+    endsAtTime: newSeries.endsAtTime,
+    startsOn: newSeries.startsOn,
+    endsOn: newSeries.endsOn,
+  });
+  if (overlap !== null) return { kind: overlap };
+
   const seriesId = generateUuidV7();
   const rows = buildScheduleRows({ actor, newSeries, parts, seriesId });
   await client.sessionSchedule.createMany({ data: rows });
@@ -75,6 +91,11 @@ export async function createSeriesInTransaction(
 
 interface ActiveSeriesRow {
   readonly id: string;
+  readonly seriesId: string;
+  readonly weekday: number;
+  readonly startsAtTime: string;
+  readonly endsAtTime: string;
+  readonly startsOn: Date;
   readonly serviceId: string;
   readonly roomId: string | null;
   readonly staffMembershipId: string;
@@ -92,6 +113,11 @@ async function listActiveRows(
     where: { seriesId, status: 'active' },
     select: {
       id: true,
+      seriesId: true,
+      weekday: true,
+      startsAtTime: true,
+      endsAtTime: true,
+      startsOn: true,
       serviceId: true,
       roomId: true,
       staffMembershipId: true,
@@ -170,7 +196,11 @@ async function findUpdateRefusal(
       roomId: patch.roomId === undefined ? first.roomId : patch.roomId,
       staffMembershipId: patch.staffMembershipId ?? first.staffMembershipId,
     });
-    if (parts.kind === 'staff_not_found' || parts.kind === 'room_not_found') {
+    if (
+      parts.kind === 'staff_not_found' ||
+      parts.kind === 'room_not_found' ||
+      parts.kind === 'staff_not_for_service'
+    ) {
       return { kind: parts.kind };
     }
     if (parts.kind !== 'resolved') return { kind: 'room_not_for_service' };
@@ -180,7 +210,43 @@ async function findUpdateRefusal(
     });
     if (sessionCount > 0) return { kind: 'has_single_bookings', sessionCount };
   }
-  return null;
+  return findOverlapOfUpdate(client, { rows, patch });
+}
+
+/** La fecha final tras el cambio: la nueva si se envió (incluso «sin fin») o la que ya tenía. */
+function resolveEndsOn(first: ActiveSeriesRow, patch: ScheduleSeriesPatch): string | null {
+  if (patch.endsOn !== undefined) return patch.endsOn;
+  return first.endsOn === null ? null : toDateOnly(first.endsOn);
+}
+
+/** El horario tal como quedaría tras el cambio. */
+function buildEditedCandidate(
+  rows: readonly ActiveSeriesRow[],
+  first: ActiveSeriesRow,
+  patch: ScheduleSeriesPatch,
+): ScheduleCandidate {
+  return {
+    roomId: patch.roomId === undefined ? first.roomId : patch.roomId,
+    staffMembershipId: patch.staffMembershipId ?? first.staffMembershipId,
+    weekdays: rows.map(({ weekday }) => weekday),
+    startsAtTime: patch.startsAtTime ?? first.startsAtTime,
+    endsAtTime: patch.endsAtTime ?? first.endsAtTime,
+    startsOn: toDateOnly(first.startsOn),
+    endsOn: resolveEndsOn(first, patch),
+    excludeSeriesId: first.seriesId,
+  };
+}
+
+/** El horario editado no puede pisar a otro de la misma sala ni de la misma persona. */
+async function findOverlapOfUpdate(
+  client: TenantTransactionClient,
+  input: { rows: readonly ActiveSeriesRow[]; patch: ScheduleSeriesPatch },
+): Promise<RefusedUpdate | null> {
+  const { rows, patch } = input;
+  const [first] = rows;
+  if (!first || !(needsRebuild(patch) || patch.endsOn !== undefined)) return null;
+  const overlap = await findScheduleOverlap(client, buildEditedCandidate(rows, first, patch));
+  return overlap === null ? null : { kind: overlap };
 }
 
 /** Las sesiones futuras que siguen en pie toman el nuevo aforo, salvo las que ya tienen más gente. */

@@ -10,6 +10,7 @@ import {
   type NewEnrollments,
   type NewRoomBlock,
   type NewScheduleSeries,
+  type RepeatWeekOutcome,
   type RoomBlockCreationOutcome,
   type RoomBlockView,
   type ScheduleRepository,
@@ -27,37 +28,35 @@ export interface SeriesWithSkipped {
   readonly skipped: readonly SkippedOccurrence[];
 }
 
-function invalidField(path: string, code: string): DomainError {
-  return new DomainError('VALIDATION_FAILED', HTTP_STATUS.badRequest, [{ path, code }]);
-}
-
 type SeriesRefusal = Exclude<
   ScheduleSeriesCreationOutcome | ScheduleSeriesUpdateOutcome,
   { kind: 'created' } | { kind: 'updated' }
 >;
 
+type ErrorArguments = ConstructorParameters<typeof DomainError>;
+
+function invalidFieldArguments(path: string, code: string): ErrorArguments {
+  return ['VALIDATION_FAILED', HTTP_STATUS.badRequest, [{ path, code }]];
+}
+
+const SERIES_ERRORS: Readonly<Record<SeriesRefusal['kind'], ErrorArguments>> = {
+  service_not_found: invalidFieldArguments('serviceId', 'unknown_service'),
+  staff_not_found: invalidFieldArguments('staffMembershipId', 'unknown_staff_member'),
+  staff_required: invalidFieldArguments('staffMembershipId', 'staff_required'),
+  staff_not_for_service: ['STAFF_NOT_FOR_SERVICE', HTTP_STATUS.conflict],
+  room_not_found: invalidFieldArguments('roomId', 'unknown_room'),
+  limit_reached: invalidFieldArguments('weekdays', 'too_many_schedules'),
+  mode_not_allowed: ['SESSION_MODE_NOT_ALLOWED', HTTP_STATUS.conflict],
+  room_not_for_service: ['ROOM_UNAVAILABLE', HTTP_STATUS.conflict],
+  room_schedule_overlap: ['ROOM_SCHEDULE_OVERLAP', HTTP_STATUS.conflict],
+  teacher_schedule_overlap: ['TEACHER_SCHEDULE_OVERLAP', HTTP_STATUS.conflict],
+  has_single_bookings: ['SCHEDULE_HAS_BOOKINGS', HTTP_STATUS.conflict],
+  not_found: ['NOT_FOUND', HTTP_STATUS.notFound],
+};
+
 /** Cada motivo por el que no se puede guardar una serie, con el error que ve la app. */
 function toSeriesError(outcome: SeriesRefusal): DomainError {
-  switch (outcome.kind) {
-    case 'service_not_found':
-      return invalidField('serviceId', 'unknown_service');
-    case 'staff_not_found':
-      return invalidField('staffMembershipId', 'unknown_staff_member');
-    case 'staff_required':
-      return invalidField('staffMembershipId', 'staff_required');
-    case 'room_not_found':
-      return invalidField('roomId', 'unknown_room');
-    case 'limit_reached':
-      return invalidField('weekdays', 'too_many_schedules');
-    case 'mode_not_allowed':
-      return new DomainError('SESSION_MODE_NOT_ALLOWED', HTTP_STATUS.conflict);
-    case 'room_not_for_service':
-      return new DomainError('ROOM_UNAVAILABLE', HTTP_STATUS.conflict);
-    case 'has_single_bookings':
-      return new DomainError('SCHEDULE_HAS_BOOKINGS', HTTP_STATUS.conflict);
-    case 'not_found':
-      return new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
-  }
+  return new DomainError(...SERIES_ERRORS[outcome.kind]);
 }
 
 @Injectable()
@@ -77,6 +76,15 @@ export class CreateScheduleSeriesUseCase {
     const outcome = await this.schedules.createSeries(actor, newSeries, new Date());
     if (outcome.kind === 'created') return outcome;
     throw toSeriesError(outcome);
+  }
+}
+
+@Injectable()
+export class RepeatWeekUseCase {
+  constructor(@Inject(SCHEDULE_REPOSITORY) private readonly schedules: ScheduleRepository) {}
+
+  async execute(actor: ActorContext, weekStart: string): Promise<RepeatWeekOutcome> {
+    return this.schedules.repeatWeek(actor, { weekStart, now: new Date() });
   }
 }
 

@@ -56,7 +56,21 @@ export const ERROR_CATALOG = {
   ROOM_UNAVAILABLE: {
     title: 'Esa sala no está libre a esa hora o no la da esa persona. Elige otra',
   },
-  SESSION_FULL: { title: 'Esta clase grupal ya no tiene plazas' },
+  SESSION_FULL: { title: 'Esta clase ya no tiene plazas' },
+  STAFF_NOT_FOR_SERVICE: {
+    title: 'Esa persona no da este servicio. Elige a una de las que lo dan',
+  },
+  ROOM_SCHEDULE_OVERLAP: {
+    title:
+      'Esa sala ya tiene un horario a esa hora en esos días. Elige otra hora, otra fecha u otra sala',
+  },
+  TEACHER_SCHEDULE_OVERLAP: {
+    title:
+      'Esa persona ya da otra clase a esa hora en esos días. Elige otra hora, otra fecha u otra persona',
+  },
+  SERVICE_ONLY_IN_SCHEDULE: {
+    title: 'Este servicio solo se da en sus horarios. Elige una de sus clases con plazas',
+  },
   SESSION_MODE_NOT_ALLOWED: {
     title: 'Este servicio no se da de esa forma (privada o en grupo). Cámbialo en el servicio',
   },

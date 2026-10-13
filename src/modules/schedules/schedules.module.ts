@@ -10,11 +10,13 @@ import {
   ListEnrollmentsUseCase,
   ListRoomBlocksUseCase,
   ListScheduleSeriesUseCase,
+  RepeatWeekUseCase,
   UnenrollClientUseCase,
   UpdateScheduleSeriesUseCase,
 } from './application/schedule.use-cases';
 import { EnrollmentsController } from './http/enrollments.controller';
 import { RoomBlocksController } from './http/room-blocks.controller';
+import { ScheduleRepeatController } from './http/schedule-repeat.controller';
 import { SchedulesController } from './http/schedules.controller';
 import { SessionCancellationController } from './http/session-cancellation.controller';
 import { PrismaScheduleRepository } from './infrastructure/prisma-schedule.repository';
@@ -22,6 +24,7 @@ import { PrismaScheduleRepository } from './infrastructure/prisma-schedule.repos
 /** Horarios de sala, grupos fijos y bloqueos (docs/spec/09 de la app). */
 @Module({
   controllers: [
+    ScheduleRepeatController,
     SchedulesController,
     EnrollmentsController,
     SessionCancellationController,
@@ -30,6 +33,7 @@ import { PrismaScheduleRepository } from './infrastructure/prisma-schedule.repos
   providers: [
     ListScheduleSeriesUseCase,
     CreateScheduleSeriesUseCase,
+    RepeatWeekUseCase,
     UpdateScheduleSeriesUseCase,
     EndScheduleSeriesUseCase,
     ListEnrollmentsUseCase,

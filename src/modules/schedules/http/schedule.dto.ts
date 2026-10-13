@@ -249,3 +249,25 @@ export class CreateRoomBlockRequestDto extends createZodDto(
       );
     }, 'ends before it starts or lasts over 31 days'),
 ) {}
+
+const MONDAY = 1;
+
+function isMonday(isoDate: string): boolean {
+  return new Date(`${isoDate}T00:00:00.000Z`).getUTCDay() === MONDAY;
+}
+
+export class RepeatWeekRequestDto extends createZodDto(
+  z.strictObject({
+    /** El lunes de la semana configurada que se copia a la siguiente. */
+    weekStart: z.iso.date().refine(isMonday, 'weekStart must be a Monday'),
+  }),
+) {}
+
+export class RepeatWeekResponseDto extends createZodDto(
+  z.strictObject({
+    copiedSeriesCount: z.number().int(),
+    alreadyCopiedSeriesCount: z.number().int(),
+    failedSeriesCount: z.number().int(),
+    skipped: z.array(skippedOccurrenceShape),
+  }),
+) {}

@@ -15,6 +15,7 @@ import {
   type RoomView,
 } from '../application/ports/room.repository';
 import { MAX_ROOMS_PER_CENTER } from '../domain/room-rules';
+import { cancelSessionWithBookings } from '../../schedules/infrastructure/session-cancellation';
 
 const ROOM_VIEW_FIELDS = {
   id: true,
@@ -174,6 +175,44 @@ function withFixedService(
   return [...serviceIds, serviceId];
 }
 
+/** Por qué se cancelan las citas de una sala que se quita; es lo que ve el centro y la persona avisada. */
+const ROOM_REMOVED_REASON = 'Sala eliminada';
+
+/**
+ * Al quitar una sala se vacía: las clases y citas que aún no han terminado se cancelan (con aviso
+ * a quienes tenían plaza y sin que nadie pierda crédito), los horarios fijos de esa sala terminan
+ * y sus bloqueos futuros desaparecen. Lo que ya ocurrió se conserva como historial.
+ */
+async function cancelFutureActivityOfRoom(
+  client: TenantTransactionClient,
+  actor: ActorContext,
+  input: { roomId: string; now: Date },
+): Promise<void> {
+  const sessions = await client.classSession.findMany({
+    where: { roomId: input.roomId, status: 'scheduled', endsAt: { gt: input.now } },
+    include: {
+      service: { select: { name: true } },
+      room: { select: { name: true } },
+      bookings: { where: { status: 'confirmed' }, select: { id: true, clientMembershipId: true } },
+    },
+  });
+  for (const session of sessions) {
+    await cancelSessionWithBookings(client, actor, {
+      session,
+      reason: ROOM_REMOVED_REASON,
+      now: input.now,
+      shouldNotify: true,
+    });
+  }
+  await client.sessionSchedule.updateMany({
+    where: { roomId: input.roomId, status: 'active' },
+    data: { status: 'ended' },
+  });
+  await client.roomBlock.deleteMany({
+    where: { roomId: input.roomId, endsAt: { gt: input.now } },
+  });
+}
+
 @Injectable()
 export class PrismaRoomRepository implements RoomRepository {
   constructor(private readonly tenantPrismaService: TenantPrismaService) {}
@@ -259,12 +298,14 @@ export class PrismaRoomRepository implements RoomRepository {
 
   async archiveRoom(actor: ActorContext, roomId: string): Promise<boolean> {
     return this.tenantPrismaService.runInTenantContext(actor, async (client) => {
+      const now = new Date();
       const archived = await client.room.updateMany({
         where: { id: roomId, archivedAt: null },
-        data: { archivedAt: new Date() },
+        data: { archivedAt: now },
       });
       if (archived.count !== 1) return false;
       await client.service.updateMany({ where: { roomId }, data: { roomId: null } });
+      await cancelFutureActivityOfRoom(client, actor, { roomId, now });
       return true;
     });
   }

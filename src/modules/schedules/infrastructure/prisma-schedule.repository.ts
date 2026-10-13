@@ -9,6 +9,7 @@ import {
   type NewEnrollments,
   type NewRoomBlock,
   type NewScheduleSeries,
+  type RepeatWeekOutcome,
   type RoomBlockCreationOutcome,
   type RoomBlockView,
   type ScheduleRepository,
@@ -38,6 +39,7 @@ import {
   updateSeriesInTransaction,
 } from './series-writes';
 import { cancelSessionWithBookings, findCancellableSession } from './session-cancellation';
+import { repeatWeekInTransaction } from './week-repeat';
 
 @Injectable()
 export class PrismaScheduleRepository implements ScheduleRepository {
@@ -64,6 +66,18 @@ export class PrismaScheduleRepository implements ScheduleRepository {
       createSeriesInTransaction(client, actor, {
         newSeries,
         today: await resolveLocalToday(client, now),
+      }),
+    );
+  }
+
+  async repeatWeek(
+    actor: ActorContext,
+    request: { weekStart: string; now: Date },
+  ): Promise<RepeatWeekOutcome> {
+    return this.tenantPrismaService.runInTenantContext(actor, async (client) =>
+      repeatWeekInTransaction(client, actor, {
+        weekStart: request.weekStart,
+        today: await resolveLocalToday(client, request.now),
       }),
     );
   }

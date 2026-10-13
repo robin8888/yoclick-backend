@@ -190,6 +190,27 @@ describe('rooms and group appointments', () => {
     expect(reopened.statusCode).toBe(201);
   });
 
+  it('cancels the appointments of a room when the room is removed, so the teacher is free again', async () => {
+    const first = (
+      await assignGroup(clients[0] as Person, teacherAna, roomOfAna)
+    ).json<BookingBody>();
+    await joinGroup(clients[1] as Person, first.session.id);
+    expect((await assignGroup(clients[2] as Person, teacherAna, sharedRoom)).statusCode).toBe(409);
+
+    const removed = await world.call('DELETE', url(`/rooms/${roomOfAna.id}`), owner, {
+      centerId: center.centerId,
+    });
+
+    expect(removed.statusCode).toBe(204);
+    const agenda = await call('GET', `/agenda?date=${slot.startsAt.slice(0, 10)}`);
+    const statuses = agenda
+      .json<{ entries: { booking: { status: string } }[] }>()
+      .entries.map((entry) => entry.booking.status);
+    expect(statuses).toEqual(['cancelled', 'cancelled']);
+    const reassigned = await assignGroup(clients[2] as Person, teacherAna, sharedRoom);
+    expect(reassigned.statusCode).toBe(201);
+  });
+
   it('does not put the same teacher in two rooms at the same time', async () => {
     await assignGroup(clients[0] as Person, teacherAna, roomOfAna);
 

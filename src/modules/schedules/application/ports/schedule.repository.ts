@@ -64,12 +64,18 @@ export type ScheduleSeriesCreationOutcome =
     }
   | { readonly kind: 'service_not_found' }
   | { readonly kind: 'staff_not_found' }
+  /** El servicio tiene profesores asignados y esa persona no es uno de ellos. */
+  | { readonly kind: 'staff_not_for_service' }
   | { readonly kind: 'room_not_found' }
   /** Ni se indicó profesor ni la sala tiene uno fijo. */
   | { readonly kind: 'staff_required' }
   /** El modo pedido no lo admite el servicio, o la sala tiene otro servicio fijo. */
   | { readonly kind: 'mode_not_allowed' }
   | { readonly kind: 'room_not_for_service' }
+  /** La sala ya tiene otro horario a esa hora en esos días y fechas. */
+  | { readonly kind: 'room_schedule_overlap' }
+  /** La misma persona ya da otra clase a esa hora en esos días y fechas. */
+  | { readonly kind: 'teacher_schedule_overlap' }
   | { readonly kind: 'limit_reached' };
 
 export interface ScheduleSeriesPatch {
@@ -92,8 +98,12 @@ export type ScheduleSeriesUpdateOutcome =
   /** Hay sesiones futuras con citas sueltas: hay que cancelarlas antes de cambiar la hora, la sala o el profesor. */
   | { readonly kind: 'has_single_bookings'; readonly sessionCount: number }
   | { readonly kind: 'staff_not_found' }
+  /** El servicio tiene profesores asignados y esa persona no es uno de ellos. */
+  | { readonly kind: 'staff_not_for_service' }
   | { readonly kind: 'room_not_found' }
-  | { readonly kind: 'room_not_for_service' };
+  | { readonly kind: 'room_not_for_service' }
+  | { readonly kind: 'room_schedule_overlap' }
+  | { readonly kind: 'teacher_schedule_overlap' };
 
 export type EndSeriesOutcome =
   | {
@@ -188,6 +198,17 @@ export type RoomBlockCreationOutcome =
   | { readonly kind: 'has_bookings'; readonly sessionCount: number }
   | { readonly kind: 'overlaps_block' };
 
+export interface RepeatWeekOutcome {
+  /** Horarios (series) copiados a la semana siguiente. */
+  readonly copiedSeriesCount: number;
+  /** Los que ya estaban copiados de antes: no se duplican. */
+  readonly alreadyCopiedSeriesCount: number;
+  /** Los que no se pudieron crear (límite de horarios, sala que ya no sirve…). */
+  readonly failedSeriesCount: number;
+  /** Fechas concretas que no se pudieron crear y por qué. */
+  readonly skipped: readonly SkippedOccurrence[];
+}
+
 export interface ScheduleRepository {
   /** Las series del centro (activas primero) con sus días; de paso crea las sesiones que falten. */
   listSeries(actor: ActorContext, query: { now: Date }): Promise<ScheduleSeriesView[]>;
@@ -196,6 +217,11 @@ export interface ScheduleRepository {
     newSeries: NewScheduleSeries,
     now: Date,
   ): Promise<ScheduleSeriesCreationOutcome>;
+  /** Copia los horarios de una semana (lunes `weekStart`) a la siguiente. */
+  repeatWeek(
+    actor: ActorContext,
+    request: { weekStart: string; now: Date },
+  ): Promise<RepeatWeekOutcome>;
   updateSeries(
     actor: ActorContext,
     request: { seriesId: string; patch: ScheduleSeriesPatch; now: Date },

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { getScheduleWeekdayOfLocalDate } from '../../src/modules/schedules/domain/schedule-rules';
 import {
@@ -208,6 +209,387 @@ describe('room schedules, fixed groups and room blocks', () => {
     ).toEqual([1, 3]);
     expect(privateAsGroup.statusCode).toBe(409);
     expect(privateAsGroup.json<{ code: string }>().code).toBe('SESSION_MODE_NOT_ALLOWED');
+  });
+
+  it('lists the classes of a service with seats left and suggests the next one', async () => {
+    await createSeries();
+    const farDate = addDaysToLocalDate(firstDate, 20);
+
+    const response = await call(
+      'GET',
+      `/services/${groupServiceId}/open-sessions?from=${firstDate}&to=${firstDate}`,
+    );
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json<{
+      isScheduled: boolean;
+      sessions: { id: string; remainingSeats: number; room: { id: string } | null }[];
+      nextOpenStartsAt: string | null;
+    }>();
+    expect(body.isScheduled).toBe(true);
+    expect(body.sessions).toHaveLength(1);
+    expect(body.sessions[0]).toMatchObject({ remainingSeats: 2, room: { id: roomId } });
+    expect(body.nextOpenStartsAt).not.toBeNull();
+    const empty = await call(
+      'GET',
+      `/services/${groupServiceId}/open-sessions?from=${addDaysToLocalDate(firstDate, 1)}&to=${addDaysToLocalDate(firstDate, 2)}`,
+    );
+    expect(empty.json<{ sessions: unknown[] }>().sessions).toHaveLength(0);
+    expect(farDate > firstDate).toBe(true);
+  });
+
+  it('does not offer a class that is already full, and says a service has no schedule when it has none', async () => {
+    const { series } = await createSeries();
+    await call('POST', `/schedules/${series.seriesId}/enrollments`, {
+      clientMembershipIds: [clients[0]?.membershipId, clients[1]?.membershipId],
+    });
+
+    const full = await call(
+      'GET',
+      `/services/${groupServiceId}/open-sessions?from=${firstDate}&to=${firstDate}`,
+    );
+    const free = await call(
+      'GET',
+      `/services/${privateServiceId}/open-sessions?from=${firstDate}&to=${firstDate}`,
+    );
+
+    expect(full.json<{ sessions: unknown[] }>().sessions).toHaveLength(0);
+    expect(free.json<{ isScheduled: boolean }>().isScheduled).toBe(false);
+  });
+
+  it('refuses a free slot for a service that has a room schedule, but lets people join its classes', async () => {
+    await createSeries();
+    const sessions = (
+      await call(
+        'GET',
+        `/services/${groupServiceId}/open-sessions?from=${firstDate}&to=${firstDate}`,
+      )
+    ).json<{ sessions: { id: string; startsAt: string }[] }>().sessions;
+    const [session] = sessions;
+    const freeSlot = await call('POST', '/agenda/bookings', {
+      clientMembershipId: clients[0]?.membershipId,
+      serviceId: groupServiceId,
+      startsAt: session?.startsAt,
+      mode: 'group',
+    });
+
+    const joined = await call('POST', '/agenda/bookings/join-group', {
+      clientMembershipId: clients[0]?.membershipId,
+      classSessionId: session?.id,
+    });
+
+    expect(freeSlot.statusCode).toBe(409);
+    expect(freeSlot.json<{ code: string }>().code).toBe('SERVICE_ONLY_IN_SCHEDULE');
+    expect(joined.statusCode).toBe(201);
+  });
+
+  describe('a room is not given twice at the same time', () => {
+    const post = (overrides: object) =>
+      call('POST', '/schedules', {
+        serviceId: groupServiceId,
+        roomId,
+        mode: 'group',
+        weekdays: [getScheduleWeekdayOfLocalDate(firstDate)],
+        startsAtTime: '14:00',
+        endsAtTime: '16:00',
+        startsOn: firstDate,
+        endsOn: addDaysToLocalDate(firstDate, 6),
+        ...overrides,
+      });
+
+    it('refuses the same room at the same hours in the same dates', async () => {
+      expect((await post({})).statusCode).toBe(201);
+
+      const again = await post({});
+
+      expect(again.statusCode).toBe(409);
+      expect(again.json<{ code: string }>().code).toBe('ROOM_SCHEDULE_OVERLAP');
+    });
+
+    it.each([
+      { caseName: 'starts inside the other one', startsAtTime: '15:00', endsAtTime: '17:00' },
+      { caseName: 'ends inside the other one', startsAtTime: '13:00', endsAtTime: '15:00' },
+      { caseName: 'contains the other one', startsAtTime: '13:00', endsAtTime: '17:00' },
+      { caseName: 'is inside the other one', startsAtTime: '14:30', endsAtTime: '15:30' },
+    ])('refuses an hour that $caseName', async ({ startsAtTime, endsAtTime }) => {
+      await post({});
+
+      const response = await post({ startsAtTime, endsAtTime });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json<{ code: string }>().code).toBe('ROOM_SCHEDULE_OVERLAP');
+    });
+
+    it('lets the same room and day have another hour, even right after', async () => {
+      await post({});
+
+      const after = await post({ startsAtTime: '16:00', endsAtTime: '18:00' });
+      const before = await post({ startsAtTime: '12:00', endsAtTime: '14:00' });
+
+      expect(after.statusCode).toBe(201);
+      expect(before.statusCode).toBe(201);
+    });
+
+    it('lets the same hours in another week', async () => {
+      await post({});
+
+      const nextWeek = await post({
+        startsOn: addDaysToLocalDate(firstDate, 7),
+        endsOn: addDaysToLocalDate(firstDate, 13),
+      });
+
+      expect(nextWeek.statusCode).toBe(201);
+    });
+
+    it('refuses a schedule without end over a week that is already given', async () => {
+      await post({});
+
+      const withoutEnd = await post({ endsOn: null });
+
+      expect(withoutEnd.statusCode).toBe(409);
+    });
+
+    it('refuses the same teacher at the same hours in another room', async () => {
+      const otherRoom = (await call('POST', '/rooms', { name: 'Aula 2', capacity: 5 })).json<{
+        id: string;
+      }>().id;
+      await post({});
+
+      const response = await post({
+        roomId: otherRoom,
+        staffMembershipId: teacherAna.membershipId,
+      });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json<{ code: string }>().code).toBe('TEACHER_SCHEDULE_OVERLAP');
+    });
+
+    it('does not refuse an edit that does not move anything, and refuses one that does collide', async () => {
+      const first = (await post({})).json<SeriesWriteBody>();
+      const second = (
+        await post({ startsAtTime: '16:00', endsAtTime: '18:00' })
+      ).json<SeriesWriteBody>();
+
+      const harmless = await call('PATCH', `/schedules/${first.series.seriesId}`, {
+        label: 'Karate infantil',
+      });
+      const collides = await call('PATCH', `/schedules/${second.series.seriesId}`, {
+        startsAtTime: '15:00',
+      });
+
+      expect(harmless.statusCode).toBe(200);
+      expect(collides.statusCode).toBe(409);
+      expect(collides.json<{ code: string }>().code).toBe('ROOM_SCHEDULE_OVERLAP');
+    });
+  });
+
+  describe('a client books a class of a service with a room schedule', () => {
+    async function firstOpenSessionId(): Promise<string> {
+      await createSeries();
+      const response = await call(
+        'GET',
+        `/services/${groupServiceId}/open-sessions?from=${firstDate}&to=${firstDate}`,
+        undefined,
+        clients[0]?.userId,
+      );
+      return response.json<{ sessions: { id: string }[] }>().sessions[0]?.id ?? '';
+    }
+
+    const joinAsClient = (sessionId: string, person: Person | undefined) =>
+      world.call('POST', url('/bookings/join-session'), person?.userId, {
+        centerId: center.centerId,
+        headers: { 'idempotency-key': randomUUID() },
+        body: { classSessionId: sessionId },
+      });
+
+    it('joins the class with the teacher and room the center decided', async () => {
+      const sessionId = await firstOpenSessionId();
+
+      const response = await joinAsClient(sessionId, clients[0]);
+
+      expect(response.statusCode).toBe(201);
+      expect(
+        response.json<{ room: { id: string } | null; session: { id: string } }>(),
+      ).toMatchObject({
+        room: { id: roomId },
+        session: { id: sessionId },
+      });
+    });
+
+    it('does not let the same person take two seats of the same class, nor a full class', async () => {
+      const sessionId = await firstOpenSessionId();
+      await joinAsClient(sessionId, clients[0]);
+      await joinAsClient(sessionId, clients[1]);
+
+      const twice = await joinAsClient(sessionId, clients[0]);
+      const full = await joinAsClient(sessionId, clients[2]);
+
+      expect(twice.statusCode).toBe(409);
+      expect(full.statusCode).toBe(409);
+      expect(full.json<{ code: string }>().code).toBe('SESSION_FULL');
+    });
+
+    it('shows a client the real seats left, counting everybody else', async () => {
+      const sessionId = await firstOpenSessionId();
+      await joinAsClient(sessionId, clients[0]);
+
+      const asOtherClient = await call(
+        'GET',
+        `/services/${groupServiceId}/open-sessions?from=${firstDate}&to=${firstDate}`,
+        undefined,
+        clients[1]?.userId,
+      );
+
+      expect(asOtherClient.json<{ sessions: { remainingSeats: number }[] }>().sessions).toEqual([
+        expect.objectContaining({ remainingSeats: 1 }),
+      ]);
+    });
+
+    const readNotices = async (userId: string) => {
+      const response = await world.call('GET', url('/notifications'), userId, {
+        centerId: center.centerId,
+      });
+      return response.json<{ notifications: { kind: string }[] }>().notifications;
+    };
+
+    const openSessions = async (userId: string | undefined) =>
+      (
+        await call(
+          'GET',
+          `/services/${groupServiceId}/open-sessions?from=${firstDate}&to=${addDaysToLocalDate(firstDate, 7)}`,
+          undefined,
+          userId,
+        )
+      ).json<{ sessions: { id: string; remainingSeats: number }[] }>().sessions;
+
+    it('cancels the seat of a client: it goes back to the room capacity and the teacher and the center are told', async () => {
+      const sessionId = await firstOpenSessionId();
+      const booking = (await joinAsClient(sessionId, clients[0])).json<{ id: string }>();
+      expect((await openSessions(clients[1]?.userId))[0]?.remainingSeats).toBe(1);
+
+      const cancelled = await world.call(
+        'POST',
+        url(`/bookings/${booking.id}/cancel`),
+        clients[0]?.userId,
+        { centerId: center.centerId },
+      );
+
+      expect(cancelled.statusCode).toBe(200);
+      expect((await openSessions(clients[1]?.userId))[0]?.remainingSeats).toBe(2);
+      const forTeacher = await readNotices(teacherAna.userId);
+      const forOwner = await readNotices(owner);
+      expect(forTeacher.map(({ kind }) => kind)).toContain('booking_cancelled');
+      expect(forOwner.map(({ kind }) => kind)).toContain('booking_cancelled');
+    });
+
+    it('moves a client to another class of the service: one seat is freed and the other taken', async () => {
+      await createSeries();
+      await createSeries({
+        weekdays: [getScheduleWeekdayOfLocalDate(addDaysToLocalDate(firstDate, 1))],
+        startsOn: firstDate,
+        startsAtTime: '12:00',
+        endsAtTime: '13:00',
+        label: 'Salsa de mediodía',
+      });
+      const [first, second] = await openSessions(clients[0]?.userId);
+      const booking = (await joinAsClient(first?.id ?? '', clients[0])).json<{ id: string }>();
+
+      const moved = await world.call(
+        'POST',
+        url(`/bookings/${booking.id}/move-to-session`),
+        clients[0]?.userId,
+        { centerId: center.centerId, body: { classSessionId: second?.id } },
+      );
+
+      expect(moved.statusCode).toBe(200);
+      expect(moved.json<{ session: { id: string } }>().session.id).toBe(second?.id);
+      const after = await openSessions(clients[1]?.userId);
+      expect(after.find(({ id }) => id === first?.id)?.remainingSeats).toBe(2);
+      expect(after.find(({ id }) => id === second?.id)?.remainingSeats).toBe(1);
+      const forTeacher = await readNotices(teacherAna.userId);
+      expect(forTeacher.map(({ kind }) => kind)).toContain('booking_rescheduled');
+    });
+
+    it('does not move a client to a class that is full', async () => {
+      await createSeries();
+      await createSeries({
+        weekdays: [getScheduleWeekdayOfLocalDate(addDaysToLocalDate(firstDate, 1))],
+        startsOn: firstDate,
+        startsAtTime: '12:00',
+        endsAtTime: '13:00',
+      });
+      const [first, second] = await openSessions(clients[0]?.userId);
+      const booking = (await joinAsClient(first?.id ?? '', clients[0])).json<{ id: string }>();
+      await joinAsClient(second?.id ?? '', clients[1]);
+      await joinAsClient(second?.id ?? '', clients[2]);
+
+      const moved = await world.call(
+        'POST',
+        url(`/bookings/${booking.id}/move-to-session`),
+        clients[0]?.userId,
+        { centerId: center.centerId, body: { classSessionId: second?.id } },
+      );
+
+      expect(moved.statusCode).toBe(409);
+      expect(moved.json<{ code: string }>().code).toBe('SESSION_FULL');
+    });
+
+    it('is only for clients: the team assigns through the agenda', async () => {
+      const sessionId = await firstOpenSessionId();
+
+      const response = await world.call('POST', url('/bookings/join-session'), owner, {
+        centerId: center.centerId,
+        headers: { 'idempotency-key': randomUUID() },
+        body: { classSessionId: sessionId },
+      });
+
+      expect(response.statusCode).toBe(403);
+    });
+  });
+
+  it('only lets the teachers of the service give it', async () => {
+    const outsider = await call('POST', '/schedules', {
+      serviceId: groupServiceId,
+      staffMembershipId: staffMember.membershipId,
+      mode: 'group',
+      weekdays: [1],
+      startsAtTime: '10:00',
+      endsAtTime: '11:00',
+      startsOn: firstDate,
+    });
+
+    expect(outsider.statusCode).toBe(409);
+    expect(outsider.json<{ code: string }>().code).toBe('STAFF_NOT_FOR_SERVICE');
+  });
+
+  it('repeats a configured week into the next one with a single call, without duplicating', async () => {
+    const weekday = getScheduleWeekdayOfLocalDate(firstDate);
+    const weekStart = addDaysToLocalDate(firstDate, -(weekday - 1));
+    const weekEnd = addDaysToLocalDate(weekStart, 6);
+    const created = await createSeries({ startsOn: firstDate, endsOn: weekEnd });
+    const nextWeekDate = addDaysToLocalDate(firstDate, 7);
+    expect(await readRoomSessions(nextWeekDate)).toHaveLength(0);
+
+    const repeated = await call('POST', '/schedules/repeat-week', { weekStart });
+    const again = await call('POST', '/schedules/repeat-week', { weekStart });
+
+    expect(repeated.statusCode).toBe(200);
+    expect(repeated.json()).toMatchObject({ copiedSeriesCount: 1, alreadyCopiedSeriesCount: 0 });
+    expect(again.json()).toMatchObject({ copiedSeriesCount: 0, alreadyCopiedSeriesCount: 1 });
+    const [copiedSession] = await readRoomSessions(nextWeekDate);
+    expect(copiedSession).toMatchObject({ mode: 'group', capacity: 2, bookedCount: 0 });
+    const listed = (await call('GET', '/schedules')).json<{ series: SeriesBody[] }>().series;
+    expect(listed).toHaveLength(2);
+    expect(listed.map(({ seriesId }) => seriesId)).toContain(created.series.seriesId);
+  });
+
+  it('only accepts a Monday as the start of the week to repeat', async () => {
+    const weekday = getScheduleWeekdayOfLocalDate(firstDate);
+    const notMonday = weekday === 1 ? addDaysToLocalDate(firstDate, 1) : firstDate;
+
+    const response = await call('POST', '/schedules/repeat-week', { weekStart: notMonday });
+
+    expect(response.statusCode).toBe(400);
   });
 
   it('enrolls people up to the capacity and gives them a seat in every future session', async () => {
