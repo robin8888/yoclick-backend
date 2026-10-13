@@ -67,7 +67,7 @@ const passShape = {
   id: z.uuid(),
   name: z.string(),
   /** «agotado» y «caducado» se calculan: no hace falta que nadie los marque. */
-  status: z.enum(['pending', 'active', 'exhausted', 'expired', 'rejected']),
+  status: z.enum(['pending', 'active', 'exhausted', 'expired', 'rejected', 'cancelled']),
   totalSessions: z.number().int(),
   remainingSessions: z.number().int(),
   priceCents: z.number().int(),
@@ -87,7 +87,9 @@ export class PassListResponseDto extends createZodDto(
 
 export class PassListQueryDto extends createZodDto(
   z.strictObject({
-    status: z.enum(['pending', 'active', 'exhausted', 'expired', 'rejected']).optional(),
+    status: z
+      .enum(['pending', 'active', 'exhausted', 'expired', 'rejected', 'cancelled'])
+      .optional(),
     clientMembershipId: z.uuid().optional(),
   }),
 ) {}
@@ -102,6 +104,8 @@ export class EligibleClientsResponseDto extends createZodDto(
       z.strictObject({
         membershipId: z.uuid(),
         fullName: z.string(),
+        /** Enlace firmado de su foto de perfil; `null` si no tiene. */
+        photoUrl: z.string().nullable(),
         /** Clases que aún se le pueden apuntar: lo que le queda menos lo ya agendado. */
         bookableSessions: z.number().int(),
       }),

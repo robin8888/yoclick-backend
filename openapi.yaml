@@ -3173,6 +3173,7 @@ paths:
               - exhausted
               - expired
               - rejected
+              - cancelled
         - name: clientMembershipId
           required: false
           in: query
@@ -3318,6 +3319,43 @@ paths:
       security:
         - bearer: []
       summary: Rechaza un bono pendiente.
+      tags:
+        - passes
+  /v1/centers/{centerId}/passes/{passId}:
+    delete:
+      operationId: passes_cancel
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: passId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "204":
+          description: ""
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: "Quita un bono asignado (por error o dado de baja): deja de salir y de poder usarse. No se borra del libro. 404 si no existe o ya estaba quitado."
       tags:
         - passes
   /v1/centers/{centerId}/schedules/repeat-week:
@@ -11921,6 +11959,7 @@ components:
             - exhausted
             - expired
             - rejected
+            - cancelled
         totalSessions:
           type: integer
           minimum: -9007199254740991
@@ -12005,6 +12044,9 @@ components:
                 pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
               fullName:
                 type: string
+              photoUrl:
+                type: string
+                nullable: true
               bookableSessions:
                 type: integer
                 minimum: -9007199254740991
@@ -12012,6 +12054,7 @@ components:
             required:
               - membershipId
               - fullName
+              - photoUrl
               - bookableSessions
             additionalProperties: false
       required:
@@ -12039,6 +12082,7 @@ components:
                   - exhausted
                   - expired
                   - rejected
+                  - cancelled
               totalSessions:
                 type: integer
                 minimum: -9007199254740991

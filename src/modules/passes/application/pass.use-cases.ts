@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { PhotoUrlSigner, type WithPhotoUrl } from '../../photos/application/photo-url-signer';
 import { DomainError } from '../../../shared/errors/domain-error';
 import { HTTP_STATUS } from '../../../shared/errors/http-status';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
@@ -127,9 +128,26 @@ export class DecidePassUseCase {
 /** A quién puede apuntar el centro a una clase de ese servicio: personas con bono y clases. */
 @Injectable()
 export class ListEligibleClientsUseCase {
+  constructor(
+    @Inject(PASS_REPOSITORY) private readonly passes: PassRepository,
+    private readonly urlSigner: PhotoUrlSigner,
+  ) {}
+
+  async execute(
+    actor: ActorContext,
+    serviceId: string,
+  ): Promise<WithPhotoUrl<EligibleClientView>[]> {
+    const clients = await this.passes.listEligibleClients(actor, { serviceId, now: new Date() });
+    return clients.map((client) => this.urlSigner.attachPhotoUrl(client));
+  }
+}
+/** El centro quita un bono que asignó por error o que da de baja. */
+@Injectable()
+export class CancelPassUseCase {
   constructor(@Inject(PASS_REPOSITORY) private readonly passes: PassRepository) {}
 
-  async execute(actor: ActorContext, serviceId: string): Promise<EligibleClientView[]> {
-    return this.passes.listEligibleClients(actor, { serviceId, now: new Date() });
+  async execute(actor: ActorContext, passId: string): Promise<void> {
+    const wasCancelled = await this.passes.cancelPass(actor, passId);
+    if (!wasCancelled) throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
   }
 }

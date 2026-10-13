@@ -75,6 +75,8 @@ export interface PassListQuery {
 export interface EligibleClientView {
   readonly membershipId: string;
   readonly fullName: string;
+  /** Ruta de su foto en el almacén; la API la convierte en un enlace firmado. */
+  readonly photoKey: string | null;
   readonly bookableSessions: number;
 }
 
@@ -98,6 +100,8 @@ export interface PassRepository {
     command: { rateId: string; clientMembershipId: string; now: Date },
   ): Promise<PassRequestOutcome>;
   listPasses(actor: ActorContext, query: PassListQuery): Promise<PassView[]>;
+  /** Quita un bono asignado (no se borra: deja de salir y de poder usarse). `false` si no existe. */
+  cancelPass(actor: ActorContext, passId: string): Promise<boolean>;
   /** Activa (empieza a contar su caducidad) o rechaza un bono pendiente. */
   decidePass(
     actor: ActorContext,

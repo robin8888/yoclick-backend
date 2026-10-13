@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import {
   ArchiveRateUseCase,
   AssignPassUseCase,
+  CancelPassUseCase,
   CreateRateUseCase,
   DecidePassUseCase,
   ListEligibleClientsUseCase,
@@ -25,6 +26,7 @@ import { PrismaPassRepository } from './infrastructure/prisma-pass.repository';
     AssignPassUseCase,
     ListPassesUseCase,
     DecidePassUseCase,
+    CancelPassUseCase,
     ListEligibleClientsUseCase,
     { provide: PASS_REPOSITORY, useClass: PrismaPassRepository },
   ],

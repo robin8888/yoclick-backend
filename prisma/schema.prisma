@@ -1239,6 +1239,8 @@ enum PassStatus {
   pending
   active
   rejected
+  /// El centro lo quitó (se asignó por error o se dio de baja): ya no sale ni se puede usar.
+  cancelled
 
   @@map("pass_status")
 }

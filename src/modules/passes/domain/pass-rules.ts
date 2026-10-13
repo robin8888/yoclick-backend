@@ -11,10 +11,11 @@ export const MAX_RATE_SERVICES = 50;
 export const MAX_RATES_PER_CENTER = 50;
 
 /** Los estados que ve la app: los dos primeros se guardan, los demás se deducen de sesiones y fecha. */
-export type PassStatusName = 'pending' | 'active' | 'exhausted' | 'expired' | 'rejected';
+export type PassStatusName =
+  'pending' | 'active' | 'exhausted' | 'expired' | 'rejected' | 'cancelled';
 
 export interface StoredPassState {
-  readonly status: 'pending' | 'active' | 'rejected';
+  readonly status: 'pending' | 'active' | 'rejected' | 'cancelled';
   readonly remainingSessions: number;
   readonly expiresAt: Date | null;
 }

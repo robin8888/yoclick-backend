@@ -28,6 +28,7 @@ import { assertRouteTargetsActorCenter } from '../../../shared/tenancy/assert-ro
 import {
   ArchiveRateUseCase,
   AssignPassUseCase,
+  CancelPassUseCase,
   CreateRateUseCase,
   DecidePassUseCase,
   ListEligibleClientsUseCase,
@@ -168,6 +169,7 @@ export class PassesController {
     private readonly listPasses: ListPassesUseCase,
     private readonly decidePass: DecidePassUseCase,
     private readonly listEligible: ListEligibleClientsUseCase,
+    private readonly cancelPass: CancelPassUseCase,
   ) {}
 
   @Get('eligible')
@@ -278,5 +280,22 @@ export class PassesController {
     return serializePass(
       await this.decidePass.execute(actor, { passId: params.passId, decision: 'reject' }),
     );
+  }
+
+  @Delete(':passId')
+  @Roles('owner', 'admin')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    operationId: 'passes_cancel',
+    summary:
+      'Quita un bono asignado (por error o dado de baja): deja de salir y de poder usarse. No se borra del libro. 404 si no existe o ya estaba quitado.',
+  })
+  @ApiNoContentResponse()
+  async cancel(
+    @CurrentActor() actor: ActorContext,
+    @Param() params: PassRouteParamsDto,
+  ): Promise<void> {
+    assertRouteTargetsActorCenter(actor, params.centerId);
+    await this.cancelPass.execute(actor, params.passId);
   }
 }

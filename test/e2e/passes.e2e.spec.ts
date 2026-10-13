@@ -243,6 +243,38 @@ describe('passes (bonos)', () => {
     });
   });
 
+  describe('removing an assigned pass', () => {
+    it('lets the center remove a pass that was assigned by mistake, and it stops being listed and used', async () => {
+      const pass = await createActivePass(ana);
+      const bookingId = await insertBooking(ana);
+
+      const removed = await world.call('DELETE', url(`/passes/${pass.id}`), ownerUserId, {
+        centerId,
+      });
+      await attendClass(bookingId);
+
+      expect(removed.statusCode).toBe(204);
+      expect(await passesOf(ana)).toEqual([]);
+      const forCenter = await world.call('GET', url('/passes'), ownerUserId, { centerId });
+      expect(forCenter.json<{ passes: PassBody[] }>().passes).toEqual([]);
+    });
+
+    it('answers 404 when it was already removed, and does not let a client remove one', async () => {
+      const pass = await createActivePass(ana);
+
+      const asClient = await world.call('DELETE', url(`/passes/${pass.id}`), ana.userId, {
+        centerId,
+      });
+      await world.call('DELETE', url(`/passes/${pass.id}`), ownerUserId, { centerId });
+      const again = await world.call('DELETE', url(`/passes/${pass.id}`), ownerUserId, {
+        centerId,
+      });
+
+      expect(asClient.statusCode).toBe(403);
+      expect(again.statusCode).toBe(404);
+    });
+  });
+
   describe('using a class', () => {
     it('takes one class off the pass when the class is finished, and only once', async () => {
       const pass = await createActivePass(ana);

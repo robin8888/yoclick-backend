@@ -33,7 +33,7 @@ interface StoredRate {
 interface StoredPass {
   readonly id: string;
   readonly name: string;
-  readonly status: 'pending' | 'active' | 'rejected';
+  readonly status: 'pending' | 'active' | 'rejected' | 'cancelled';
   readonly totalSessions: number;
   readonly remainingSessions: number;
   readonly priceCents: number;
@@ -327,7 +327,7 @@ export class PrismaPassRepository implements PassRepository {
         distinct: ['clientMembershipId'],
         select: {
           clientMembershipId: true,
-          clientMembership: { select: { user: { select: { fullName: true } } } },
+          clientMembership: { select: { user: { select: { fullName: true, photoKey: true } } } },
         },
       });
       const eligible: EligibleClientView[] = [];
@@ -341,6 +341,7 @@ export class PrismaPassRepository implements PassRepository {
         eligible.push({
           membershipId: holder.clientMembershipId,
           fullName: holder.clientMembership.user.fullName,
+          photoKey: holder.clientMembership.user.photoKey,
           bookableSessions,
         });
       }
@@ -357,6 +358,8 @@ export class PrismaPassRepository implements PassRepository {
       });
       const passes = await client.clientPass.findMany({
         where: {
+          // Los que el centro quitó ya no salen en ninguna lista.
+          status: { not: 'cancelled' },
           ...(query.clientMembershipId !== null && {
             clientMembershipId: query.clientMembershipId,
           }),
@@ -371,6 +374,21 @@ export class PrismaPassRepository implements PassRepository {
       const views = passes.map((pass) => toPassView(pass, { names, now: query.now }));
       const { statuses } = query;
       return statuses === null ? views : views.filter(({ status }) => statuses.includes(status));
+    });
+  }
+
+  async cancelPass(actor: ActorContext, passId: string): Promise<boolean> {
+    return this.tenantPrismaService.runInTenantContext(actor, async (client) => {
+      // Solo los pendientes, activos o rechazados; uno ya quitado es indistinguible de uno inexistente.
+      const cancelled = await client.clientPass.updateMany({
+        where: { id: passId, status: { not: 'cancelled' } },
+        data: {
+          status: 'cancelled',
+          decidedByMembershipId: actor.membershipId,
+          decidedAt: new Date(),
+        },
+      });
+      return cancelled.count === 1;
     });
   }
 
