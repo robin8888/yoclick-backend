@@ -19,6 +19,7 @@ import {
   WITH_SESSION_DETAILS,
   type BookingWithSessionDetails,
 } from './booking-view.mapper';
+import { consumePassForBooking } from '../../passes/infrastructure/pass-consumption';
 
 /**
  * La reserva que esta persona puede mover: el personal solo las suyas, administración todas las del
@@ -113,6 +114,10 @@ export class PrismaSessionRecordRepository implements SessionRecordRepository {
           sessionNotes: command.notes,
         },
       });
+      // Cerrar la clase la da por asistida; si ya se descontó al llegar, no se descuenta otra vez.
+      if (closed.count === 1) {
+        await consumePassForBooking(client, { bookingId: command.bookingId, now: command.now });
+      }
       const booking = toBookingView(await reloadBooking(client, command.bookingId));
       if (closed.count === 1) return { kind: 'ended', booking };
       return decideSessionEnd(booking) === 'already_ended'

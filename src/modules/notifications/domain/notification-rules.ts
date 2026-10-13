@@ -21,6 +21,8 @@ export const NOTIFICATION_KINDS = [
   'session_cancelled',
   'schedule_enrolled',
   'schedule_unenrolled',
+  'pass_requested',
+  'pass_activated',
 ] as const;
 export type NotificationKindName = (typeof NOTIFICATION_KINDS)[number];
 

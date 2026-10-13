@@ -10,6 +10,7 @@ import {
   type CheckInRepository,
 } from '../application/ports/check-in.repository';
 import { CHECKIN_EARLY_MINUTES, pickBookingToCheckIn } from '../domain/check-in';
+import { consumePassForBooking } from '../../passes/infrastructure/pass-consumption';
 import { toBookingView, WITH_SESSION_DETAILS } from './booking-view.mapper';
 
 type CheckInCommand = { clientMembershipId: string; now: Date };
@@ -65,6 +66,10 @@ export class PrismaCheckInRepository implements CheckInRepository {
         where: { id: picked.bookingId, checkedInAt: null },
         data: { checkedInAt: command.now, checkedInByMembershipId: actor.membershipId },
       });
+      // Llegar a clase es asistir: se descuenta del bono en la misma transacción que la llegada.
+      if (marked.count === 1) {
+        await consumePassForBooking(client, { bookingId: picked.bookingId, now: command.now });
+      }
       const stored = await client.booking.findUniqueOrThrow({
         where: { id: picked.bookingId },
         include: WITH_SESSION_DETAILS,
