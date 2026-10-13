@@ -1,3 +1,4 @@
+import { MILLISECONDS_PER_DAY } from '../../../shared/time/time-units';
 import { z } from 'zod';
 import { createZodDto } from '../../../shared/http/create-zod-dto';
 
@@ -18,6 +19,11 @@ export class CreateBookingRequestDto extends createZodDto(
     startsAt: z.iso.datetime(),
     staffMembershipId: z.uuid().optional(),
   }),
+) {}
+
+/** El cliente se apunta a una clase con plazas de un servicio con horario de sala. */
+export class JoinOpenSessionRequestDto extends createZodDto(
+  z.strictObject({ classSessionId: z.uuid() }),
 ) {}
 
 export class RescheduleBookingRequestDto extends createZodDto(
@@ -91,6 +97,8 @@ const roomSessionShape = z.strictObject({
       bookingId: z.uuid(),
       clientMembershipId: z.uuid(),
       fullName: z.string(),
+      /** Enlace firmado de su foto de perfil; `null` si no tiene. */
+      photoUrl: z.string().nullable(),
       status: z.enum(['confirmed', 'cancelled', 'attended', 'no_show']),
       /** Plaza de grupo fijo (matrícula) o cita suelta. */
       source: z.enum(['single', 'enrollment']),
@@ -279,5 +287,49 @@ export class AgendaResponseDto extends createZodDto(
         client: z.strictObject({ membershipId: z.uuid(), fullName: z.string() }),
       }),
     ),
+  }),
+) {}
+
+const MAX_SERVICE_SESSIONS_RANGE_DAYS = 62;
+
+export class ServiceSessionsRouteParamsDto extends createZodDto(
+  z.strictObject({ centerId: z.uuid(), serviceId: z.uuid() }),
+) {}
+
+export class ServiceSessionsQueryDto extends createZodDto(
+  z
+    .strictObject({ from: z.iso.date(), to: z.iso.date() })
+    .refine(
+      ({ from, to }) =>
+        to >= from &&
+        (new Date(`${to}T00:00:00.000Z`).getTime() - new Date(`${from}T00:00:00.000Z`).getTime()) /
+          MILLISECONDS_PER_DAY <=
+          MAX_SERVICE_SESSIONS_RANGE_DAYS,
+      { error: 'The range must go forward and cover at most 62 days', path: ['to'] },
+    ),
+) {}
+
+export class ServiceSessionsResponseDto extends createZodDto(
+  z.strictObject({
+    timezone: z.string(),
+    /** El servicio tiene horario de sala vigente: solo se reserva en sus clases. */
+    isScheduled: z.boolean(),
+    /** Clases con plazas libres en el rango, por orden de hora. */
+    sessions: z.array(
+      z.strictObject({
+        id: z.uuid(),
+        startsAt: z.iso.datetime(),
+        endsAt: z.iso.datetime(),
+        mode: z.enum(['private', 'group']),
+        capacity: z.number().int(),
+        bookedCount: z.number().int(),
+        remainingSeats: z.number().int(),
+        room: z.strictObject({ id: z.uuid(), name: z.string() }).nullable(),
+        teacher: z.strictObject({ membershipId: z.uuid(), fullName: z.string() }),
+        label: z.string().nullable(),
+      }),
+    ),
+    /** La próxima clase con plazas, aunque caiga fuera del rango. */
+    nextOpenStartsAt: z.iso.datetime().nullable(),
   }),
 ) {}

@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { DomainError } from '../../../shared/errors/domain-error';
 import { HTTP_STATUS } from '../../../shared/errors/http-status';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
+import { PhotoUrlSigner, type WithPhotoUrl } from '../../photos/application/photo-url-signer';
 import {
   decideCancellation,
   isCancellationWithinPolicy,
@@ -21,6 +22,11 @@ import {
   type PlacementOptions,
   type PlacementOptionsQuery,
   type RoomAgenda,
+  type ServiceSessionsQuery,
+  type ServiceSessionsView,
+  type RoomDayView,
+  type RoomSessionView,
+  type MoveToSessionCommand,
   type RescheduleBookingCommand,
   type RescheduleOutcome,
 } from './ports/booking.repository';
@@ -38,6 +44,7 @@ const REFUSALS_BY_OUTCOME: Readonly<
   already_booked: ['ALREADY_BOOKED', HTTP_STATUS.conflict],
   room_unavailable: ['ROOM_UNAVAILABLE', HTTP_STATUS.conflict],
   mode_not_allowed: ['SESSION_MODE_NOT_ALLOWED', HTTP_STATUS.conflict],
+  service_scheduled_only: ['SERVICE_ONLY_IN_SCHEDULE', HTTP_STATUS.conflict],
 };
 
 /** Reservar un hueco individual. La hora se vuelve a comprobar en el servidor, nunca se confía en la app. */
@@ -66,6 +73,9 @@ export class JoinGroupSessionUseCase {
     if (outcome.kind === 'already_booked') {
       throw new DomainError('ALREADY_BOOKED', HTTP_STATUS.conflict);
     }
+    if (outcome.kind === 'outside_window') {
+      throw new DomainError('OUTSIDE_BOOKING_WINDOW', HTTP_STATUS.conflict);
+    }
     throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
   }
 }
@@ -82,13 +92,47 @@ export class GetPlacementOptionsUseCase {
   }
 }
 
+type SignedRoomSession = Omit<RoomSessionView, 'attendees'> & {
+  readonly attendees: readonly WithPhotoUrl<RoomSessionView['attendees'][number]>[];
+};
+type SignedRoomAgenda = Omit<RoomAgenda, 'rooms' | 'sessionsWithoutRoom'> & {
+  readonly rooms: readonly (Omit<RoomDayView, 'sessions'> & {
+    readonly sessions: readonly SignedRoomSession[];
+  })[];
+  readonly sessionsWithoutRoom: readonly SignedRoomSession[];
+};
+
 /** La agenda del centro por sala: cuándo está ocupada cada una y con qué clase, profesor y alumnos. */
 @Injectable()
 export class GetRoomAgendaUseCase {
+  constructor(
+    @Inject(BOOKING_REPOSITORY) private readonly bookings: BookingRepository,
+    private readonly urlSigner: PhotoUrlSigner,
+  ) {}
+
+  async execute(actor: ActorContext, query: { date: string }): Promise<SignedRoomAgenda> {
+    const agenda = await this.bookings.listRoomAgenda(actor, query);
+    const signSession = (session: RoomSessionView): SignedRoomSession => ({
+      ...session,
+      attendees: session.attendees.map((attendee) => this.urlSigner.attachPhotoUrl(attendee)),
+    });
+    return {
+      ...agenda,
+      rooms: agenda.rooms.map((room) => ({ ...room, sessions: room.sessions.map(signSession) })),
+      sessionsWithoutRoom: agenda.sessionsWithoutRoom.map(signSession),
+    };
+  }
+}
+
+/** Las clases de un servicio con plazas libres: lo que se ofrece al asignar o pedir una cita. */
+@Injectable()
+export class ListServiceSessionsUseCase {
   constructor(@Inject(BOOKING_REPOSITORY) private readonly bookings: BookingRepository) {}
 
-  async execute(actor: ActorContext, query: { date: string }): Promise<RoomAgenda> {
-    return this.bookings.listRoomAgenda(actor, query);
+  async execute(actor: ActorContext, query: ServiceSessionsQuery): Promise<ServiceSessionsView> {
+    const view = await this.bookings.listServiceSessions(actor, query);
+    if (!view) throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
+    return view;
   }
 }
 
@@ -114,6 +158,7 @@ const REFUSALS_BY_RESCHEDULE_OUTCOME: Readonly<
   not_found: ['NOT_FOUND', HTTP_STATUS.notFound],
   not_reschedulable: ['BOOKING_NOT_RESCHEDULABLE', HTTP_STATUS.conflict],
   too_late: ['RESCHEDULE_TOO_LATE', HTTP_STATUS.conflict],
+  session_full: ['SESSION_FULL', HTTP_STATUS.conflict],
 };
 
 /**
@@ -129,6 +174,21 @@ export class RescheduleBookingUseCase {
     command: RescheduleBookingCommand,
   ): Promise<Extract<RescheduleOutcome, { kind: 'rescheduled' }>> {
     const outcome = await this.bookings.rescheduleBooking(actor, command);
+    if (outcome.kind === 'rescheduled') return outcome;
+    throw new DomainError(...REFUSALS_BY_RESCHEDULE_OUTCOME[outcome.kind]);
+  }
+}
+
+/** El cliente pasa su reserva a otra clase con plazas del mismo servicio. */
+@Injectable()
+export class MoveBookingToSessionUseCase {
+  constructor(@Inject(BOOKING_REPOSITORY) private readonly bookings: BookingRepository) {}
+
+  async execute(
+    actor: ActorContext,
+    command: MoveToSessionCommand,
+  ): Promise<Extract<RescheduleOutcome, { kind: 'rescheduled' }>> {
+    const outcome = await this.bookings.moveToSession(actor, command);
     if (outcome.kind === 'rescheduled') return outcome;
     throw new DomainError(...REFUSALS_BY_RESCHEDULE_OUTCOME[outcome.kind]);
   }

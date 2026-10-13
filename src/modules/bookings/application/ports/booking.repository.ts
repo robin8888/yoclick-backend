@@ -61,6 +61,11 @@ export interface JoinGroupSessionCommand {
   readonly classSessionId: string;
   readonly clientMembershipId: string;
   readonly now: Date;
+  /**
+   * Quien se apunta es el propio cliente: se respetan la antelación mínima y la ventana de reserva
+   * del servicio, y que esté visible. El centro, al asignar, no las necesita.
+   */
+  readonly isClientBooking?: boolean | undefined;
 }
 
 export type CreateBookingOutcome =
@@ -74,7 +79,9 @@ export type CreateBookingOutcome =
   /** La sala no existe, está ocupada a esa hora o no la da esa persona. */
   | { readonly kind: 'room_unavailable' }
   /** El servicio no se da en ese modo (solo privado o solo en grupo). */
-  | { readonly kind: 'mode_not_allowed' };
+  | { readonly kind: 'mode_not_allowed' }
+  /** El servicio tiene horario de sala: solo se puede reservar en sus clases, no en una hora libre. */
+  | { readonly kind: 'service_scheduled_only' };
 
 export type JoinGroupSessionOutcome =
   | { readonly kind: 'created'; readonly booking: BookingView }
@@ -82,7 +89,9 @@ export type JoinGroupSessionOutcome =
   /** La sesión no existe, no es grupal, está cancelada o ya empezó. */
   | { readonly kind: 'session_not_found' }
   | { readonly kind: 'session_full' }
-  | { readonly kind: 'already_booked' };
+  | { readonly kind: 'already_booked' }
+  /** El propio cliente pide una clase demasiado pronto o demasiado lejos, o de un servicio oculto. */
+  | { readonly kind: 'outside_window' };
 
 export interface RescheduleBookingCommand {
   readonly bookingId: string;
@@ -92,6 +101,13 @@ export interface RescheduleBookingCommand {
   readonly preferredStaffMembershipId?: string | undefined;
   /** Rejilla de inicios más fina cuando mueve la cita el equipo (p. ej. cada 15 minutos). */
   readonly slotStepMinutes?: number | undefined;
+}
+
+export interface MoveToSessionCommand {
+  readonly bookingId: string;
+  /** La clase con plazas a la que pasa la reserva (de `GET /services/:id/open-sessions`). */
+  readonly classSessionId: string;
+  readonly now: Date;
 }
 
 export type RescheduleOutcome =
@@ -113,7 +129,9 @@ export type RescheduleOutcome =
   | { readonly kind: 'service_not_found' }
   | { readonly kind: 'client_not_found' }
   | { readonly kind: 'room_unavailable' }
-  | { readonly kind: 'mode_not_allowed' };
+  | { readonly kind: 'mode_not_allowed' }
+  /** La clase a la que se pasa ya no tiene plazas. */
+  | { readonly kind: 'session_full' };
 
 export type BookingListScope = 'upcoming' | 'past';
 
@@ -161,6 +179,37 @@ export interface PlacementOptions {
   }[];
 }
 
+export interface ServiceSessionsQuery {
+  readonly serviceId: string;
+  readonly fromDate: string;
+  readonly toDate: string;
+  readonly now: Date;
+}
+
+/** Una clase de un servicio a la que aún se puede apuntar a alguien. */
+export interface ServiceSessionView {
+  readonly id: string;
+  readonly startsAt: Date;
+  readonly endsAt: Date;
+  readonly mode: 'private' | 'group';
+  readonly capacity: number;
+  readonly bookedCount: number;
+  readonly remainingSeats: number;
+  readonly room: { readonly id: string; readonly name: string } | null;
+  readonly teacher: { readonly membershipId: string; readonly fullName: string };
+  /** El nombre del horario del que nació («Grupo especial»), si lo tiene. */
+  readonly label: string | null;
+}
+
+export interface ServiceSessionsView {
+  readonly timeZone: string;
+  /** El servicio tiene horario de sala vigente: solo se reserva en sus clases. */
+  readonly isScheduled: boolean;
+  readonly sessions: readonly ServiceSessionView[];
+  /** La próxima clase con plazas, aunque quede fuera del rango pedido. */
+  readonly nextOpenStartsAt: Date | null;
+}
+
 export interface GroupOptionsQuery {
   readonly serviceId: string;
   readonly date: string;
@@ -203,6 +252,8 @@ export interface RoomSessionView {
     readonly bookingId: string;
     readonly clientMembershipId: string;
     readonly fullName: string;
+    /** Ruta de la foto en el almacén; la API la convierte en enlace firmado antes de responder. */
+    readonly photoKey: string | null;
     readonly status: BookingStatusName;
     /** Plaza de grupo fijo (matrícula) o cita suelta. */
     readonly source: 'single' | 'enrollment';
@@ -290,6 +341,8 @@ export interface BookingRepository {
    * Mueve una reserva a otra hora desde la agenda del centro. La administración mueve cualquiera; el
    * personal, solo las de sus sesiones. No exige antelación y avisa al cliente.
    */
+  /** El cliente pasa su reserva a otra clase con plazas del mismo servicio. */
+  moveToSession(actor: ActorContext, command: MoveToSessionCommand): Promise<RescheduleOutcome>;
   rescheduleByTeam(
     actor: ActorContext,
     command: RescheduleBookingCommand,
@@ -319,6 +372,10 @@ export interface BookingRepository {
   ): Promise<DayAgenda>;
   /** La agenda del día por sala: cuándo está ocupada cada una, con su aforo, profesor y alumnos. */
   listRoomAgenda(actor: ActorContext, query: { date: string }): Promise<RoomAgenda>;
+  listServiceSessions(
+    actor: ActorContext,
+    query: ServiceSessionsQuery,
+  ): Promise<ServiceSessionsView | null>;
 }
 
 export const BOOKING_REPOSITORY = Symbol('BOOKING_REPOSITORY');

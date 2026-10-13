@@ -19,7 +19,9 @@ const SESSION_INCLUDE = {
       id: true,
       status: true,
       source: true,
-      clientMembership: { select: { id: true, user: { select: { fullName: true } } } },
+      clientMembership: {
+        select: { id: true, user: { select: { fullName: true, photoKey: true } } },
+      },
     },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
   },
@@ -86,6 +88,7 @@ function toRoomSessionView(session: StoredSession): RoomSessionView {
       bookingId: booking.id,
       clientMembershipId: booking.clientMembership.id,
       fullName: booking.clientMembership.user.fullName,
+      photoKey: booking.clientMembership.user.photoKey,
       status: booking.status,
       source: booking.source,
     })),

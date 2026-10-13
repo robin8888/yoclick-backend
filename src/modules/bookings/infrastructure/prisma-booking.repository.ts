@@ -26,9 +26,12 @@ import {
   type JoinGroupSessionOutcome,
   type PlacementOptions,
   type PlacementOptionsQuery,
+  type MoveToSessionCommand,
   type RescheduleBookingCommand,
   type RescheduleOutcome,
   type RoomAgenda,
+  type ServiceSessionsQuery,
+  type ServiceSessionsView,
   type TeamCancellationOutcome,
 } from '../application/ports/booking.repository';
 import { recordBookingNotification } from '../../notifications/infrastructure/booking-notification.recorder';
@@ -38,6 +41,8 @@ import {
   listPlacementOptionsInTransaction,
 } from './placement-options';
 import { listRoomAgendaInTransaction } from './room-agenda';
+import { moveBookingToSessionInTransaction } from './booking-move';
+import { listServiceSessionsInTransaction } from './service-sessions';
 import { releaseSessionIfEmpty } from './session-release';
 import {
   rescheduleBookingInTransaction,
@@ -92,6 +97,14 @@ async function recordCancellationNotice(
   });
 }
 
+/**
+ * El mismo actor con la visibilidad de las reservas del equipo (la política `client_own` deja a un
+ * cliente ver solo las suyas). Solo para contar plazas: nunca devuelve reservas ajenas.
+ */
+function withTeamVisibility(actor: ActorContext): ActorContext {
+  return { ...actor, role: 'staff' };
+}
+
 @Injectable()
 export class PrismaBookingRepository implements BookingRepository {
   constructor(private readonly tenantPrismaService: TenantPrismaService) {}
@@ -109,8 +122,20 @@ export class PrismaBookingRepository implements BookingRepository {
     actor: ActorContext,
     command: JoinGroupSessionCommand,
   ): Promise<JoinGroupSessionOutcome> {
-    return this.tenantPrismaService.runInTenantContext(actor, (client) =>
+    // Para contar las plazas hay que ver todas las reservas de la clase, no solo las del cliente:
+    // la consulta corre con la visibilidad del equipo, pero la reserva se firma con el actor real.
+    return this.tenantPrismaService.runInTenantContext(withTeamVisibility(actor), (client) =>
       joinGroupSessionInTransaction(client, actor, command),
+    );
+  }
+
+  async listServiceSessions(
+    actor: ActorContext,
+    query: ServiceSessionsQuery,
+  ): Promise<ServiceSessionsView | null> {
+    // Las plazas libres cuentan las reservas de todos, también para un cliente que consulta.
+    return this.tenantPrismaService.runInTenantContext(withTeamVisibility(actor), (client) =>
+      listServiceSessionsInTransaction(client, query),
     );
   }
 
@@ -144,6 +169,17 @@ export class PrismaBookingRepository implements BookingRepository {
   ): Promise<RescheduleOutcome> {
     return this.tenantPrismaService.runInTenantContext(actor, (client) =>
       rescheduleBookingInTransaction(client, actor, command),
+    );
+  }
+
+  async moveToSession(
+    actor: ActorContext,
+    command: MoveToSessionCommand,
+  ): Promise<RescheduleOutcome> {
+    // Las plazas de la clase nueva se cuentan con la visibilidad del equipo; la reserva que se
+    // mueve se busca por dueño, así que nunca se toca una ajena.
+    return this.tenantPrismaService.runInTenantContext(withTeamVisibility(actor), (client) =>
+      moveBookingToSessionInTransaction(client, actor, command),
     );
   }
 

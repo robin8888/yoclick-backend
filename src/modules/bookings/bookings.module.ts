@@ -9,6 +9,8 @@ import {
   GetPlacementOptionsUseCase,
   GetRoomAgendaUseCase,
   JoinGroupSessionUseCase,
+  ListServiceSessionsUseCase,
+  MoveBookingToSessionUseCase,
   ListMyBookingsUseCase,
   RescheduleBookingByTeamUseCase,
   RescheduleBookingUseCase,
@@ -30,6 +32,8 @@ import { AgendaRoomsController } from './http/agenda-rooms.controller';
 import { BookingSessionsController } from './http/booking-sessions.controller';
 import { CheckInController } from './http/check-in.controller';
 import { BookingsController } from './http/bookings.controller';
+import { ClientSessionBookingsController } from './http/client-session-bookings.controller';
+import { ServiceSessionsController } from './http/service-sessions.controller';
 import { SessionRecordsController } from './http/session-records.controller';
 import { PrismaCheckInRepository } from './infrastructure/prisma-check-in.repository';
 import { PrismaBookingRepository } from './infrastructure/prisma-booking.repository';
@@ -39,12 +43,14 @@ import { PrismaSessionRecordRepository } from './infrastructure/prisma-session-r
   imports: [IdempotencyModule],
   controllers: [
     BookingsController,
+    ClientSessionBookingsController,
     BookingReschedulingController,
     BookingSessionsController,
     AgendaController,
     AgendaPlacementController,
     AgendaRoomsController,
     AgendaReschedulingController,
+    ServiceSessionsController,
     SessionRecordsController,
     CheckInController,
   ],
@@ -59,6 +65,8 @@ import { PrismaSessionRecordRepository } from './infrastructure/prisma-session-r
     GetGroupOptionsUseCase,
     GetPlacementOptionsUseCase,
     GetRoomAgendaUseCase,
+    ListServiceSessionsUseCase,
+    MoveBookingToSessionUseCase,
     JoinGroupSessionUseCase,
     StartSessionUseCase,
     EndSessionUseCase,

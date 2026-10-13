@@ -1,3 +1,4 @@
+import { MILLISECONDS_PER_DAY, MILLISECONDS_PER_MINUTE } from '../../../shared/time/time-units';
 import { v7 as generateUuidV7 } from 'uuid';
 import { type TenantTransactionClient } from '../../../shared/database/tenant-prisma.service';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
@@ -149,7 +150,10 @@ export type SessionReservation =
       readonly service: SchedulableService;
       readonly endsAt: Date;
     }
-  | Exclude<CreateBookingOutcome, { readonly kind: 'created' }>;
+  | Exclude<
+      CreateBookingOutcome,
+      { readonly kind: 'created' } | { readonly kind: 'service_scheduled_only' }
+    >;
 
 type RoomChoice =
   | { readonly kind: 'rooms'; readonly rooms: readonly (UsableRoom | null)[] }
@@ -322,6 +326,9 @@ export async function createBookingInTransaction(
   actor: ActorContext,
   command: CreateBookingCommand,
 ): Promise<CreateBookingOutcome> {
+  if (await isOnlyGivenInSchedule(client, command.serviceId)) {
+    return { kind: 'service_scheduled_only' };
+  }
   const reservation = await reserveSessionInTransaction(client, actor, command);
   if (reservation.kind !== 'reserved') return reservation;
   const clientMembershipId = command.clientMembershipId ?? actor.membershipId;
@@ -341,6 +348,43 @@ export async function createBookingInTransaction(
   return { kind: 'created', booking: toBookingView(booking) };
 }
 
+/**
+ * Un servicio con horario de sala vigente solo se da en sus clases: no se puede reservar en una
+ * hora libre cualquiera. Un servicio sin horario sigue funcionando como siempre.
+ */
+async function isOnlyGivenInSchedule(
+  client: TenantTransactionClient,
+  serviceId: string,
+): Promise<boolean> {
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  const activeScheduleCount = await client.sessionSchedule.count({
+    where: {
+      serviceId,
+      status: 'active',
+      OR: [{ endsOn: null }, { endsOn: { gte: today } }],
+    },
+  });
+  return activeScheduleCount > 0;
+}
+
+/** El servicio de la clase es visible y la clase cae dentro de su antelación mínima y su ventana. */
+async function isOpenToClient(
+  client: TenantTransactionClient,
+  session: { serviceId: string; startsAt: Date },
+  now: Date,
+): Promise<boolean> {
+  const service = await client.service.findFirst({
+    where: { id: session.serviceId, archivedAt: null, isVisible: true },
+    select: { minNoticeMinutes: true, bookingWindowDays: true },
+  });
+  if (!service) return false;
+  const earliest = now.getTime() + service.minNoticeMinutes * MILLISECONDS_PER_MINUTE;
+  const latest = now.getTime() + service.bookingWindowDays * MILLISECONDS_PER_DAY;
+  const startsAt = session.startsAt.getTime();
+  return startsAt >= earliest && startsAt <= latest;
+}
+
 async function findJoinableSession(
   client: TenantTransactionClient,
   command: JoinGroupSessionCommand,
@@ -348,7 +392,6 @@ async function findJoinableSession(
   return client.classSession.findFirst({
     where: {
       id: command.classSessionId,
-      mode: 'group',
       status: 'scheduled',
       startsAt: { gt: command.now },
     },
@@ -379,6 +422,9 @@ export async function joinGroupSessionInTransaction(
   await lockSessionSeats(client, command.classSessionId);
   const session = await findJoinableSession(client, command);
   if (!session) return { kind: 'session_not_found' };
+  if (command.isClientBooking === true && !(await isOpenToClient(client, session, command.now))) {
+    return { kind: 'outside_window' };
+  }
 
   if (await isSessionFull(client, session)) return { kind: 'session_full' };
   const isClientBusy = await hasOverlappingBooking(client, {

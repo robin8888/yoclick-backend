@@ -53,6 +53,8 @@ function buildRepository(overrides: Partial<BookingRepository> = {}): BookingRep
     listPlacementOptions: jest.fn(),
     listGroupOptions: jest.fn(),
     listRoomAgenda: jest.fn(),
+    listServiceSessions: jest.fn(),
+    moveToSession: jest.fn(),
     rescheduleBooking: jest.fn(),
     rescheduleByTeam: jest.fn(),
     listClientBookings: jest.fn(),
