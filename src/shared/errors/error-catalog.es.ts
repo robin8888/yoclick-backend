@@ -90,6 +90,9 @@ export const ERROR_CATALOG = {
     title: 'Hay clases o citas en ese tramo. Cancélalas o muévelas antes de bloquear la sala',
   },
   PAYMENTS_NOT_INCLUDED: { title: 'El plan de este centro no incluye cobros online' },
+  CENTER_CONTACT_EMAIL_REQUIRED: {
+    title: 'Añade un email de contacto al centro para activar los cobros online',
+  },
   PAYMENTS_NOT_READY: {
     title: 'Este centro aún no puede cobrar online. Pídele que complete el alta de cobros',
   },

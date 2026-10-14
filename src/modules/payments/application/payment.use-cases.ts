@@ -101,6 +101,10 @@ export class StartPaymentsOnboardingUseCase {
     actor: ActorContext,
     centerPayments: CenterPaymentsInfo,
   ): Promise<string> {
+    // Stripe exige un email de contacto para abrir la cuenta de cobros.
+    if (centerPayments.contactEmail === null) {
+      throw new DomainError('CENTER_CONTACT_EMAIL_REQUIRED', HTTP_STATUS.unprocessableEntity);
+    }
     const created = await this.gateway.createConnectedAccount({
       centerId: actor.centerId,
       businessName: centerPayments.name,
