@@ -106,6 +106,12 @@ Leyenda de rol: **P** público · **U** usuario autenticado · **C** cliente del
 | GET | `/bookings/{id}/checkin-token` | C | Token QR firmado, vida 60 s, se rota en la app |
 | POST | `/checkins` | S | `{ token, sessionId }` → valida firma, caducidad, sesión, centro y que no se haya usado |
 | POST | `/class-sessions/{id}/attendance` | S | Pasar lista manual |
+| POST | `/centers/{centerId}/me/checkin-code` | C·O·A·S | QR firmado de 5 min (`yoclick:checkin:<jwt>`); el equipo lo usa para fichar |
+| POST | `/centers/{centerId}/attendance/check-in` | O·A·S | Escanea un QR. `kind: 'client'` registra la llegada a la cita; `kind: 'staff'` ficha entrada o salida de esa persona (alterna; repetir en 30 s no duplica) |
+| GET | `/centers/{centerId}/me/time-entries?month=YYYY-MM[&staffMembershipId]` | O·A·S | `time_entries_list`: turnos del mes + `totals` (`workedMinutes, daysWorked, editedCount`); otra persona solo owner/admin |
+| POST | `/centers/{centerId}/me/time-entries` | O·A·S | `time_entries_create`: alta manual de un día olvidado `{ clockInAt, clockOutAt }`; 409 `TIME_ENTRY_OVERLAP`, 422 `TIME_ENTRY_INVALID_RANGE`/`TOO_LONG`/`IN_FUTURE` |
+| PATCH | `/centers/{centerId}/me/time-entries/{entryId}` | O·A·S | `time_entries_update`: corrige entrada/salida; queda `isEdited` con las horas originales. El personal solo las suyas |
+| DELETE | `/centers/{centerId}/me/time-entries/{entryId}` | O·A·S | `time_entries_delete`: borrado lógico |
 
 ### Staff
 

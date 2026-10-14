@@ -3,6 +3,8 @@ import { AccessTokenService } from '../../../shared/auth/access-token.service';
 import { DomainError } from '../../../shared/errors/domain-error';
 import { HTTP_STATUS } from '../../../shared/errors/http-status';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
+import { type TeamClockScan } from '../../time-clock/application/ports/time-entry.repository';
+import { RecordTeamClockScanUseCase } from '../../time-clock/application/time-entry.use-cases';
 import { buildCheckInQrContent, extractCheckInToken } from '../domain/check-in';
 import {
   CHECK_IN_REPOSITORY,
@@ -15,7 +17,18 @@ export interface IssuedCheckInCode {
   readonly expiresAt: Date;
 }
 
-type CompletedCheckIn = Extract<CheckInOutcome, { kind: 'checked_in' | 'already_checked_in' }>;
+type CompletedClientCheckIn = Extract<
+  CheckInOutcome,
+  { kind: 'checked_in' | 'already_checked_in' }
+>;
+
+/** El QR era de alguien del equipo: se ha fichado su entrada o su salida en vez de una cita. */
+export interface TeamClockedCheckIn {
+  readonly kind: 'team_clocked';
+  readonly scan: TeamClockScan;
+}
+
+export type CompletedCheckIn = CompletedClientCheckIn | TeamClockedCheckIn;
 
 function invalidCodeError(): DomainError {
   return new DomainError('CHECKIN_CODE_INVALID', HTTP_STATUS.unprocessableEntity);
@@ -40,6 +53,7 @@ export class CheckInClientUseCase {
   constructor(
     private readonly accessTokens: AccessTokenService,
     @Inject(CHECK_IN_REPOSITORY) private readonly checkIns: CheckInRepository,
+    private readonly teamClock: RecordTeamClockScanUseCase,
   ) {}
 
   async execute(input: {
@@ -52,6 +66,13 @@ export class CheckInClientUseCase {
     const claims = await this.accessTokens.verifyCheckinToken(token);
     // Un código de otro centro es indistinguible de uno falso.
     if (claims.centerId !== input.actor.centerId) throw invalidCodeError();
+
+    // Una persona del equipo ficha su jornada; cualquier otra membresía sigue el flujo de la clienta.
+    const teamOutcome = await this.teamClock.execute(input.actor, {
+      scannedMembershipId: claims.membershipId,
+      now: input.now,
+    });
+    if (teamOutcome.kind === 'recorded') return { kind: 'team_clocked', scan: teamOutcome.scan };
 
     const outcome = await this.checkIns.checkInClient(input.actor, {
       clientMembershipId: claims.membershipId,

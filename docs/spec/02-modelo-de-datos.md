@@ -81,6 +81,7 @@ create unique index bookings_once on bookings (class_session_id, booked_for_user
 ```
 
 Las plazas se controlan con `select … for update` sobre la sesión dentro de la transacción de reserva (o un contador con `check (booked <= capacity)`).
+| `staff_time_entries` | `id, center_id, staff_membership_id, work_date (fecha local del centro), clock_in_at, clock_out_at, in_source/out_source ('qr'\|'manual'), scanned_by_membership_id, is_edited, original_clock_in_at, original_clock_out_at, edited_at, edited_by_membership_id, deleted_at` | Fichaje del equipo (API-312b). Una entrada abierta por persona (índice único parcial); `CHECK clock_out_at > clock_in_at`; sin `DELETE`. RLS: owner/admin ven todo el centro, `staff` lo suyo, lo que él haya escaneado y las abiertas (para fichar a otra persona). Editar guarda las horas originales la primera vez |
 
 ### Cobros
 

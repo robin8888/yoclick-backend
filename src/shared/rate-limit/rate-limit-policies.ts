@@ -37,6 +37,8 @@ export const RATE_LIMITS = {
   issueCheckinToken: { limit: 30, ttl: ONE_MINUTE },
   /** Escanear QR: quien atiende pasa a varias personas seguidas, nunca cientos por minuto. */
   checkInClient: { limit: 60, ttl: ONE_MINUTE },
+  /** Ver y corregir los turnos propios: unas pocas veces al día. */
+  manageTimeEntries: { limit: 30, ttl: ONE_MINUTE },
   /**
    * Subidas de ficheros (fotos, PDF, inicio de subida de vídeo): cada una cuesta almacenamiento y
    * tráfico de CDN. Una persona sube unas pocas al día; un bucle que llena el almacén no. Se suman al

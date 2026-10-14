@@ -20,6 +20,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { ActivityModule } from './modules/activity/activity.module';
 import { PrivacyModule } from './modules/privacy/privacy.module';
 import { ClientsModule } from './modules/clients/clients.module';
+import { TimeClockModule } from './modules/time-clock/time-clock.module';
 import { PassesModule } from './modules/passes/passes.module';
 import { RoomsModule } from './modules/rooms/rooms.module';
 import { SchedulesModule } from './modules/schedules/schedules.module';
@@ -64,6 +65,7 @@ import { buildLoggerOptions } from './shared/logging/build-logger-options';
     ReportsModule,
     RoomsModule,
     PassesModule,
+    TimeClockModule,
     SchedulesModule,
     ClientsModule,
     NotificationsModule,

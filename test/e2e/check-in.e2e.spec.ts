@@ -173,11 +173,19 @@ describe('attendance check-in by QR', () => {
     expect(response.json<ProblemBody>().code).toBe('CHECKIN_CODE_INVALID');
   });
 
-  it('keeps the roles apart: clients cannot scan and the team cannot issue a client code', async () => {
+  it('keeps the roles apart: clients cannot scan, and the team issues a QR to clock in', async () => {
     const qrContent = await issueCodeAsAna();
 
     expect((await scanAs(ana, qrContent)).statusCode).toBe(403);
-    expect((await world.call('POST', issueUrl(), staff.userId, { centerId })).statusCode).toBe(403);
+    expect((await world.call('POST', issueUrl(), staff.userId, { centerId })).statusCode).toBe(200);
+  });
+
+  it('answers kind client for a client arrival', async () => {
+    await insertBooking(5);
+
+    const response = await scanAs(staff, await issueCodeAsAna());
+
+    expect(response.json<{ kind: string }>().kind).toBe('client');
   });
 
   it('refuses a client that already left the center', async () => {

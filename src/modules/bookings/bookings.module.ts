@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { IdempotencyModule } from '../../shared/idempotency/idempotency.module';
+import { TimeClockModule } from '../time-clock/time-clock.module';
 import {
   CancelBookingUseCase,
   CancelBookingByTeamUseCase,
@@ -41,7 +42,7 @@ import { PrismaBookingRepository } from './infrastructure/prisma-booking.reposit
 import { PrismaSessionRecordRepository } from './infrastructure/prisma-session-record.repository';
 
 @Module({
-  imports: [IdempotencyModule],
+  imports: [IdempotencyModule, TimeClockModule],
   controllers: [
     BookingsController,
     ClientSessionBookingsController,

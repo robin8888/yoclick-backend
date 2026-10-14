@@ -17,7 +17,23 @@ import { assertRouteTargetsActorCenter } from '../../../shared/tenancy/assert-ro
 import { CheckInClientUseCase, IssueCheckInCodeUseCase } from '../application/check-in.use-cases';
 import { CenterRouteParamsDto } from './booking.dto';
 import { CheckInCodeResponseDto, CheckInRequestDto, CheckInResponseDto } from './check-in.dto';
+import { type TeamClockScan } from '../../time-clock/application/ports/time-entry.repository';
+import { serializeTimeEntry } from '../../time-clock/http/serialize-time-entry';
 import { serializeBooking } from './serialize-booking';
+
+function serializeTeamClock(scan: TeamClockScan): Record<string, unknown> {
+  return {
+    kind: 'staff',
+    staff: {
+      membershipId: scan.staffMembershipId,
+      fullName: scan.fullName,
+      action: scan.action,
+      occurredAt: scan.occurredAt.toISOString(),
+      workedMinutes: scan.workedMinutes,
+      entry: serializeTimeEntry(scan.entry),
+    },
+  };
+}
 
 /** Asistencia por QR: la persona clienta enseña un código firmado y quien atiende lo escanea. */
 @ApiTags('attendance')
@@ -32,13 +48,13 @@ export class CheckInController {
   ) {}
 
   @Post('me/checkin-code')
-  @Roles('client')
+  @Roles('client', 'owner', 'admin', 'staff')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: RATE_LIMITS.issueCheckinToken })
   @ApiOperation({
     operationId: 'attendance_issue_code',
     summary:
-      'El QR de asistencia de quien lo pide en este centro: un JWT firmado de 5 minutos dentro de yoclick:checkin:<jwt>. La app lo dibuja tal cual y lo renueva antes de que caduque; nunca lo construye ella.',
+      'El QR de asistencia (clientela) o de fichaje (equipo) de quien lo pide en este centro: un JWT firmado de 5 minutos dentro de yoclick:checkin:<jwt>. La app lo dibuja tal cual y lo renueva antes de que caduque; nunca lo construye ella.',
   })
   @ApiOkResponse({ type: CheckInCodeResponseDto })
   async issue(
@@ -57,7 +73,7 @@ export class CheckInController {
   @ApiOperation({
     operationId: 'attendance_check_in',
     summary:
-      'Registra la llegada de la clienta cuyo QR se ha escaneado, en su cita confirmada de ahora (desde 60 minutos antes hasta que termina). El personal solo en las clases que atiende; administración en cualquiera. 422 CHECKIN_CODE_INVALID si el código es falso, caduco o de otro centro; 409 CHECKIN_NO_BOOKING si no tiene cita para registrar. Repetirlo devuelve la misma llegada.',
+      'Registra la llegada de la clienta cuyo QR se ha escaneado, en su cita confirmada de ahora (desde 60 minutos antes hasta que termina). El personal solo en las clases que atiende; administración en cualquiera. 422 CHECKIN_CODE_INVALID si el código es falso, caduco o de otro centro; 409 CHECKIN_NO_BOOKING si no tiene cita para registrar. Repetirlo devuelve la misma llegada. Si el QR es de una persona del equipo (owner/admin/staff) ficha su jornada: kind staff con su entrada o su salida (alterna; repetir en 30 s no duplica).',
   })
   @ApiOkResponse({ type: CheckInResponseDto })
   async checkIn(
@@ -71,7 +87,9 @@ export class CheckInController {
       qrContent: body.qrContent,
       now: new Date(),
     });
+    if (outcome.kind === 'team_clocked') return serializeTeamClock(outcome.scan);
     return {
+      kind: 'client',
       clientFullName: outcome.clientFullName,
       checkedInAt: outcome.checkedInAt.toISOString(),
       isFirstCheckIn: outcome.kind === 'checked_in',

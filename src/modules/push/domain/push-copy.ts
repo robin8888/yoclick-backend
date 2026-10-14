@@ -35,6 +35,8 @@ const COPY_BY_KIND: Readonly<Record<string, PushCopy>> = {
   session_cancelled: { title: 'Han cancelado una clase', body: OPEN_APP_BODY },
   schedule_enrolled: { title: 'Tienes un horario fijo nuevo', body: OPEN_APP_BODY },
   schedule_unenrolled: { title: 'Cambio en tu horario fijo', body: OPEN_APP_BODY },
+  pass_requested: { title: 'Nueva solicitud de bono', body: OPEN_APP_BODY },
+  pass_activated: { title: 'Tu bono está activo', body: OPEN_APP_BODY },
 };
 
 const FALLBACK_COPY: PushCopy = { title: 'Tienes un aviso nuevo', body: OPEN_APP_BODY };

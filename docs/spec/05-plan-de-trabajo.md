@@ -23,6 +23,9 @@ Leyenda: ✅ hecho · 🟡 parcial · ⬜ pendiente. Basado en el historial de g
 - 🟡 APP-6 Administración: pestañas Agenda, Registro de clases y **Más** con Servicios y horario (lista, editor, archivar, horario en lectura), Invita a tu equipo e Invita a tus clientes. Falta: Datos del centro (sin campos fiscales en la API), editar horario, Clientes, Marca, equipo con lista de miembros.
 - ⬜ APP-4, APP-7, APP-8 y fases 2+ (Practicar y bonos solo como pantallas «muy pronto» o estado vacío).
 
+### 14 oct 2026: fichaje del equipo (back)
+- ✅ Módulo `time-clock`: un QR por persona del equipo que alterna entrada y salida (mismo escáner que la asistencia), edición y alta manual de turnos con horas originales y marca de editado, borrado lógico y totales del mes. El informe PDF lo genera la app. Migración `20261105090000_staff_time_entries`.
+
 ### Pendientes para mañana, en orden
 1. **Revisar con el prototipo renderizado** (`docs/design/prototipo-yoclick.html`, truco: copiar el HTML, cambiar `render();` final por `jump("ID");` y capturar con Edge headless) las pantallas ya construidas: `book1..book4`, `booked`, `appts`, `iagenda`, `iclass`, `aagenda` y la barra del instructor (Agenda, Clientes, Avisos, Perfil). Seguir el prototipo tal cual salvo que el usuario diga otra cosa; fondo blanco.
 2. Perfil del alumno real (hoy es un marcador con cerrar sesión) y pestaña «Mis clientes» del instructor.

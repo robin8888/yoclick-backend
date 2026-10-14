@@ -107,6 +107,10 @@ export const ERROR_CATALOG = {
   CHECKIN_NO_BOOKING: {
     title: 'Esta persona no tiene una cita confirmada para registrar ahora',
   },
+  TIME_ENTRY_OVERLAP: { title: 'Ese horario se solapa con otro turno que ya tienes registrado' },
+  TIME_ENTRY_INVALID_RANGE: { title: 'La salida tiene que ser posterior a la entrada' },
+  TIME_ENTRY_TOO_LONG: { title: 'Un turno no puede durar más de 16 horas' },
+  TIME_ENTRY_IN_FUTURE: { title: 'No se puede registrar una hora que aún no ha llegado' },
   PREMIUM_APPEARANCE_NOT_INCLUDED: {
     title: 'Personalizar el fondo y la colmena es del plan Premium',
   },

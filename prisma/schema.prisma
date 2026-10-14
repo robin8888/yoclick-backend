@@ -346,6 +346,7 @@ model Center {
   rooms               Room[]
   rates               Rate[]
   clientPasses        ClientPass[]
+  staffTimeEntries    StaffTimeEntry[]
   balanceMovements    BalanceMovement[]
   staffAvailabilities StaffAvailability[]
   routines            Routine[]
@@ -421,6 +422,9 @@ model Membership {
   notifications           Notification[]       @relation("NotificationRecipient")
   clientPasses            ClientPass[]         @relation("ClientPasses")
   decidedPasses           ClientPass[]         @relation("PassDecidedBy")
+  timeEntries             StaffTimeEntry[]     @relation("TimeEntryStaff")
+  scannedTimeEntries      StaffTimeEntry[]     @relation("TimeEntryScanner")
+  editedTimeEntries       StaffTimeEntry[]     @relation("TimeEntryEditor")
   serviceAssignments      ServiceStaff[]
   taughtClassSessions     ClassSession[]       @relation("StaffClassSessions")
   bookings                Booking[]            @relation("ClientBookings")
@@ -1321,4 +1325,43 @@ model BalanceMovement {
 
   @@index([centerId, clientPassId])
   @@map("balance_movements")
+}
+
+/// Cómo se registró una hora de entrada o de salida del equipo.
+enum TimeEntrySource {
+  qr
+  manual
+
+  @@map("time_entry_source")
+}
+
+/// Un turno de trabajo del equipo (fichaje): entrada y salida. Una sola abierta por persona.
+model StaffTimeEntry {
+  id                    String           @id @db.Uuid
+  centerId              String           @map("center_id") @db.Uuid
+  staffMembershipId     String           @map("staff_membership_id") @db.Uuid
+  /// Fecha local del centro (su zona horaria) de la entrada.
+  workDate              DateTime         @map("work_date") @db.Date
+  clockInAt             DateTime         @map("clock_in_at") @db.Timestamptz
+  clockOutAt            DateTime?        @map("clock_out_at") @db.Timestamptz
+  inSource              TimeEntrySource  @map("in_source")
+  outSource             TimeEntrySource? @map("out_source")
+  scannedByMembershipId String?          @map("scanned_by_membership_id") @db.Uuid
+  isEdited              Boolean          @default(false) @map("is_edited")
+  /// Horas antes de la primera edición; nulas si nunca se editó o si es un alta manual.
+  originalClockInAt     DateTime?        @map("original_clock_in_at") @db.Timestamptz
+  originalClockOutAt    DateTime?        @map("original_clock_out_at") @db.Timestamptz
+  editedAt              DateTime?        @map("edited_at") @db.Timestamptz
+  editedByMembershipId  String?          @map("edited_by_membership_id") @db.Uuid
+  deletedAt             DateTime?        @map("deleted_at") @db.Timestamptz
+  createdAt             DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime         @updatedAt @map("updated_at") @db.Timestamptz
+
+  center    Center      @relation(fields: [centerId], references: [id])
+  staff     Membership  @relation("TimeEntryStaff", fields: [staffMembershipId], references: [id])
+  scannedBy Membership? @relation("TimeEntryScanner", fields: [scannedByMembershipId], references: [id])
+  editedBy  Membership? @relation("TimeEntryEditor", fields: [editedByMembershipId], references: [id])
+
+  @@index([centerId, staffMembershipId, workDate])
+  @@map("staff_time_entries")
 }

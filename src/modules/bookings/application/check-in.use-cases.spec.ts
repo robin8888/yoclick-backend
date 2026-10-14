@@ -2,6 +2,7 @@ import { type AccessTokenService } from '../../../shared/auth/access-token.servi
 import { DomainError } from '../../../shared/errors/domain-error';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
 import { CheckInClientUseCase, IssueCheckInCodeUseCase } from './check-in.use-cases';
+import { type RecordTeamClockScanUseCase } from '../../time-clock/application/time-entry.use-cases';
 import { type CheckInOutcome, type CheckInRepository } from './ports/check-in.repository';
 
 const NOW = new Date('2026-10-05T10:00:00Z');
@@ -46,6 +47,14 @@ function buildRepository(outcome: CheckInOutcome): RepositoryDouble {
   return { repository: { checkInClient }, checkInClient };
 }
 
+function buildTeamClock(outcome: unknown = { kind: 'not_team_member' }): {
+  teamClock: RecordTeamClockScanUseCase;
+  execute: jest.Mock;
+} {
+  const execute = jest.fn().mockResolvedValue(outcome);
+  return { teamClock: { execute } as unknown as RecordTeamClockScanUseCase, execute };
+}
+
 async function errorOf(work: Promise<unknown>): Promise<DomainError> {
   try {
     await work;
@@ -81,7 +90,7 @@ describe('CheckInClientUseCase', () => {
   it('rejects content that is not a check-in QR without verifying anything', async () => {
     const { tokens, verifyCheckinToken } = buildTokens();
     const { repository } = buildRepository({ kind: 'no_booking' });
-    const useCase = new CheckInClientUseCase(tokens, repository);
+    const useCase = new CheckInClientUseCase(tokens, repository, buildTeamClock().teamClock);
 
     const error = await errorOf(useCase.execute({ ...request, qrContent: 'https://x.es' }));
 
@@ -96,7 +105,9 @@ describe('CheckInClientUseCase', () => {
     });
     const { repository, checkInClient } = buildRepository({ kind: 'no_booking' });
 
-    const error = await errorOf(new CheckInClientUseCase(tokens, repository).execute(request));
+    const error = await errorOf(
+      new CheckInClientUseCase(tokens, repository, buildTeamClock().teamClock).execute(request),
+    );
 
     expect(error.code).toBe('CHECKIN_CODE_INVALID');
     expect(checkInClient).not.toHaveBeenCalled();
@@ -109,6 +120,7 @@ describe('CheckInClientUseCase', () => {
     const useCase = new CheckInClientUseCase(
       buildTokens().tokens,
       buildRepository({ kind }).repository,
+      buildTeamClock().teamClock,
     );
 
     expect((await errorOf(useCase.execute(request))).code).toBe(expectedCode);
@@ -124,8 +136,24 @@ describe('CheckInClientUseCase', () => {
     const useCase = new CheckInClientUseCase(
       buildTokens().tokens,
       buildRepository(outcome).repository,
+      buildTeamClock().teamClock,
     );
 
     await expect(useCase.execute(request)).resolves.toBe(outcome);
+  });
+
+  it('clocks a team member in or out instead of looking for a booking', async () => {
+    const scan = { action: 'clock_in', staffMembershipId: CLIENT_MEMBERSHIP_ID };
+    const { teamClock, execute } = buildTeamClock({ kind: 'recorded', scan });
+    const { repository, checkInClient } = buildRepository({ kind: 'no_booking' });
+    const useCase = new CheckInClientUseCase(buildTokens().tokens, repository, teamClock);
+
+    await expect(useCase.execute(request)).resolves.toEqual({ kind: 'team_clocked', scan });
+
+    expect(execute).toHaveBeenCalledWith(STAFF, {
+      scannedMembershipId: CLIENT_MEMBERSHIP_ID,
+      now: NOW,
+    });
+    expect(checkInClient).not.toHaveBeenCalled();
   });
 });
