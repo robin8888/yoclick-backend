@@ -284,6 +284,51 @@ describe('attendance check-in by QR', () => {
     });
   });
 
+  describe('one class takes one session off the pass, however many times the QR is scanned', () => {
+    async function readRemainingSessions(): Promise<number> {
+      const passes = await world.tenantPrismaService.runInTenantContext(ownerActor(), (prisma) =>
+        prisma.clientPass.findMany({ where: { clientMembershipId: ana.membershipId } }),
+      );
+      return passes[0]?.remainingSessions ?? -1;
+    }
+
+    it('does not take another session when the teacher already confirmed with the checkbox', async () => {
+      await insertRateAndPass({ remainingSessions: 4 });
+      const bookingId = await insertBooking(5);
+      const confirmation = await world.call(
+        'POST',
+        `/v1/centers/${centerId}/bookings/${bookingId}/attendance`,
+        staff.userId,
+        { centerId },
+      );
+      expect(confirmation.statusCode).toBe(200);
+      expect(await readRemainingSessions()).toBe(3);
+      const qrContent = await issueCodeAsAna();
+
+      const scans = [];
+      for (let attempt = 0; attempt < 6; attempt += 1) {
+        scans.push((await scanAs(staff, qrContent)).json<CheckInBody>());
+      }
+
+      expect(scans.every((scan) => !scan.isFirstCheckIn)).toBe(true);
+      expect(scans.every((scan) => scan.booking?.id === bookingId)).toBe(true);
+      expect(scans.every((scan) => scan.access.isGranted)).toBe(true);
+      expect(await readRemainingSessions()).toBe(3);
+    });
+
+    it('takes a single session when the QR is scanned several times for the same class', async () => {
+      await insertRateAndPass({ remainingSessions: 4 });
+      await insertBooking(5);
+      const qrContent = await issueCodeAsAna();
+
+      for (let attempt = 0; attempt < 6; attempt += 1) {
+        await scanAs(staff, qrContent);
+      }
+
+      expect(await readRemainingSessions()).toBe(3);
+    });
+  });
+
   it('lets a team member in and clocks them with the person block', async () => {
     const issued = await world.call('POST', issueUrl(), otherStaff.userId, { centerId });
     const response = await scanAs(staff, issued.json<CheckInCodeBody>().qrContent);
