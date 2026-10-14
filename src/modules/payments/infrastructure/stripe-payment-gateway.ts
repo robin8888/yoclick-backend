@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { z } from 'zod';
 import {
   type ConnectedAccountState,
@@ -9,7 +10,10 @@ import {
 } from '../application/ports/payment-gateway';
 import { isValidStripeSignature } from './stripe-signature';
 
-const STRIPE_API_BASE_URL = 'https://api.stripe.com/v1';
+const STRIPE_API_ORIGIN = 'https://api.stripe.com';
+/** Versión de la API con la que se habla a Accounts v2 (cuentas conectadas y sus enlaces). */
+const STRIPE_V2_API_VERSION = '2026-09-30.endive';
+const V1_ACCOUNT_IN_V2_ERROR_CODE = 'v1_account_instead_of_v2_account';
 const REQUEST_TIMEOUT_MS = 15_000;
 const PAYMENT_CURRENCY = 'eur';
 
@@ -29,6 +33,7 @@ const accountSchema = z.object({
 });
 
 const accountLinkSchema = z.object({ url: z.url() });
+const createdAccountSchema = z.object({ id: z.string() });
 
 const paymentIntentSchema = z.object({
   id: z.string(),
@@ -62,6 +67,34 @@ function prefixKeys(
   );
 }
 
+const stripeErrorSchema = z.object({
+  error: z.object({ code: z.string().optional(), message: z.string().optional() }),
+});
+
+/** Fallo devuelto por Stripe; `stripeCode` permite reaccionar sin comparar textos. */
+class StripeApiError extends Error {
+  constructor(
+    message: string,
+    readonly stripeCode: string | null,
+  ) {
+    super(message);
+    this.name = 'StripeApiError';
+  }
+}
+
+interface StripeFailure {
+  readonly code: string | null;
+  readonly message: string;
+}
+
+/** Motivo que da Stripe (sin cuerpo de petición ni claves) para poder diagnosticar el fallo. */
+async function readStripeFailure(response: Response): Promise<StripeFailure> {
+  const parsed = stripeErrorSchema.safeParse(await response.json().catch(() => null));
+  if (!parsed.success) return { code: null, message: 'unknown reason' };
+  const { code, message } = parsed.data.error;
+  return { code: code ?? null, message: message ?? 'no message' };
+}
+
 interface StripeRequest<TSchema extends z.ZodType> {
   method: 'GET' | 'POST';
   path: string;
@@ -70,8 +103,17 @@ interface StripeRequest<TSchema extends z.ZodType> {
   idempotencyKey?: string;
 }
 
+interface StripeJsonRequest<TSchema extends z.ZodType> {
+  method: 'POST';
+  path: string;
+  schema: TSchema;
+  body: Readonly<Record<string, unknown>>;
+}
+
 /** Stripe Connect sobre su API HTTP: sin SDK, solo las cuatro llamadas que se necesitan. */
 export class StripePaymentGateway implements PaymentGateway {
+  private readonly logger = new Logger(StripePaymentGateway.name);
+
   constructor(private readonly config: StripeGatewayConfig) {}
 
   get publishableKey(): string {
@@ -83,24 +125,62 @@ export class StripePaymentGateway implements PaymentGateway {
     businessName: string;
     contactEmail: string | null;
   }): Promise<{ accountId: string }> {
-    const account = await this.send({
+    const account = await this.sendJson({
       method: 'POST',
-      path: '/accounts',
-      schema: accountSchema,
-      fields: {
-        type: 'express',
-        country: 'ES',
-        'capabilities[card_payments][requested]': 'true',
-        'capabilities[transfers][requested]': 'true',
-        'business_profile[name]': input.businessName,
-        ...(input.contactEmail === null ? {} : { email: input.contactEmail }),
-        ...prefixKeys('metadata', { centerId: input.centerId }),
+      path: '/core/accounts',
+      schema: createdAccountSchema,
+      body: {
+        display_name: input.businessName,
+        ...(input.contactEmail === null ? {} : { contact_email: input.contactEmail }),
+        identity: { country: 'ES' },
+        dashboard: 'express',
+        defaults: {
+          responsibilities: { fees_collector: 'application', losses_collector: 'application' },
+        },
+        configuration: {
+          merchant: { capabilities: { card_payments: { requested: true } } },
+          recipient: {
+            capabilities: { stripe_balance: { stripe_transfers: { requested: true } } },
+          },
+        },
+        metadata: { centerId: input.centerId },
       },
     });
     return { accountId: account.id };
   }
 
   async createOnboardingLink(accountId: string): Promise<{ url: string }> {
+    try {
+      return await this.createOnboardingLinkV2(accountId);
+    } catch (error) {
+      // Las cuentas creadas antes de Accounts v2 solo admiten el enlace v1.
+      const isLegacyAccount =
+        error instanceof StripeApiError && error.stripeCode === V1_ACCOUNT_IN_V2_ERROR_CODE;
+      if (!isLegacyAccount) throw error;
+      return this.createOnboardingLinkV1(accountId);
+    }
+  }
+
+  private async createOnboardingLinkV2(accountId: string): Promise<{ url: string }> {
+    const link = await this.sendJson({
+      method: 'POST',
+      path: '/core/account_links',
+      schema: accountLinkSchema,
+      body: {
+        account: accountId,
+        use_case: {
+          type: 'account_onboarding',
+          account_onboarding: {
+            return_url: this.config.returnUrl,
+            refresh_url: this.config.refreshUrl,
+          },
+        },
+      },
+    });
+    return { url: link.url };
+  }
+
+  private async createOnboardingLinkV1(accountId: string): Promise<{ url: string }> {
     const link = await this.send({
       method: 'POST',
       path: '/account_links',
@@ -188,19 +268,57 @@ export class StripePaymentGateway implements PaymentGateway {
     request: StripeRequest<TSchema>,
   ): Promise<z.infer<TSchema>> {
     const { method, path, fields, idempotencyKey } = request;
-    const response = await fetch(`${STRIPE_API_BASE_URL}${path}`, {
+    return this.call({
       method,
+      url: `${STRIPE_API_ORIGIN}/v1${path}`,
+      schema: request.schema,
       headers: {
-        authorization: `Bearer ${this.config.secretKey}`,
         ...(fields === undefined ? {} : { 'content-type': 'application/x-www-form-urlencoded' }),
         ...(idempotencyKey === undefined ? {} : { 'idempotency-key': idempotencyKey }),
       },
       ...(fields === undefined ? {} : { body: encodeForm(fields) }),
+    });
+  }
+
+  /** Accounts v2: cuerpo JSON y versión de API explícita. */
+  private async sendJson<TSchema extends z.ZodType>(
+    request: StripeJsonRequest<TSchema>,
+  ): Promise<z.infer<TSchema>> {
+    return this.call({
+      method: request.method,
+      url: `${STRIPE_API_ORIGIN}/v2${request.path}`,
+      schema: request.schema,
+      headers: { 'content-type': 'application/json', 'stripe-version': STRIPE_V2_API_VERSION },
+      body: JSON.stringify(request.body),
+    });
+  }
+
+  private async call<TSchema extends z.ZodType>(input: {
+    method: 'GET' | 'POST';
+    url: string;
+    schema: TSchema;
+    headers: Readonly<Record<string, string>>;
+    body?: URLSearchParams | string;
+  }): Promise<z.infer<TSchema>> {
+    const response = await fetch(input.url, {
+      method: input.method,
+      headers: { authorization: `Bearer ${this.config.secretKey}`, ...input.headers },
+      ...(input.body === undefined ? {} : { body: input.body }),
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
-    if (!response.ok) {
-      throw new Error(`Stripe ${method} ${path} failed with status ${String(response.status)}`);
-    }
-    return request.schema.parse(await response.json());
+    if (!response.ok) throw await this.toApiError(input, response);
+    return input.schema.parse(await response.json());
+  }
+
+  private async toApiError(
+    input: { method: string; url: string },
+    response: Response,
+  ): Promise<StripeApiError> {
+    const failure = await readStripeFailure(response);
+    const path = new URL(input.url).pathname;
+    const summary = `Stripe ${input.method} ${path} failed with status ${String(response.status)}`;
+    const message = `${summary}: ${failure.code ?? 'no_code'} - ${failure.message}`;
+    this.logger.error(message);
+    return new StripeApiError(message, failure.code);
   }
 }
