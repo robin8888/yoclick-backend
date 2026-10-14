@@ -219,6 +219,12 @@ const blockShape = {
   reason: z.enum(['rental', 'maintenance', 'event', 'other']),
   note: z.string().nullable(),
   createdBy: personShape,
+  /** Quien alquila la sala; nulo en un bloqueo sin más. */
+  renter: personShape.nullable(),
+  /** Lo que debe pagar quien alquila, en céntimos. */
+  priceCents: z.number().int().nullable(),
+  /** Hay un cobro online confirmado. */
+  isPaid: z.boolean(),
 };
 
 export class RoomBlockResponseDto extends createZodDto(
@@ -233,6 +239,23 @@ export class RoomBlockListResponseDto extends createZodDto(
   z.strictObject({ blocks: z.array(z.strictObject(blockShape)) }),
 ) {}
 
+const MAX_RENTAL_PRICE_CENTS = 1_000_000;
+
+export class MyRentalsResponseDto extends createZodDto(
+  z.strictObject({
+    rentals: z.array(
+      z.strictObject({
+        id: z.uuid(),
+        roomName: z.string(),
+        startsAt: z.iso.datetime(),
+        endsAt: z.iso.datetime(),
+        priceCents: z.number().int().nullable(),
+        isPaid: z.boolean(),
+      }),
+    ),
+  }),
+) {}
+
 export class CreateRoomBlockRequestDto extends createZodDto(
   z
     .strictObject({
@@ -241,7 +264,18 @@ export class CreateRoomBlockRequestDto extends createZodDto(
       endsAt: z.iso.datetime(),
       reason: z.enum(['rental', 'maintenance', 'event', 'other']),
       note: z.string().trim().min(1).max(MAX_BLOCK_NOTE_LENGTH).optional(),
+      /** Alquiler a una persona registrada (solo con motivo `rental`). */
+      renterMembershipId: z.uuid().optional(),
+      /** Precio del alquiler en céntimos; exige `renterMembershipId`. */
+      priceCents: z.number().int().min(1).max(MAX_RENTAL_PRICE_CENTS).optional(),
     })
+    .refine(
+      (body) => {
+        const isRental = body.renterMembershipId !== undefined || body.priceCents !== undefined;
+        return !isRental || (body.reason === 'rental' && body.renterMembershipId !== undefined);
+      },
+      { error: 'a rental price or renter needs the rental reason and a renter' },
+    )
     .refine((body) => {
       const lengthMilliseconds = Date.parse(body.endsAt) - Date.parse(body.startsAt);
       return (

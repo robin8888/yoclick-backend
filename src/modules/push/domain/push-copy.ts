@@ -37,6 +37,8 @@ const COPY_BY_KIND: Readonly<Record<string, PushCopy>> = {
   schedule_unenrolled: { title: 'Cambio en tu horario fijo', body: OPEN_APP_BODY },
   pass_requested: { title: 'Nueva solicitud de bono', body: OPEN_APP_BODY },
   pass_activated: { title: 'Tu bono está activo', body: OPEN_APP_BODY },
+  room_rental_assigned: { title: 'Tienes un alquiler de sala', body: OPEN_APP_BODY },
+  payment_received: { title: 'Has recibido un pago', body: OPEN_APP_BODY },
 };
 
 const FALLBACK_COPY: PushCopy = { title: 'Tienes un aviso nuevo', body: OPEN_APP_BODY };

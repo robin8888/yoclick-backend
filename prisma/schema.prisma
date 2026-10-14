@@ -171,6 +171,8 @@ enum NotificationKind {
   schedule_unenrolled
   pass_requested
   pass_activated
+  room_rental_assigned
+  payment_received
 
   @@map("notification_kind")
 }
@@ -327,6 +329,10 @@ model Center {
   documentStorageLimitBytes BigInt       @default(1073741824) @map("document_storage_limit_bytes")
   /// Espacio de fotos de la galería del equipo (100 MiB por defecto). Las fotos de perfil no cuentan: hay una por persona. Solo lo cambia Yoclick.
   photoStorageLimitBytes    BigInt       @default(104857600) @map("photo_storage_limit_bytes")
+  /// Cuenta Express de Stripe Connect del centro (acct_...). Nulo = aún no ha empezado el alta de cobros.
+  stripeAccountId           String?      @unique @map("stripe_account_id")
+  /// Stripe confirma que la cuenta ya puede cobrar (KYC completo). Solo lo fija la lectura de la cuenta en Stripe.
+  stripeChargesEnabled      Boolean      @default(false) @map("stripe_charges_enabled")
   /// Premium: fondo de las pantallas del centro. Solo este es liso; con `backgroundColorEnd` es un degradado de dos colores. Nulo = el del tema.
   backgroundColor           String?      @map("background_color") @db.Char(7)
   backgroundColorEnd        String?      @map("background_color_end") @db.Char(7)
@@ -356,6 +362,7 @@ model Center {
   rooms               Room[]
   rates               Rate[]
   clientPasses        ClientPass[]
+  payments            Payment[]
   staffTimeEntries    StaffTimeEntry[]
   balanceMovements    BalanceMovement[]
   staffAvailabilities StaffAvailability[]
@@ -431,6 +438,8 @@ model Membership {
   instructedGroups        ClientGroup[]        @relation("GroupInstructor")
   notifications           Notification[]       @relation("NotificationRecipient")
   clientPasses            ClientPass[]         @relation("ClientPasses")
+  payments                Payment[]            @relation("ClientPayments")
+  rentedRoomBlocks        RoomBlock[]          @relation("RoomBlockRenter")
   decidedPasses           ClientPass[]         @relation("PassDecidedBy")
   timeEntries             StaffTimeEntry[]     @relation("TimeEntryStaff")
   scannedTimeEntries      StaffTimeEntry[]     @relation("TimeEntryScanner")
@@ -981,12 +990,17 @@ model RoomBlock {
   endsAt                DateTime        @map("ends_at") @db.Timestamptz
   reason                RoomBlockReason
   note                  String?
+  /// Alquiler a una persona registrada: quien alquila y cuánto debe pagar (nulos si es un bloqueo sin más).
+  renterMembershipId    String?         @map("renter_membership_id") @db.Uuid
+  priceCents            Int?            @map("price_cents")
   createdByMembershipId String          @map("created_by_membership_id") @db.Uuid
   createdAt             DateTime        @default(now()) @map("created_at") @db.Timestamptz
 
-  center    Center     @relation(fields: [centerId], references: [id])
-  room      Room       @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  createdBy Membership @relation("RoomBlockCreator", fields: [createdByMembershipId], references: [id])
+  center    Center      @relation(fields: [centerId], references: [id])
+  room      Room        @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  createdBy Membership  @relation("RoomBlockCreator", fields: [createdByMembershipId], references: [id])
+  renter    Membership? @relation("RoomBlockRenter", fields: [renterMembershipId], references: [id])
+  payments  Payment[]
 
   @@index([centerId, startsAt])
   @@index([roomId, startsAt])
@@ -1312,6 +1326,7 @@ model ClientPass {
   rate             Rate              @relation(fields: [rateId], references: [id])
   decidedBy        Membership?       @relation("PassDecidedBy", fields: [decidedByMembershipId], references: [id])
   movements        BalanceMovement[]
+  payments         Payment[]
 
   @@index([centerId, clientMembershipId, status])
   @@index([centerId, status])
@@ -1376,4 +1391,45 @@ model StaffTimeEntry {
 
   @@index([centerId, staffMembershipId, workDate])
   @@map("staff_time_entries")
+}
+
+enum PaymentKind {
+  pass
+  room_rental
+
+  @@map("payment_kind")
+}
+
+enum PaymentStatus {
+  pending
+  succeeded
+  failed
+
+  @@map("payment_status")
+}
+
+/// Un cobro online de una persona al centro (Stripe Connect). La verdad la marca Stripe, no la app.
+model Payment {
+  id                    String        @id @db.Uuid
+  centerId              String        @map("center_id") @db.Uuid
+  clientMembershipId    String        @map("client_membership_id") @db.Uuid
+  kind                  PaymentKind
+  clientPassId          String?       @map("client_pass_id") @db.Uuid
+  roomBlockId           String?       @map("room_block_id") @db.Uuid
+  amountCents           Int           @map("amount_cents")
+  currency              String        @default("eur")
+  status                PaymentStatus @default(pending)
+  stripePaymentIntentId String        @unique @map("stripe_payment_intent_id")
+  paidAt                DateTime?     @map("paid_at") @db.Timestamptz
+  createdAt             DateTime      @default(now()) @map("created_at") @db.Timestamptz
+
+  center           Center      @relation(fields: [centerId], references: [id])
+  clientMembership Membership  @relation("ClientPayments", fields: [clientMembershipId], references: [id])
+  clientPass       ClientPass? @relation(fields: [clientPassId], references: [id])
+  roomBlock        RoomBlock?  @relation(fields: [roomBlockId], references: [id], onDelete: SetNull)
+
+  @@index([centerId, status])
+  @@index([clientPassId])
+  @@index([roomBlockId])
+  @@map("payments")
 }

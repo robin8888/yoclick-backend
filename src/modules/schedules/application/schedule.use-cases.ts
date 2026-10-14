@@ -9,6 +9,7 @@ import {
   type EnrollOutcome,
   type NewEnrollments,
   type NewRoomBlock,
+  type RentalView,
   type NewScheduleSeries,
   type RepeatWeekOutcome,
   type RoomBlockCreationOutcome,
@@ -195,6 +196,11 @@ export class CreateRoomBlockUseCase {
     const outcome = await this.schedules.createBlock(actor, newBlock);
     if (outcome.kind === 'created') return outcome;
     if (outcome.kind === 'room_not_found') throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
+    if (outcome.kind === 'renter_not_found') {
+      throw new DomainError('VALIDATION_FAILED', HTTP_STATUS.badRequest, [
+        { path: 'renterMembershipId', code: 'not_found' },
+      ]);
+    }
     if (outcome.kind === 'has_bookings') {
       throw new DomainError('ROOM_HAS_BOOKINGS', HTTP_STATUS.conflict);
     }
@@ -202,6 +208,16 @@ export class CreateRoomBlockUseCase {
     throw new DomainError('CONFLICT', HTTP_STATUS.conflict, [
       { path: 'startsAt', code: conflictCode },
     ]);
+  }
+}
+
+/** Los alquileres de sala de quien pregunta, con su precio y si ya están pagados. */
+@Injectable()
+export class ListMyRentalsUseCase {
+  constructor(@Inject(SCHEDULE_REPOSITORY) private readonly schedules: ScheduleRepository) {}
+
+  async execute(actor: ActorContext): Promise<RentalView[]> {
+    return this.schedules.listRentalsOf(actor);
   }
 }
 

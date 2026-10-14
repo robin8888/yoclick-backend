@@ -115,6 +115,8 @@ export function toEnrollmentView(enrollment: StoredEnrollment): EnrollmentView {
 
 export const BLOCK_VIEW_INCLUDE = {
   createdBy: { select: { id: true, user: { select: { fullName: true } } } },
+  renter: { select: { id: true, user: { select: { fullName: true } } } },
+  payments: { where: { status: 'succeeded' }, select: { id: true }, take: 1 },
 } satisfies Prisma.RoomBlockInclude;
 
 type StoredBlock = Prisma.RoomBlockGetPayload<{ include: typeof BLOCK_VIEW_INCLUDE }>;
@@ -128,5 +130,11 @@ export function toRoomBlockView(block: StoredBlock): RoomBlockView {
     reason: block.reason,
     note: block.note,
     createdBy: { membershipId: block.createdBy.id, fullName: block.createdBy.user.fullName },
+    renter:
+      block.renter === null
+        ? null
+        : { membershipId: block.renter.id, fullName: block.renter.user.fullName },
+    priceCents: block.priceCents,
+    isPaid: block.payments.length > 0,
   };
 }

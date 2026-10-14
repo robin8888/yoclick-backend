@@ -89,6 +89,10 @@ export const ERROR_CATALOG = {
   ROOM_HAS_BOOKINGS: {
     title: 'Hay clases o citas en ese tramo. Cancélalas o muévelas antes de bloquear la sala',
   },
+  PAYMENTS_NOT_INCLUDED: { title: 'El plan de este centro no incluye cobros online' },
+  PAYMENTS_NOT_READY: {
+    title: 'Este centro aún no puede cobrar online. Pídele que complete el alta de cobros',
+  },
   BOOKING_NOT_CANCELLABLE: { title: 'Esta reserva ya no se puede cancelar' },
   BOOKING_NOT_RESCHEDULABLE: { title: 'Esta reserva ya no se puede cambiar de hora' },
   RESCHEDULE_TOO_LATE: {

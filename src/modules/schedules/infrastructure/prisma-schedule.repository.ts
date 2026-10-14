@@ -11,6 +11,7 @@ import {
   type NewScheduleSeries,
   type RepeatWeekOutcome,
   type RoomBlockCreationOutcome,
+  type RentalView,
   type RoomBlockView,
   type ScheduleRepository,
   type ScheduleSeriesCreationOutcome,
@@ -168,6 +169,27 @@ export class PrismaScheduleRepository implements ScheduleRepository {
     return this.tenantPrismaService.runInTenantContext(actor, (client) =>
       createBlockInTransaction(client, actor, newBlock),
     );
+  }
+
+  async listRentalsOf(actor: ActorContext): Promise<RentalView[]> {
+    return this.tenantPrismaService.runInTenantContext(actor, async (client) => {
+      const rentals = await client.roomBlock.findMany({
+        where: { renterMembershipId: actor.membershipId },
+        include: {
+          room: { select: { name: true } },
+          payments: { where: { status: 'succeeded' }, select: { id: true }, take: 1 },
+        },
+        orderBy: [{ startsAt: 'asc' }, { id: 'asc' }],
+      });
+      return rentals.map((rental) => ({
+        id: rental.id,
+        roomName: rental.room.name,
+        startsAt: rental.startsAt,
+        endsAt: rental.endsAt,
+        priceCents: rental.priceCents,
+        isPaid: rental.payments.length > 0,
+      }));
+    });
   }
 
   async deleteBlock(

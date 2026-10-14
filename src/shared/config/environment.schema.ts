@@ -21,6 +21,12 @@ function parseDatabaseUrl(connectionString: string): URL | null {
   }
 }
 
+/** Una variable en blanco del .env (`CLAVE=`) cuenta como no puesta. */
+const optionalSetting = z.preprocess(
+  (value) => (value === '' ? undefined : value),
+  z.string().min(1).optional(),
+);
+
 const baseEnvironmentSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   // En contenedor hay que poner 0.0.0.0 de forma explícita; por defecto no se expone a la red.
@@ -83,6 +89,17 @@ const baseEnvironmentSchema = z.object({
   // `enabled` firma los enlaces de descarga (hay que activar Token Authentication en el pull zone y usar su
   // clave); `disabled` los deja sin firmar, que es lo único que acepta un CDN sin esa protección.
   BUNNY_STORAGE_TOKEN_AUTH: z.enum(['enabled', 'disabled']).default('disabled'),
+  // Cobros de bonos y alquileres (plan Premium): `stripe` usa Stripe Connect; `fake` no llama a nadie.
+  PAYMENT_PROVIDER: z.enum(['fake', 'stripe']).default('fake'),
+  // Solo hacen falta con PAYMENT_PROVIDER=stripe (se exigen en ese caso, ver más abajo).
+  STRIPE_SECRET_KEY: optionalSetting,
+  // Sin él los avisos de Stripe se rechazan y los cobros se confirman solo desde la app.
+  STRIPE_WEBHOOK_SECRET: optionalSetting,
+  // Clave pública: la app la recibe de la API al pagar, así que no vive en su configuración.
+  STRIPE_PUBLISHABLE_KEY: optionalSetting,
+  // A dónde vuelve el navegador tras el alta de cobros del centro en Stripe (Stripe pide https).
+  STRIPE_CONNECT_RETURN_URL: z.url().default('https://yoclick.app/stripe/return'),
+  STRIPE_CONNECT_REFRESH_URL: z.url().default('https://yoclick.app/stripe/refresh'),
   EMAIL_PROVIDER: z.enum(['console', 'brevo']).default('console'),
   // Solo hacen falta con EMAIL_PROVIDER=brevo (se exigen en ese caso, ver más abajo).
   BREVO_API_KEY: z.string().min(1).optional(),
@@ -228,10 +245,27 @@ function listFileStorageRequirements(environment: ParsedEnvironment): Production
   return requirements;
 }
 
+const STRIPE_SETTINGS = [
+  'STRIPE_SECRET_KEY',
+  'STRIPE_WEBHOOK_SECRET',
+  'STRIPE_PUBLISHABLE_KEY',
+] as const;
+
+/** Con Stripe hacen falta sus dos claves; con `fake` no. */
+function listPaymentProviderRequirements(environment: ParsedEnvironment): ProductionRequirement[] {
+  if (environment.PAYMENT_PROVIDER !== 'stripe') return [];
+  return STRIPE_SETTINGS.map((path) => ({
+    isMet: environment[path] !== undefined,
+    path,
+    message: 'is required when PAYMENT_PROVIDER=stripe',
+  }));
+}
+
 export const environmentSchema = baseEnvironmentSchema.superRefine((environment, context) => {
   const isProduction = environment.NODE_ENV === 'production';
   const requirements = [
     ...listEmailProviderRequirements(environment),
+    ...listPaymentProviderRequirements(environment),
     ...listVideoProviderRequirements(environment),
     ...listFileStorageRequirements(environment),
     ...(isProduction ? listProductionRequirements(environment) : []),

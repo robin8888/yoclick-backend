@@ -5,6 +5,7 @@ import {
   CreateRoomBlockUseCase,
   CreateScheduleSeriesUseCase,
   DeleteRoomBlockUseCase,
+  ListMyRentalsUseCase,
   EndScheduleSeriesUseCase,
   EnrollClientsUseCase,
   ListEnrollmentsUseCase,
@@ -43,6 +44,7 @@ import { PrismaScheduleRepository } from './infrastructure/prisma-schedule.repos
     ListRoomBlocksUseCase,
     CreateRoomBlockUseCase,
     DeleteRoomBlockUseCase,
+    ListMyRentalsUseCase,
     { provide: SCHEDULE_REPOSITORY, useClass: PrismaScheduleRepository },
   ],
 })

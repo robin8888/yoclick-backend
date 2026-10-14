@@ -30,12 +30,14 @@ import { type RoomBlockView } from '../application/ports/schedule.repository';
 import {
   CreateRoomBlockUseCase,
   DeleteRoomBlockUseCase,
+  ListMyRentalsUseCase,
   ListRoomBlocksUseCase,
 } from '../application/schedule.use-cases';
 import {
   BlockRouteParamsDto,
   CenterRouteParamsDto,
   CreateRoomBlockRequestDto,
+  MyRentalsResponseDto,
   RoomBlockListResponseDto,
   RoomBlockResponseDto,
   RoomBlocksQueryDto,
@@ -73,8 +75,32 @@ export class RoomBlocksController {
     private readonly listBlocks: ListRoomBlocksUseCase,
     private readonly createBlock: CreateRoomBlockUseCase,
     private readonly deleteBlock: DeleteRoomBlockUseCase,
+    private readonly listMyRentals: ListMyRentalsUseCase,
     private readonly activity: ActivityRecorder,
   ) {}
+
+  @Get('room-rentals/mine')
+  @Roles('client')
+  @ApiOperation({
+    operationId: 'room_rentals_mine',
+    summary:
+      'Los alquileres de sala hechos a nombre de la propia persona, con precio y estado de pago.',
+  })
+  @ApiOkResponse({ type: MyRentalsResponseDto })
+  async mine(
+    @CurrentActor() actor: ActorContext,
+    @Param() params: CenterRouteParamsDto,
+  ): Promise<Record<string, unknown>> {
+    assertRouteTargetsActorCenter(actor, params.centerId);
+    const rentals = await this.listMyRentals.execute(actor);
+    return {
+      rentals: rentals.map((rental) => ({
+        ...rental,
+        startsAt: rental.startsAt.toISOString(),
+        endsAt: rental.endsAt.toISOString(),
+      })),
+    };
+  }
 
   @Get('room-blocks')
   @Roles('owner', 'admin', 'staff')
@@ -133,6 +159,8 @@ export class RoomBlocksController {
       endsAt: new Date(body.endsAt),
       reason: body.reason,
       note: body.note ?? null,
+      renterMembershipId: body.renterMembershipId ?? null,
+      priceCents: body.priceCents ?? null,
     });
     await this.activity.record(actor, { kind: 'room_blocked', subject: body.reason });
     return {

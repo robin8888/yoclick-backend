@@ -46,13 +46,38 @@ async function tryInsertBlock(
 ): Promise<string | null> {
   const blockId = generateUuidV7();
   const inserted = await client.$queryRaw<{ id: string }[]>`
-    insert into room_blocks (id, center_id, room_id, starts_at, ends_at, reason, note, created_by_membership_id)
+    insert into room_blocks (id, center_id, room_id, starts_at, ends_at, reason, note,
+                             renter_membership_id, price_cents, created_by_membership_id)
     values (${blockId}::uuid, ${actor.centerId}::uuid, ${newBlock.roomId}::uuid,
             ${newBlock.startsAt}::timestamptz, ${newBlock.endsAt}::timestamptz,
-            ${newBlock.reason}::room_block_reason, ${newBlock.note}, ${actor.membershipId}::uuid)
+            ${newBlock.reason}::room_block_reason, ${newBlock.note},
+            ${newBlock.renterMembershipId}::uuid, ${newBlock.priceCents}::integer,
+            ${actor.membershipId}::uuid)
     on conflict do nothing
     returning id`;
   return inserted.length === 1 ? blockId : null;
+}
+
+/** La persona que alquila ve en su app el alquiler y, si lo tiene, su precio. */
+async function notifyRenter(
+  client: TenantTransactionClient,
+  input: { actor: ActorContext; newBlock: NewRoomBlock; roomName: string },
+): Promise<void> {
+  const { newBlock } = input;
+  if (newBlock.renterMembershipId === null) return;
+  await client.notification.create({
+    data: {
+      id: generateUuidV7(),
+      centerId: input.actor.centerId,
+      recipientMembershipId: newBlock.renterMembershipId,
+      kind: 'room_rental_assigned',
+      data: {
+        roomName: input.roomName,
+        startsAt: newBlock.startsAt.toISOString(),
+        ...(newBlock.priceCents === null ? {} : { priceCents: String(newBlock.priceCents) }),
+      },
+    },
+  });
 }
 
 /**
@@ -66,10 +91,17 @@ export async function createBlockInTransaction(
 ): Promise<RoomBlockCreationOutcome> {
   const room = await client.room.findFirst({
     where: { id: newBlock.roomId, archivedAt: null },
-    select: { id: true },
+    select: { id: true, name: true },
   });
   if (!room) return { kind: 'room_not_found' };
   if (newBlock.startsAt < new Date()) return { kind: 'in_the_past' };
+  if (newBlock.renterMembershipId !== null) {
+    const renter = await client.membership.findFirst({
+      where: { id: newBlock.renterMembershipId, role: 'client' },
+      select: { id: true },
+    });
+    if (!renter) return { kind: 'renter_not_found' };
+  }
   await lockRoom(client, newBlock.roomId);
 
   // Una sala solo se separa en un tramo libre: una clase ya asignada hay que cancelarla o moverla antes.
@@ -81,6 +113,9 @@ export async function createBlockInTransaction(
     where: { id: blockId },
     include: BLOCK_VIEW_INCLUDE,
   });
+  if (newBlock.renterMembershipId !== null) {
+    await notifyRenter(client, { actor, newBlock, roomName: room.name });
+  }
   return { kind: 'created', block: toRoomBlockView(block), cancelledSessionCount: 0 };
 }
 

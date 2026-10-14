@@ -1,10 +1,13 @@
 import helmet from '@fastify/helmet';
 import { type NestFastifyApplication } from '@nestjs/platform-fastify';
+import { captureRawBodyOf } from './http/capture-raw-body';
 
 const HSTS_MAX_AGE_SECONDS = 15_552_000;
 const API_VERSION_PREFIX = 'v1';
 /** Rutas de operación (no son API de negocio): sin versión para que balanceadores y monitores las encuentren. */
 const UNVERSIONED_ROUTES = ['health'];
+/** Rutas cuya firma se verifica sobre los bytes recibidos (avisos de Stripe). */
+const RAW_BODY_ROUTES = [`/${API_VERSION_PREFIX}/webhooks/stripe`];
 
 /**
  * Configuración HTTP común a producción, a los tests e2e y a la generación del contrato, para que
@@ -16,6 +19,7 @@ export async function configureApplication(application: NestFastifyApplication):
     hsts: { maxAge: HSTS_MAX_AGE_SECONDS, includeSubDomains: true },
     contentSecurityPolicy: false,
   });
+  captureRawBodyOf(application.getHttpAdapter().getInstance(), RAW_BODY_ROUTES);
   // Ninguna respuesta de esta API debe quedar en una caché compartida ni en el disco del dispositivo:
   // llevan tokens y datos personales.
   application
