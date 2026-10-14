@@ -89,7 +89,7 @@ describe('CheckInClientUseCase', () => {
 
   it('rejects content that is not a check-in QR without verifying anything', async () => {
     const { tokens, verifyCheckinToken } = buildTokens();
-    const { repository } = buildRepository({ kind: 'no_booking' });
+    const { repository } = buildRepository({ kind: 'invalid_client' });
     const useCase = new CheckInClientUseCase(tokens, repository, buildTeamClock().teamClock);
 
     const error = await errorOf(useCase.execute({ ...request, qrContent: 'https://x.es' }));
@@ -103,7 +103,7 @@ describe('CheckInClientUseCase', () => {
       membershipId: CLIENT_MEMBERSHIP_ID,
       centerId: 'other-center',
     });
-    const { repository, checkInClient } = buildRepository({ kind: 'no_booking' });
+    const { repository, checkInClient } = buildRepository({ kind: 'invalid_client' });
 
     const error = await errorOf(
       new CheckInClientUseCase(tokens, repository, buildTeamClock().teamClock).execute(request),
@@ -113,17 +113,31 @@ describe('CheckInClientUseCase', () => {
     expect(checkInClient).not.toHaveBeenCalled();
   });
 
-  it.each([
-    ['invalid_client', 'CHECKIN_CODE_INVALID'],
-    ['no_booking', 'CHECKIN_NO_BOOKING'],
-  ] as const)('maps the repository outcome "%s" to %s', async (kind, expectedCode) => {
+  it('maps an unknown client to CHECKIN_CODE_INVALID', async () => {
     const useCase = new CheckInClientUseCase(
       buildTokens().tokens,
-      buildRepository({ kind }).repository,
+      buildRepository({ kind: 'invalid_client' }).repository,
       buildTeamClock().teamClock,
     );
 
-    expect((await errorOf(useCase.execute(request))).code).toBe(expectedCode);
+    expect((await errorOf(useCase.execute(request))).code).toBe('CHECKIN_CODE_INVALID');
+  });
+
+  it('returns a denied access as an outcome instead of an error', async () => {
+    const outcome = {
+      kind: 'not_checked_in',
+      clientMembershipId: CLIENT_MEMBERSHIP_ID,
+      clientFullName: 'Luc�a Torres',
+      photoKey: null,
+      access: { isGranted: false, reason: 'no_pass', pass: null },
+    } as const satisfies CheckInOutcome;
+    const useCase = new CheckInClientUseCase(
+      buildTokens().tokens,
+      buildRepository(outcome).repository,
+      buildTeamClock().teamClock,
+    );
+
+    await expect(useCase.execute(request)).resolves.toBe(outcome);
   });
 
   it('returns the check-in when the repository registers it', async () => {
@@ -145,7 +159,7 @@ describe('CheckInClientUseCase', () => {
   it('clocks a team member in or out instead of looking for a booking', async () => {
     const scan = { action: 'clock_in', staffMembershipId: CLIENT_MEMBERSHIP_ID };
     const { teamClock, execute } = buildTeamClock({ kind: 'recorded', scan });
-    const { repository, checkInClient } = buildRepository({ kind: 'no_booking' });
+    const { repository, checkInClient } = buildRepository({ kind: 'invalid_client' });
     const useCase = new CheckInClientUseCase(buildTokens().tokens, repository, teamClock);
 
     await expect(useCase.execute(request)).resolves.toEqual({ kind: 'team_clocked', scan });

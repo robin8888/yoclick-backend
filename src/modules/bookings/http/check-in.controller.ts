@@ -14,23 +14,32 @@ import { ProblemDetailsDto } from '../../../shared/errors/problem-details.dto';
 import { RATE_LIMITS } from '../../../shared/rate-limit/rate-limit-policies';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
 import { assertRouteTargetsActorCenter } from '../../../shared/tenancy/assert-route-targets-actor-center';
-import { CheckInClientUseCase, IssueCheckInCodeUseCase } from '../application/check-in.use-cases';
+import { PhotoUrlSigner } from '../../photos/application/photo-url-signer';
+import { type PassAccessDecision } from '../../passes/domain/pass-access';
+import {
+  CheckInClientUseCase,
+  IssueCheckInCodeUseCase,
+  type ClientCheckInOutcome,
+} from '../application/check-in.use-cases';
 import { CenterRouteParamsDto } from './booking.dto';
 import { CheckInCodeResponseDto, CheckInRequestDto, CheckInResponseDto } from './check-in.dto';
 import { type TeamClockScan } from '../../time-clock/application/ports/time-entry.repository';
 import { serializeTimeEntry } from '../../time-clock/http/serialize-time-entry';
 import { serializeBooking } from './serialize-booking';
 
-function serializeTeamClock(scan: TeamClockScan): Record<string, unknown> {
+function serializeAccess(access: {
+  isGranted: boolean;
+  reason: string;
+  pass: PassAccessDecision['pass'];
+}): Record<string, unknown> {
   return {
-    kind: 'staff',
-    staff: {
-      membershipId: scan.staffMembershipId,
-      fullName: scan.fullName,
-      action: scan.action,
-      occurredAt: scan.occurredAt.toISOString(),
-      workedMinutes: scan.workedMinutes,
-      entry: serializeTimeEntry(scan.entry),
+    isGranted: access.isGranted,
+    reason: access.reason,
+    pass: access.pass && {
+      name: access.pass.name,
+      remainingSessions: access.pass.remainingSessions,
+      totalSessions: access.pass.totalSessions,
+      expiresAt: access.pass.expiresAt?.toISOString() ?? null,
     },
   };
 }
@@ -45,7 +54,53 @@ export class CheckInController {
   constructor(
     private readonly issueCode: IssueCheckInCodeUseCase,
     private readonly checkInClient: CheckInClientUseCase,
+    private readonly photoUrlSigner: PhotoUrlSigner,
   ) {}
+
+  private serializeTeamClock(scan: TeamClockScan): Record<string, unknown> {
+    return {
+      kind: 'staff',
+      person: {
+        membershipId: scan.staffMembershipId,
+        fullName: scan.fullName,
+        photoUrl: this.photoUrlSigner.sign(scan.photoKey),
+        role: scan.role,
+      },
+      access: serializeAccess({ isGranted: true, reason: 'team_member', pass: null }),
+      staff: {
+        membershipId: scan.staffMembershipId,
+        fullName: scan.fullName,
+        action: scan.action,
+        occurredAt: scan.occurredAt.toISOString(),
+        workedMinutes: scan.workedMinutes,
+        entry: serializeTimeEntry(scan.entry),
+      },
+    };
+  }
+
+  private serializeClientOutcome(
+    outcome: ClientCheckInOutcome,
+    clientMembershipId: string,
+  ): Record<string, unknown> {
+    const base = {
+      kind: 'client',
+      person: {
+        membershipId: clientMembershipId,
+        fullName: outcome.clientFullName,
+        photoUrl: this.photoUrlSigner.sign(outcome.photoKey),
+        role: 'client',
+      },
+      access: serializeAccess(outcome.access),
+      clientFullName: outcome.clientFullName,
+    };
+    if (outcome.kind === 'not_checked_in') return { ...base, isFirstCheckIn: false };
+    return {
+      ...base,
+      checkedInAt: outcome.checkedInAt.toISOString(),
+      isFirstCheckIn: outcome.kind === 'checked_in',
+      booking: serializeBooking(outcome.booking),
+    };
+  }
 
   @Post('me/checkin-code')
   @Roles('client', 'owner', 'admin', 'staff')
@@ -87,13 +142,7 @@ export class CheckInController {
       qrContent: body.qrContent,
       now: new Date(),
     });
-    if (outcome.kind === 'team_clocked') return serializeTeamClock(outcome.scan);
-    return {
-      kind: 'client',
-      clientFullName: outcome.clientFullName,
-      checkedInAt: outcome.checkedInAt.toISOString(),
-      isFirstCheckIn: outcome.kind === 'checked_in',
-      booking: serializeBooking(outcome.booking),
-    };
+    if (outcome.kind === 'team_clocked') return this.serializeTeamClock(outcome.scan);
+    return this.serializeClientOutcome(outcome, outcome.clientMembershipId);
   }
 }

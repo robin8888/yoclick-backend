@@ -61,6 +61,8 @@ function visibleEntryFilter(actor: ActorContext): { staffMembershipId?: string }
 interface ScanContext {
   readonly staffMembershipId: string;
   readonly fullName: string;
+  readonly role: 'owner' | 'admin' | 'staff';
+  readonly photoKey: string | null;
   readonly actor: ActorContext;
   readonly now: Date;
 }
@@ -76,6 +78,8 @@ function buildRecordedScan(
     scan: {
       staffMembershipId: context.staffMembershipId,
       fullName: context.fullName,
+      role: context.role,
+      photoKey: context.photoKey,
       action: result.action,
       occurredAt: (isClockOut ? entry.clockOutAt : entry.clockInAt) ?? context.now,
       workedMinutes: isClockOut ? entry.workedMinutes : null,
@@ -152,13 +156,15 @@ export class PrismaTimeEntryRepository implements TimeEntryRepository {
           status: 'active',
           role: { in: [...TEAM_ROLES] },
         },
-        select: { user: { select: { fullName: true } } },
+        select: { role: true, user: { select: { fullName: true, photoKey: true } } },
       });
       if (!member) return { kind: 'not_team_member' };
       await lockTimeline(client, command.scannedMembershipId);
       return clockTeamMember(client, {
         staffMembershipId: command.scannedMembershipId,
         fullName: member.user.fullName,
+        role: member.role as ScanContext['role'],
+        photoKey: member.user.photoKey,
         actor,
         now: command.now,
       });

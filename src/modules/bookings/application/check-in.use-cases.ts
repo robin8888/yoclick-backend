@@ -17,9 +17,9 @@ export interface IssuedCheckInCode {
   readonly expiresAt: Date;
 }
 
-type CompletedClientCheckIn = Extract<
+export type ClientCheckInOutcome = Extract<
   CheckInOutcome,
-  { kind: 'checked_in' | 'already_checked_in' }
+  { kind: 'checked_in' | 'already_checked_in' | 'not_checked_in' }
 >;
 
 /** El QR era de alguien del equipo: se ha fichado su entrada o su salida en vez de una cita. */
@@ -28,7 +28,7 @@ export interface TeamClockedCheckIn {
   readonly scan: TeamClockScan;
 }
 
-export type CompletedCheckIn = CompletedClientCheckIn | TeamClockedCheckIn;
+export type CompletedCheckIn = ClientCheckInOutcome | TeamClockedCheckIn;
 
 function invalidCodeError(): DomainError {
   return new DomainError('CHECKIN_CODE_INVALID', HTTP_STATUS.unprocessableEntity);
@@ -79,9 +79,6 @@ export class CheckInClientUseCase {
       now: input.now,
     });
     if (outcome.kind === 'invalid_client') throw invalidCodeError();
-    if (outcome.kind === 'no_booking') {
-      throw new DomainError('CHECKIN_NO_BOOKING', HTTP_STATUS.conflict);
-    }
     return outcome;
   }
 }

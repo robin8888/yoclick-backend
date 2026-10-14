@@ -29,16 +29,50 @@ const staffClockSchema = z.strictObject({
   entry: timeEntrySchema,
 });
 
+/** Qui�n es la persona escaneada, para que la app la muestre antes de dejarla pasar. */
+const scannedPersonSchema = z.strictObject({
+  membershipId: z.uuid(),
+  fullName: z.string(),
+  photoUrl: z.string().nullable(),
+  role: z.enum(['client', 'staff', 'admin', 'owner']),
+});
+
+const accessPassSchema = z.strictObject({
+  name: z.string(),
+  remainingSessions: z.number().int(),
+  totalSessions: z.number().int(),
+  expiresAt: z.iso.datetime().nullable(),
+});
+
+/** Si puede entrar y por qu�; en rojo (`isGranted: false`) `reason` dice qu� le falta. */
+const accessSchema = z.strictObject({
+  isGranted: z.boolean(),
+  reason: z.enum([
+    'valid_pass',
+    'team_member',
+    'passes_not_required',
+    'no_pass',
+    'pass_pending',
+    'pass_expired',
+    'pass_exhausted',
+  ]),
+  pass: accessPassSchema.nullable(),
+});
+
 /**
- * `kind: 'client'` trae la llegada a la cita; `kind: 'staff'` trae el fichaje de la persona del equipo
- * (entonces `clientFullName`, `checkedInAt`, `isFirstCheckIn` y `booking` no vienen).
+ * Siempre trae `person` y `access`. `kind: 'client'`: si `access.isGranted` y tiene cita ahora trae la
+ * llegada (`booking`, `checkedInAt`, `isFirstCheckIn`); sin acceso o sin cita no se registra nada y
+ * `booking` y `checkedInAt` no vienen. `kind: 'staff'` trae el fichaje en `staff`.
  */
 export class CheckInResponseDto extends createZodDto(
   z.strictObject({
     kind: z.enum(['client', 'staff']),
+    person: scannedPersonSchema,
+    access: accessSchema,
     clientFullName: z.string().optional(),
-    checkedInAt: z.iso.datetime().optional(),
-    /** `false` si esa llegada ya estaba registrada (repetir el escaneo no falla). */
+    /** Solo si se ha registrado (o ya estaba registrada) la llegada a una cita. */
+    checkedInAt: z.iso.datetime().nullish(),
+    /** `false` si esa llegada ya estaba registrada o no se ha registrado ninguna. */
     isFirstCheckIn: z.boolean().optional(),
     booking: z.strictObject(bookingShape).optional(),
     staff: staffClockSchema.optional(),

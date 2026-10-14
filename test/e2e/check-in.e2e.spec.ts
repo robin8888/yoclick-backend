@@ -17,10 +17,24 @@ interface CheckInCodeBody {
 }
 
 interface CheckInBody {
+  kind: 'client' | 'staff';
   clientFullName: string;
-  checkedInAt: string;
+  checkedInAt?: string | null;
   isFirstCheckIn: boolean;
-  booking: { id: string; status: string };
+  booking?: { id: string; status: string };
+  person: { membershipId: string; fullName: string; photoUrl: string | null; role: string };
+  access: {
+    isGranted: boolean;
+    reason: string;
+    pass: { name: string; remainingSessions: number; totalSessions: number } | null;
+  };
+}
+
+interface PassOverrides {
+  status?: 'pending' | 'active' | 'rejected' | 'cancelled';
+  remainingSessions?: number;
+  expiresAt?: Date | null;
+  hasPass?: boolean;
 }
 
 interface ProblemBody {
@@ -76,6 +90,48 @@ describe('attendance check-in by QR', () => {
       });
     });
     return bookingId;
+  }
+
+  async function insertRateAndPass(overrides: PassOverrides): Promise<void> {
+    const rateId = generateUuidV7();
+    const thirtyDaysFromNow = new Date(Date.now() + 30 * 24 * 60 * MILLISECONDS_PER_MINUTE);
+    await world.tenantPrismaService.runInTenantContext(ownerActor(), async (prisma) => {
+      await prisma.rate.create({
+        data: {
+          id: rateId,
+          centerId,
+          name: 'Bono 10',
+          sessionsCount: 10,
+          validDays: 30,
+          priceCents: 5000,
+          serviceIds: [],
+        },
+      });
+      if (overrides.hasPass === false) return;
+      await prisma.clientPass.create({
+        data: {
+          id: generateUuidV7(),
+          centerId,
+          clientMembershipId: ana.membershipId,
+          rateId,
+          name: 'Bono 10',
+          totalSessions: 10,
+          remainingSessions: overrides.remainingSessions ?? 4,
+          priceCents: 5000,
+          serviceIds: [],
+          status: overrides.status ?? 'active',
+          isRequestedByClient: false,
+          expiresAt: overrides.expiresAt === undefined ? thirtyDaysFromNow : overrides.expiresAt,
+        },
+      });
+    });
+  }
+
+  async function readCheckedInAt(bookingId: string): Promise<Date | null> {
+    const stored = await world.tenantPrismaService.runInTenantContext(ownerActor(), (prisma) =>
+      prisma.booking.findUniqueOrThrow({ where: { id: bookingId } }),
+    );
+    return stored.checkedInAt;
   }
 
   async function issueCodeAsAna(): Promise<string> {
@@ -142,23 +198,102 @@ describe('attendance check-in by QR', () => {
   });
 
   it('does not register an arrival for a class the professional does not run', async () => {
-    await insertBooking(5);
+    const bookingId = await insertBooking(5);
     const response = await scanAs(otherStaff, await issueCodeAsAna());
 
-    expect(response.statusCode).toBe(409);
-    expect(response.json<ProblemBody>().code).toBe('CHECKIN_NO_BOOKING');
+    expect(response.statusCode).toBe(200);
+    expect(response.json<CheckInBody>()).toMatchObject({
+      kind: 'client',
+      access: { isGranted: true, reason: 'passes_not_required' },
+      isFirstCheckIn: false,
+    });
+    expect(response.json<CheckInBody>().booking).toBeUndefined();
+    expect(response.json<CheckInBody>().checkedInAt ?? null).toBeNull();
+    expect(await readCheckedInAt(bookingId)).toBeNull();
   });
 
   it.each([
     ['too early (more than an hour before)', 90, 'confirmed'],
     ['already finished', -90, 'confirmed'],
     ['cancelled', 10, 'cancelled'],
-  ])('answers 409 when the booking is %s', async (_caseName, startsInMinutes, status) => {
+  ])('answers 200 without a booking when it is %s', async (_caseName, startsInMinutes, status) => {
     await insertBooking(startsInMinutes, status);
     const response = await scanAs(staff, await issueCodeAsAna());
 
-    expect(response.statusCode).toBe(409);
-    expect(response.json<ProblemBody>().code).toBe('CHECKIN_NO_BOOKING');
+    expect(response.statusCode).toBe(200);
+    expect(response.json<CheckInBody>().booking).toBeUndefined();
+    expect(response.json<CheckInBody>().access.isGranted).toBe(true);
+  });
+
+  it('identifies the person scanned with name, photo and role', async () => {
+    const response = await scanAs(staff, await issueCodeAsAna());
+
+    expect(response.json<CheckInBody>().person).toEqual({
+      membershipId: ana.membershipId,
+      fullName: expect.any(String),
+      photoUrl: null,
+      role: 'client',
+    });
+  });
+
+  describe('pass-based access', () => {
+    it('grants access and registers the arrival with a valid pass', async () => {
+      await insertRateAndPass({});
+      const bookingId = await insertBooking(5);
+
+      const body = (await scanAs(staff, await issueCodeAsAna())).json<CheckInBody>();
+
+      expect(body.access).toMatchObject({
+        isGranted: true,
+        reason: 'valid_pass',
+        pass: { name: 'Bono 10', remainingSessions: 4, totalSessions: 10 },
+      });
+      expect(body.booking?.id).toBe(bookingId);
+    });
+
+    it.each([
+      ['no pass at all', { hasPass: false }, 'no_pass'],
+      ['a pending pass', { status: 'pending' as const }, 'pass_pending'],
+      ['an exhausted pass', { remainingSessions: 0 }, 'pass_exhausted'],
+      ['an expired pass', { expiresAt: new Date(Date.now() - 60_000) }, 'pass_expired'],
+      ['a rejected pass', { status: 'rejected' as const }, 'no_pass'],
+    ])('denies access and registers nothing with %s', async (_name, overrides, reason) => {
+      await insertRateAndPass(overrides);
+      const bookingId = await insertBooking(5);
+
+      const response = await scanAs(staff, await issueCodeAsAna());
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json<CheckInBody>();
+      expect(body).toMatchObject({ kind: 'client', access: { isGranted: false, reason } });
+      expect(body.booking).toBeUndefined();
+      expect(await readCheckedInAt(bookingId)).toBeNull();
+    });
+
+    it('keeps answering the same arrival when the last session was just used', async () => {
+      await insertRateAndPass({ remainingSessions: 1 });
+      await insertBooking(5);
+      const qrContent = await issueCodeAsAna();
+
+      const first = (await scanAs(staff, qrContent)).json<CheckInBody>();
+      const second = (await scanAs(staff, qrContent)).json<CheckInBody>();
+
+      expect(first.isFirstCheckIn).toBe(true);
+      expect(second.isFirstCheckIn).toBe(false);
+      expect(second.booking?.id).toBe(first.booking?.id);
+    });
+  });
+
+  it('lets a team member in and clocks them with the person block', async () => {
+    const issued = await world.call('POST', issueUrl(), otherStaff.userId, { centerId });
+    const response = await scanAs(staff, issued.json<CheckInCodeBody>().qrContent);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json<CheckInBody>()).toMatchObject({
+      kind: 'staff',
+      person: { membershipId: otherStaff.membershipId, role: 'staff' },
+      access: { isGranted: true, reason: 'team_member', pass: null },
+    });
   });
 
   it.each([

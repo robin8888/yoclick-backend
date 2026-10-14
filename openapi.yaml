@@ -11390,12 +11390,83 @@ components:
           enum:
             - client
             - staff
+        person:
+          type: object
+          properties:
+            membershipId:
+              type: string
+              format: uuid
+              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            fullName:
+              type: string
+            photoUrl:
+              type: string
+              nullable: true
+            role:
+              type: string
+              enum:
+                - client
+                - staff
+                - admin
+                - owner
+          required:
+            - membershipId
+            - fullName
+            - photoUrl
+            - role
+          additionalProperties: false
+        access:
+          type: object
+          properties:
+            isGranted:
+              type: boolean
+            reason:
+              type: string
+              enum:
+                - valid_pass
+                - team_member
+                - passes_not_required
+                - no_pass
+                - pass_pending
+                - pass_expired
+                - pass_exhausted
+            pass:
+              type: object
+              properties:
+                name:
+                  type: string
+                remainingSessions:
+                  type: integer
+                  minimum: -9007199254740991
+                  maximum: 9007199254740991
+                totalSessions:
+                  type: integer
+                  minimum: -9007199254740991
+                  maximum: 9007199254740991
+                expiresAt:
+                  type: string
+                  format: date-time
+                  pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                  nullable: true
+              required:
+                - name
+                - remainingSessions
+                - totalSessions
+                - expiresAt
+              additionalProperties: false
+              nullable: true
+          required:
+            - isGranted
+            - reason
+            - pass
+          additionalProperties: false
         clientFullName:
           type: string
         checkedInAt:
           type: string
           format: date-time
           pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+          nullable: true
         isFirstCheckIn:
           type: boolean
         booking:
@@ -11678,6 +11749,8 @@ components:
           additionalProperties: false
       required:
         - kind
+        - person
+        - access
       additionalProperties: false
     TimeEntryListResponseDto:
       type: object

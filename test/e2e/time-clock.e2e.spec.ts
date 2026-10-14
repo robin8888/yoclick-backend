@@ -247,13 +247,16 @@ describe('team time clock (fichaje)', () => {
       expect(response.json<ProblemBody>().code).toBe('CHECKIN_CODE_INVALID');
     });
 
-    it('keeps the client flow unchanged (kind client)', async () => {
+    it('answers the client flow (kind client) without clocking anything', async () => {
       const qrContent = await issueCode(ana);
 
       const response = await scanAs(staff, qrContent);
 
-      expect(response.statusCode).toBe(409);
-      expect(response.json<ProblemBody>().code).toBe('CHECKIN_NO_BOOKING');
+      expect(response.statusCode).toBe(200);
+      expect(response.json<{ kind: string; person: { role: string } }>()).toMatchObject({
+        kind: 'client',
+        person: { role: 'client' },
+      });
     });
   });
 

@@ -25,6 +25,9 @@ export interface TimeEntryView {
 export interface TeamClockScan {
   readonly staffMembershipId: string;
   readonly fullName: string;
+  readonly role: 'owner' | 'admin' | 'staff';
+  /** Ruta de su foto de perfil en el almac�n; quien presenta el fichaje la firma. */
+  readonly photoKey: string | null;
   readonly action: 'clock_in' | 'clock_out';
   readonly occurredAt: Date;
   /** Solo en la salida: minutos del turno que se cierra. */
