@@ -13,6 +13,7 @@ export interface VerifyMfaLoginCommand {
   /** El desafío que recibió la app al acertar la contraseña. */
   readonly mfaToken: string;
   readonly code?: string | undefined;
+  readonly emailCode?: string | undefined;
   readonly recoveryCode?: string | undefined;
   readonly deviceName: string | null;
 }
@@ -43,6 +44,7 @@ export class VerifyMfaLoginUseCase {
     await this.secondFactorVerifier.assertValid({
       account,
       code: command.code,
+      emailCode: command.emailCode,
       recoveryCode: command.recoveryCode,
       failureStatus: HTTP_STATUS.unauthorized,
     });

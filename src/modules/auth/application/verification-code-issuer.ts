@@ -28,7 +28,10 @@ export interface CodeRecipient {
   readonly fullName: string;
 }
 
-const CODE_TTL_MINUTES: Readonly<Record<VerificationPurposeName, number>> = {
+/** Los códigos del segundo factor por correo los emite `EmailSecondFactorCodeIssuer`, que responde 429. */
+type AccountCodePurpose = Exclude<VerificationPurposeName, 'mfa_email'>;
+
+const CODE_TTL_MINUTES: Readonly<Record<AccountCodePurpose, number>> = {
   email_verification: EMAIL_VERIFICATION_CODE_TTL_MINUTES,
   password_reset: PASSWORD_RESET_CODE_TTL_MINUTES,
 };
@@ -46,7 +49,7 @@ export class VerificationCodeIssuer {
    * Si hay un código reciente, no se envía otro: así nadie puede usar la app para inundar un buzón.
    * La respuesta HTTP es la misma tanto si se envía como si no.
    */
-  async issue(recipient: CodeRecipient, purpose: VerificationPurposeName): Promise<void> {
+  async issue(recipient: CodeRecipient, purpose: AccountCodePurpose): Promise<void> {
     const now = new Date();
     const recentCode = await this.codes.findActiveCode(recipient.userId, purpose, now);
     const cooldownMs = MIN_SECONDS_BETWEEN_CODES * MILLISECONDS_PER_SECOND;

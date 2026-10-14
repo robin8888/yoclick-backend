@@ -1,4 +1,4 @@
-export type VerificationPurposeName = 'email_verification' | 'password_reset';
+export type VerificationPurposeName = 'email_verification' | 'password_reset' | 'mfa_email';
 
 export interface ActiveVerificationCode {
   readonly id: string;

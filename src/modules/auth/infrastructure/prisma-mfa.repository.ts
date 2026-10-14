@@ -17,6 +17,7 @@ export class PrismaMfaRepository implements MfaRepository {
     );
     if (!factor) return null;
     return {
+      method: factor.method,
       encryptedSecret: factor.secretEncrypted,
       isConfirmed: factor.confirmedAt !== null,
       lastUsedStep: factor.lastUsedStep === null ? null : Number(factor.lastUsedStep),
@@ -30,8 +31,27 @@ export class PrismaMfaRepository implements MfaRepository {
 
       await client.mfaFactor.upsert({
         where: { userId },
-        create: { id: generateUuidV7(), userId, secretEncrypted: encryptedSecret },
-        update: { secretEncrypted: encryptedSecret, lastUsedStep: null, confirmedAt: null },
+        create: { id: generateUuidV7(), userId, method: 'totp', secretEncrypted: encryptedSecret },
+        update: {
+          method: 'totp',
+          secretEncrypted: encryptedSecret,
+          lastUsedStep: null,
+          confirmedAt: null,
+        },
+      });
+      return true;
+    });
+  }
+
+  async saveUnconfirmedEmailFactor(userId: string): Promise<boolean> {
+    return this.tenantPrismaService.runInUserContext(userId, async (client) => {
+      const existing = await client.mfaFactor.findUnique({ where: { userId } });
+      if (existing?.confirmedAt) return false;
+
+      await client.mfaFactor.upsert({
+        where: { userId },
+        create: { id: generateUuidV7(), userId, method: 'email', secretEncrypted: null },
+        update: { method: 'email', secretEncrypted: null, lastUsedStep: null, confirmedAt: null },
       });
       return true;
     });
@@ -42,7 +62,10 @@ export class PrismaMfaRepository implements MfaRepository {
       // El UPDATE condicional decide: solo una petición confirma un factor que aún no lo estaba.
       const confirmed = await client.mfaFactor.updateMany({
         where: { userId, confirmedAt: null },
-        data: { confirmedAt: new Date(), lastUsedStep: BigInt(confirmation.step) },
+        data: {
+          confirmedAt: new Date(),
+          lastUsedStep: confirmation.step === null ? null : BigInt(confirmation.step),
+        },
       });
       if (confirmed.count !== 1) return false;
 

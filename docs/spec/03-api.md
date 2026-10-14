@@ -49,7 +49,10 @@ Leyenda de rol: **P** público · **U** usuario autenticado · **C** cliente del
 | POST | `/auth/register` | P | Email, contraseña, nombre, consentimientos (privacy obligatorio). Envía verificación. |
 | POST | `/auth/login` | P | → `{ accessToken, refreshToken, mfaRequired? }` |
 | POST | `/auth/oauth/apple` · `/auth/oauth/google` | P | Verifica `identityToken` / `idToken` contra JWKS del proveedor (aud, iss, exp, nonce) |
-| POST | `/auth/mfa/verify` | P (token MFA) | TOTP |
+| POST | `/auth/mfa/verify` | P (token MFA) | Exactamente uno de `code` (TOTP), `emailCode` (código por correo) o `recoveryCode` |
+| POST | `/auth/mfa/email/send` | P (token MFA) | Envía el código de 6 dígitos al correo (caduca a 10 min; 429 si se pidió hace < 60 s). El `mfa_required` del login incluye `methods` y `emailHint` |
+| GET | `/me/mfa` | U | `isEnabled`, `method` (`totp`\|`email`\|null), `emailHint`, `recoveryCodesRemaining` |
+| POST | `/me/mfa/email/setup` · `/me/mfa/email/confirm` · `/me/mfa/email/send` | U | Alta del segundo factor por correo (contraseña + primer código), y envío de un código para desactivar/regenerar |
 | POST | `/auth/refresh` | P | Rotación; reutilización ⇒ revoca la familia |
 | POST | `/auth/logout` | U | Revoca el refresh actual (o todos con `?all=true`) |
 | POST | `/auth/password/forgot` · `/auth/password/reset` | P | Respuesta idéntica exista o no el email |

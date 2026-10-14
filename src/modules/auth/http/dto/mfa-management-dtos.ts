@@ -32,7 +32,23 @@ export class MfaConfirmResponseDto extends createZodDto(
 ) {}
 
 export class MfaStatusResponseDto extends createZodDto(
-  z.strictObject({ isEnabled: z.boolean(), recoveryCodesRemaining: z.number().int().min(0) }),
+  z.strictObject({
+    isEnabled: z.boolean(),
+    /** El método principal activo (`totp` = app de autenticación, `email` = código por correo). */
+    method: z.enum(['totp', 'email']).nullable(),
+    /** Correo enmascarado (`a***@dominio.com`) al que llegarían los códigos por correo. */
+    emailHint: z.string().nullable(),
+    recoveryCodesRemaining: z.number().int().min(0),
+  }),
+) {}
+
+/** Se ha enviado un código al correo: la app enseña a qué buzón y hasta cuándo vale. */
+export class EmailCodeSentResponseDto extends createZodDto(
+  z.strictObject({
+    emailHint: z.string(),
+    /** Instante en que caduca el código (10 minutos tras el envío). */
+    codeExpiresAt: z.iso.datetime(),
+  }),
 ) {}
 
 /** Contraseña más una prueba del propio segundo factor: el código de la app o uno de recuperación. */
@@ -41,9 +57,10 @@ export class MfaProofRequestDto extends createZodDto(
     .strictObject({
       password: z.string().min(1).max(MAX_PASSWORD_LENGTH_ACCEPTED),
       code: totpCodeSchema.optional(),
+      emailCode: totpCodeSchema.optional(),
       recoveryCode: recoveryCodeFieldSchema.optional(),
     })
-    .refine(hasExactlyOneSecondFactorCode, 'send either code or recoveryCode, not both'),
+    .refine(hasExactlyOneSecondFactorCode, 'send exactly one of code, emailCode or recoveryCode'),
 ) {}
 
 export class RegeneratedRecoveryCodesResponseDto extends createZodDto(

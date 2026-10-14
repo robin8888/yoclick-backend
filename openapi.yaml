@@ -129,7 +129,33 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ProblemDetailsDto"
-      summary: Completa el inicio de sesión con el código de la app de autenticación o un código de recuperación. Cada código de la app sirve una sola vez.
+      summary: "Completa el inicio de sesión con el código de la app (`code`), el recibido por correo (`emailCode`) o un código de recuperación (`recoveryCode`): exactamente uno. Cada código sirve una sola vez; el de correo caduca a los 10 minutos y se invalida tras 5 fallos."
+      tags:
+        - auth
+  /v1/auth/mfa/email/send:
+    post:
+      operationId: auth_send_mfa_email_code
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MfaEmailSendRequestDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailCodeSentResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      summary: Envía al correo de la persona el código de 6 dígitos del segundo factor (caduca a los 10 minutos). Pide el desafío `mfaToken` del login. 429 RATE_LIMITED si se pidió otro hace menos de 60 s; 409 MFA_NOT_ENABLED; 401 si el desafío no es válido.
       tags:
         - auth
   /v1/auth/refresh:
@@ -306,7 +332,7 @@ paths:
                 $ref: "#/components/schemas/ProblemDetailsDto"
       security:
         - bearer: []
-      summary: Si el segundo factor está activo y cuántos códigos de recuperación quedan.
+      summary: Si el segundo factor está activo, con qué método (`totp` o `email`), el correo enmascarado y cuántos códigos de recuperación quedan.
       tags:
         - mfa
   /v1/me/mfa/totp/setup:
@@ -386,7 +412,7 @@ paths:
                 $ref: "#/components/schemas/ProblemDetailsDto"
       security:
         - bearer: []
-      summary: Desactiva el segundo factor. Pide la contraseña y un código. No disponible para propietarias y administradoras.
+      summary: Desactiva el segundo factor. Pide la contraseña y un código (`code`, `emailCode` o `recoveryCode`). No disponible para propietarias y administradoras.
       tags:
         - mfa
   /v1/me/mfa/recovery-codes/regenerate:
@@ -415,6 +441,84 @@ paths:
       security:
         - bearer: []
       summary: Sustituye los códigos de recuperación por diez nuevos. Pide la contraseña y un código.
+      tags:
+        - mfa
+  /v1/me/mfa/email/setup:
+    post:
+      operationId: mfa_setup_email
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MfaSetupRequestDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailCodeSentResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: "Empieza a activar el segundo factor por correo: pide la contraseña y envía un código de 6 dígitos al correo de la cuenta. No cuenta hasta confirmarlo. 409 MFA_ALREADY_ENABLED; 429 RATE_LIMITED si se pidió otro hace menos de 60 s."
+      tags:
+        - mfa
+  /v1/me/mfa/email/confirm:
+    post:
+      operationId: mfa_confirm_email
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MfaConfirmRequestDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MfaConfirmResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Activa el segundo factor por correo con el primer código recibido y entrega diez códigos de recuperación (una sola vez). 403 MFA_CODE_INVALID si el código es erróneo, caducó o se agotaron sus 5 intentos.
+      tags:
+        - mfa
+  /v1/me/mfa/email/send:
+    post:
+      operationId: mfa_send_email_code
+      parameters: []
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailCodeSentResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Con el segundo factor ya activo, envía un código por correo para usarlo en desactivar el factor o regenerar los códigos de recuperación (`emailCode`). 409 MFA_NOT_ENABLED; 429 RATE_LIMITED si se pidió otro hace menos de 60 s.
       tags:
         - mfa
   /v1/me:
@@ -6864,10 +6968,22 @@ components:
           type: string
           format: date-time
           pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+        methods:
+          minItems: 1
+          type: array
+          items:
+            type: string
+            enum:
+              - totp
+              - email
+        emailHint:
+          type: string
       required:
         - status
         - mfaToken
         - mfaTokenExpiresAt
+        - methods
+        - emailHint
       additionalProperties: false
     LoginRequestDto:
       type: object
@@ -6897,6 +7013,9 @@ components:
         code:
           type: string
           pattern: ^\d{6}$
+        emailCode:
+          type: string
+          pattern: ^\d{6}$
         recoveryCode:
           type: string
           minLength: 8
@@ -6907,6 +7026,29 @@ components:
           maxLength: 100
       required:
         - mfaToken
+      additionalProperties: false
+    MfaEmailSendRequestDto:
+      type: object
+      properties:
+        mfaToken:
+          type: string
+          minLength: 1
+          maxLength: 2048
+      required:
+        - mfaToken
+      additionalProperties: false
+    EmailCodeSentResponseDto:
+      type: object
+      properties:
+        emailHint:
+          type: string
+        codeExpiresAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+      required:
+        - emailHint
+        - codeExpiresAt
       additionalProperties: false
     RefreshRequestDto:
       type: object
@@ -7051,12 +7193,24 @@ components:
       properties:
         isEnabled:
           type: boolean
+        method:
+          type: string
+          enum:
+            - totp
+            - email
+            - null
+          nullable: true
+        emailHint:
+          type: string
+          nullable: true
         recoveryCodesRemaining:
           type: integer
           minimum: 0
           maximum: 9007199254740991
       required:
         - isEnabled
+        - method
+        - emailHint
         - recoveryCodesRemaining
       additionalProperties: false
     MfaSetupRequestDto:
@@ -7109,6 +7263,9 @@ components:
           minLength: 1
           maxLength: 256
         code:
+          type: string
+          pattern: ^\d{6}$
+        emailCode:
           type: string
           pattern: ^\d{6}$
         recoveryCode:

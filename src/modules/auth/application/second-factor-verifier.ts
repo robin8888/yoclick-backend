@@ -1,17 +1,19 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { DomainError } from '../../../shared/errors/domain-error';
 import { HTTP_STATUS } from '../../../shared/errors/http-status';
-import { SecretEncryptor } from '../../../shared/crypto/secret-encryptor';
-import { TotpEngine } from '../infrastructure/totp-engine';
+import { EmailSecondFactorCodeVerifier } from './email-second-factor-code-verifier';
 import { LoginFailureRecorder } from './login-failure-recorder';
 import { MFA_REPOSITORY, type MfaRepository } from './ports/mfa.repository';
 import { type UserAccount } from './ports/user-account.repository';
 import { RecoveryCodeService } from './recovery-code-service';
+import { TotpCodeChecker } from './totp-code-checker';
 
 export interface SecondFactorAttempt {
   readonly account: UserAccount;
   /** Código de 6 dígitos de la app de autenticación. */
   readonly code?: string | undefined;
+  /** Código de 6 dígitos enviado al correo (vale para quien tiene la app y para quien eligió el correo). */
+  readonly emailCode?: string | undefined;
   /** Código de recuperación de un solo uso, si se perdió el dispositivo. */
   readonly recoveryCode?: string | undefined;
   /** 401 al iniciar sesión (aún sin sesión); 403 con la sesión iniciada (un 401 haría que la app intente renovarla). */
@@ -31,10 +33,10 @@ export interface SecondFactorAttempt {
 export class SecondFactorVerifier {
   constructor(
     @Inject(MFA_REPOSITORY) private readonly mfa: MfaRepository,
-    private readonly totpEngine: TotpEngine,
-    private readonly secretEncryptor: SecretEncryptor,
+    private readonly totpCodeChecker: TotpCodeChecker,
     private readonly recoveryCodeService: RecoveryCodeService,
     private readonly failureRecorder: LoginFailureRecorder,
+    private readonly emailCodeVerifier: EmailSecondFactorCodeVerifier,
   ) {}
 
   /**
@@ -47,20 +49,34 @@ export class SecondFactorVerifier {
     readonly failureStatus: number;
   }): Promise<number> {
     const factor = await this.mfa.findFactor(attempt.account.id);
-    if (!factor || factor.isConfirmed) {
+    if (!factor || factor.isConfirmed || factor.encryptedSecret === null) {
       throw new DomainError('MFA_NOT_ENABLED', HTTP_STATUS.conflict);
     }
 
-    const step = this.totpEngine.findMatchingStep(
-      this.secretEncryptor.decrypt(factor.encryptedSecret),
-      attempt.code,
-      new Date(),
-    );
+    const step = this.totpCodeChecker.findMatchingStep(factor.encryptedSecret, attempt.code);
     if (step === null) {
       await this.failureRecorder.record(attempt.account);
       throw new DomainError('MFA_CODE_INVALID', attempt.failureStatus);
     }
     return step;
+  }
+
+  /** El primer código recibido por correo, al activar el método por correo (factor aún sin confirmar). */
+  async verifyEmailSetupCode(attempt: {
+    readonly account: UserAccount;
+    readonly code: string;
+    readonly failureStatus: number;
+  }): Promise<void> {
+    const factor = await this.mfa.findFactor(attempt.account.id);
+    if (!factor || factor.isConfirmed || factor.method !== 'email') {
+      throw new DomainError('MFA_NOT_ENABLED', HTTP_STATUS.conflict);
+    }
+
+    const isValid = await this.emailCodeVerifier.isValid(attempt.account.id, attempt.code);
+    if (isValid) return;
+
+    await this.failureRecorder.record(attempt.account);
+    throw new DomainError('MFA_CODE_INVALID', attempt.failureStatus);
   }
 
   async assertValid(attempt: SecondFactorAttempt): Promise<void> {
@@ -76,7 +92,12 @@ export class SecondFactorVerifier {
     if (!factor?.isConfirmed) return false;
 
     if (attempt.code !== undefined) {
+      // Quien eligió el correo no tiene app: un código de 6 dígitos de la app no puede valer.
+      if (factor.encryptedSecret === null) return false;
       return this.isTotpValid(attempt.account.id, factor.encryptedSecret, attempt.code);
+    }
+    if (attempt.emailCode !== undefined) {
+      return this.emailCodeVerifier.isValid(attempt.account.id, attempt.emailCode);
     }
     if (attempt.recoveryCode !== undefined) {
       return this.mfa.consumeRecoveryCode(
@@ -93,8 +114,7 @@ export class SecondFactorVerifier {
     encryptedSecret: string,
     code: string,
   ): Promise<boolean> {
-    const secret = this.secretEncryptor.decrypt(encryptedSecret);
-    const step = this.totpEngine.findMatchingStep(secret, code, new Date());
+    const step = this.totpCodeChecker.findMatchingStep(encryptedSecret, code);
     return step !== null && (await this.mfa.markStepUsed(userId, step));
   }
 }

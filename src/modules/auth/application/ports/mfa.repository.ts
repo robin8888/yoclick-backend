@@ -1,13 +1,17 @@
+import { type SecondFactorMethod } from '../../domain/email-second-factor';
+
 export interface MfaFactorState {
-  readonly encryptedSecret: string;
+  readonly method: SecondFactorMethod;
+  /** Solo el método `totp` tiene secreto. */
+  readonly encryptedSecret: string | null;
   readonly isConfirmed: boolean;
   /** Último intervalo de 30 s aceptado, o `null` si nunca se ha usado. */
   readonly lastUsedStep: number | null;
 }
 
 export interface MfaConfirmation {
-  /** El intervalo del primer código válido: cuenta como ya usado. */
-  readonly step: number;
+  /** El intervalo del primer código de la app, que cuenta como ya usado. `null` con el método por correo. */
+  readonly step: number | null;
   readonly recoveryCodeHashes: readonly string[];
 }
 
@@ -18,6 +22,8 @@ export interface MfaRepository {
    * uno confirmado: no se puede pisar un segundo factor activo sin pasar por desactivarlo.
    */
   saveUnconfirmedFactor(userId: string, encryptedSecret: string): Promise<boolean>;
+  /** Igual que `saveUnconfirmedFactor`, para el método por correo (sin secreto). */
+  saveUnconfirmedEmailFactor(userId: string): Promise<boolean>;
   /** Confirma el factor y guarda los códigos de recuperación, juntos o nada. `false` si no había nada que confirmar. */
   confirmFactor(userId: string, confirmation: MfaConfirmation): Promise<boolean>;
   /** Anti-reutilización atómica: acepta el intervalo solo si es posterior al último usado. */

@@ -337,7 +337,8 @@ export class InMemorySessionRepository implements SessionRepository {
 }
 
 interface StoredFactor {
-  encryptedSecret: string;
+  method?: 'totp' | 'email';
+  encryptedSecret: string | null;
   isConfirmed: boolean;
   lastUsedStep: number | null;
   recoveryCodes: { codeHash: string; usedAt: Date | null }[];
@@ -353,6 +354,7 @@ export class InMemoryMfaRepository implements MfaRepository {
     return Promise.resolve(
       factor
         ? {
+            method: factor.method ?? 'totp',
             encryptedSecret: factor.encryptedSecret,
             isConfirmed: factor.isConfirmed,
             lastUsedStep: factor.lastUsedStep,
@@ -364,7 +366,20 @@ export class InMemoryMfaRepository implements MfaRepository {
   saveUnconfirmedFactor(userId: string, encryptedSecret: string): Promise<boolean> {
     if (this.factors.get(userId)?.isConfirmed) return Promise.resolve(false);
     this.factors.set(userId, {
+      method: 'totp',
       encryptedSecret,
+      isConfirmed: false,
+      lastUsedStep: null,
+      recoveryCodes: [],
+    });
+    return Promise.resolve(true);
+  }
+
+  saveUnconfirmedEmailFactor(userId: string): Promise<boolean> {
+    if (this.factors.get(userId)?.isConfirmed) return Promise.resolve(false);
+    this.factors.set(userId, {
+      method: 'email',
+      encryptedSecret: null,
       isConfirmed: false,
       lastUsedStep: null,
       recoveryCodes: [],

@@ -7,7 +7,7 @@ import { type UserAccount } from './ports/user-account.repository';
 import { RecoveryCodeService } from './recovery-code-service';
 
 /**
- * Activa el segundo factor ya comprobado: confirma el factor, genera y guarda los códigos de recuperación
+ * Activa el segundo factor ya comprobado (`confirmedStep` es nulo con el método por correo): confirma el factor, genera y guarda los códigos de recuperación
  * y avisa por correo. Devuelve los códigos en claro, que se enseñan UNA sola vez: después solo existe su HMAC.
  */
 @Injectable()
@@ -18,7 +18,7 @@ export class MfaActivator {
     private readonly securityNotifier: AccountSecurityNotifier,
   ) {}
 
-  async activate(account: UserAccount, confirmedStep: number): Promise<readonly string[]> {
+  async activate(account: UserAccount, confirmedStep: number | null): Promise<readonly string[]> {
     const recovery = this.recoveryCodeService.generate();
     const wasConfirmed = await this.mfa.confirmFactor(account.id, {
       step: confirmedStep,

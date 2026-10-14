@@ -38,9 +38,20 @@ import { MFA_REPOSITORY } from './application/ports/mfa.repository';
 import { RecoveryCodeService } from './application/recovery-code-service';
 import { RegenerateRecoveryCodesUseCase } from './application/regenerate-recovery-codes.use-case';
 import { SecondFactorVerifier } from './application/second-factor-verifier';
+import { ConfirmEmailMfaUseCase } from './application/confirm-email-mfa.use-case';
+import { EmailSecondFactorCodeIssuer } from './application/email-second-factor-code-issuer';
+import { EmailSecondFactorCodeVerifier } from './application/email-second-factor-code-verifier';
+import { TotpCodeChecker } from './application/totp-code-checker';
+import { SecondFactorSecurityEvents } from './application/second-factor-security-events';
+import {
+  SendAccountEmailCodeUseCase,
+  SendLoginEmailCodeUseCase,
+} from './application/send-email-second-factor-code.use-cases';
+import { SetupEmailMfaUseCase } from './application/setup-email-mfa.use-case';
 import { SetupTotpUseCase } from './application/setup-totp.use-case';
 import { VerifyMfaLoginUseCase } from './application/verify-mfa-login.use-case';
 import { MfaController } from './http/mfa.controller';
+import { MfaEmailController } from './http/mfa-email.controller';
 import { PrismaMfaRepository } from './infrastructure/prisma-mfa.repository';
 import { TotpEngine } from './infrastructure/totp-engine';
 import { PasswordController } from './http/password.controller';
@@ -66,6 +77,7 @@ import { PwnedPasswordsChecker } from './infrastructure/pwned-passwords.checker'
     OpenSessionsController,
     PasswordController,
     MfaController,
+    MfaEmailController,
   ],
   providers: [
     PasswordHasher,
@@ -77,6 +89,14 @@ import { PwnedPasswordsChecker } from './infrastructure/pwned-passwords.checker'
     LoginFailureRecorder,
     SetupTotpUseCase,
     ConfirmTotpUseCase,
+    SetupEmailMfaUseCase,
+    ConfirmEmailMfaUseCase,
+    SendLoginEmailCodeUseCase,
+    SendAccountEmailCodeUseCase,
+    EmailSecondFactorCodeIssuer,
+    SecondFactorSecurityEvents,
+    EmailSecondFactorCodeVerifier,
+    TotpCodeChecker,
     DisableMfaUseCase,
     RegenerateRecoveryCodesUseCase,
     GetMfaStatusUseCase,

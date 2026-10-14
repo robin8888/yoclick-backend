@@ -27,7 +27,7 @@ export const ERROR_CATALOG = {
   MFA_REQUIRED: {
     title: 'Esta acción exige verificación en dos pasos. Actívala e inicia sesión de nuevo',
   },
-  MFA_CODE_INVALID: { title: 'El código no es válido' },
+  MFA_CODE_INVALID: { title: 'El código no es válido o ha caducado' },
   MFA_ALREADY_ENABLED: { title: 'La verificación en dos pasos ya está activada' },
   MFA_NOT_ENABLED: { title: 'La verificación en dos pasos no está activada' },
   MFA_REQUIRED_FOR_ROLE: {

@@ -50,8 +50,18 @@ enum ConsentKind {
 enum VerificationPurpose {
   email_verification
   password_reset
+  /// Código de 6 dígitos enviado al correo como segundo factor (alta, inicio de sesión, desactivar).
+  mfa_email
 
   @@map("verification_purpose")
+}
+
+/// Cómo demuestra la persona su segundo factor principal: app de autenticación o código por correo.
+enum MfaMethod {
+  totp
+  email
+
+  @@map("mfa_method")
 }
 
 /// Por ahora solo `individual` (una persona del equipo atiende a un cliente); los grupos llegan después.
@@ -535,7 +545,9 @@ model RefreshToken {
 model MfaFactor {
   id              String    @id @db.Uuid
   userId          String    @unique @map("user_id") @db.Uuid
-  secretEncrypted String    @map("secret_enc")
+  /// Solo el método `totp` guarda secreto; con `email` es nulo (el código llega al correo).
+  secretEncrypted String?   @map("secret_enc")
+  method          MfaMethod @default(totp)
   /// Hasta que se confirma con un primer código válido, el factor no cuenta ni se exige.
   confirmedAt     DateTime? @map("confirmed_at") @db.Timestamptz
   /// Último intervalo de 30 s aceptado: un código ya usado no sirve otra vez (anti-reutilización).

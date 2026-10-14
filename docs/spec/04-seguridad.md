@@ -76,6 +76,7 @@ Cada control tiene un id (`SEC-xx`) que los PR citan. Un ticket no está termina
 - **SEC-45** Refresh opaco rotativo con detección de reutilización; revocación por dispositivo y global.
 - **SEC-46** Rate limit y bloqueo progresivo en login, forgot, MFA y `join/code` (por IP y por cuenta). Mensajes genéricos («Email o contraseña incorrectos»).
 - **SEC-47** MFA TOTP obligatorio para `owner`, `admin` y superadmin.
+- **SEC-47b** Segundo factor por código enviado al correo (alternativa a la app, y respaldo en el login para quien ya tiene MFA): 6 dígitos con `crypto.randomInt`, guardado solo como HMAC con pepper, comparación en tiempo constante, un solo uso, caduca a los 10 min, 5 intentos por código (después queda invalidado), emitir uno invalida el anterior y no se emite otro hasta pasados 60 s (`429 RATE_LIMITED`). Los fallos cuentan para el mismo bloqueo que la contraseña. El correo solo lleva el código y su caducidad. Eventos de seguridad (`mfa_email_code_sent|send_throttled|used|failed`) con solo el id de la persona, sin código ni correo.
 
 ### API3 · BOPLA (autorización a nivel de propiedad)
 - **SEC-48** DTOs de entrada **explícitos** por caso de uso (zod `strict()`): nunca `Object.assign(entity, body)`. Un cliente no puede enviar `role`, `centerId`, `status`, `priceCents`, `remainingSessions`.

@@ -19,12 +19,15 @@ import { type AuthenticatedLogin, LoginUseCase } from '../application/login.use-
 import { LogoutUseCase } from '../application/logout.use-case';
 import { RefreshSessionUseCase } from '../application/refresh-session.use-case';
 import { type SessionTokens } from '../application/session-issuer';
+import { SendLoginEmailCodeUseCase } from '../application/send-email-second-factor-code.use-cases';
 import { VerifyMfaLoginUseCase } from '../application/verify-mfa-login.use-case';
 import { LoginRequestDto } from './dto/login-request.dto';
 import { LogoutRequestDto } from './dto/logout-request.dto';
 import { MfaVerifyRequestDto } from './dto/mfa-verify-request.dto';
+import { EmailCodeSentResponseDto } from './dto/mfa-management-dtos';
 import { RefreshRequestDto } from './dto/refresh-request.dto';
 import {
+  MfaEmailSendRequestDto,
   MfaChallengeResponseDto,
   MfaLoginResponseDto,
   RefreshResponseDto,
@@ -56,6 +59,7 @@ export class SessionController {
   constructor(
     private readonly loginUseCase: LoginUseCase,
     private readonly verifyMfaLogin: VerifyMfaLoginUseCase,
+    private readonly sendLoginEmailCode: SendLoginEmailCodeUseCase,
     private readonly refreshSession: RefreshSessionUseCase,
     private readonly logoutUseCase: LogoutUseCase,
   ) {}
@@ -88,6 +92,8 @@ export class SessionController {
         status: 'mfa_required',
         mfaToken: result.mfaToken,
         mfaTokenExpiresAt: result.mfaTokenExpiresAt.toISOString(),
+        methods: result.methods,
+        emailHint: result.emailHint,
       };
     }
     return serializeAuthenticatedLogin(result);
@@ -100,17 +106,33 @@ export class SessionController {
   @ApiOperation({
     operationId: 'auth_verify_mfa',
     summary:
-      'Completa el inicio de sesión con el código de la app de autenticación o un código de recuperación. Cada código de la app sirve una sola vez.',
+      'Completa el inicio de sesión con el código de la app (`code`), el recibido por correo (`emailCode`) o un código de recuperación (`recoveryCode`): exactamente uno. Cada código sirve una sola vez; el de correo caduca a los 10 minutos y se invalida tras 5 fallos.',
   })
   @ApiOkResponse({ type: MfaLoginResponseDto })
   async verifyMfa(@Body() body: MfaVerifyRequestDto): Promise<Record<string, unknown>> {
     const login = await this.verifyMfaLogin.execute({
       mfaToken: body.mfaToken,
       code: body.code,
+      emailCode: body.emailCode,
       recoveryCode: body.recoveryCode,
       deviceName: body.deviceName ?? null,
     });
     return serializeAuthenticatedLogin(login);
+  }
+
+  @Post('mfa/email/send')
+  @Throttle({ default: RATE_LIMITS.sendEmailCode })
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    operationId: 'auth_send_mfa_email_code',
+    summary:
+      'Envía al correo de la persona el código de 6 dígitos del segundo factor (caduca a los 10 minutos). Pide el desafío `mfaToken` del login. 429 RATE_LIMITED si se pidió otro hace menos de 60 s; 409 MFA_NOT_ENABLED; 401 si el desafío no es válido.',
+  })
+  @ApiOkResponse({ type: EmailCodeSentResponseDto })
+  async sendMfaEmailCode(@Body() body: MfaEmailSendRequestDto): Promise<Record<string, unknown>> {
+    const sent = await this.sendLoginEmailCode.execute(body.mfaToken);
+    return { emailHint: sent.emailHint, codeExpiresAt: sent.codeExpiresAt.toISOString() };
   }
 
   @Post('refresh')

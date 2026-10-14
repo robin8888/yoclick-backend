@@ -117,3 +117,20 @@ export function buildPasswordResetMessage(details: VerificationCodeDetails): Ema
     ].join('\n'),
   };
 }
+
+/** Código del segundo factor por correo. Solo lleva el código y su caducidad: nada más que pueda filtrarse. */
+export function buildSecondFactorCodeMessage(details: VerificationCodeDetails): EmailMessage {
+  return {
+    to: details.to,
+    subject: 'Tu código de verificación en dos pasos',
+    textBody: [
+      `Hola, ${details.fullName}:`,
+      '',
+      `Tu código de verificación es ${details.code}.`,
+      `Caduca en ${String(details.validForMinutes)} minutos y solo sirve una vez.`,
+      '',
+      NEVER_SHARE,
+      'Si no estás intentando entrar en tu cuenta, ignora este mensaje y cambia tu contraseña.',
+    ].join('\n'),
+  };
+}

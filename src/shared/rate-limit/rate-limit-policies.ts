@@ -23,6 +23,8 @@ export const RATE_LIMITS = {
   forgotPassword: { limit: 5, ttl: ONE_MINUTE },
   resendVerification: { limit: 5, ttl: ONE_MINUTE },
   submitCode: { limit: 10, ttl: ONE_MINUTE },
+  /** Pedir el código del segundo factor por correo: además hay 60 s de enfriamiento por cuenta. */
+  sendEmailCode: { limit: 5, ttl: ONE_MINUTE },
   refreshSession: { limit: 30, ttl: ONE_MINUTE },
   /** Cambiar contraseña, exportar datos, eliminar la cuenta: lo que haría quien robara un token. */
   /** Dar de alta centros: poco frecuente y atractivo para el abuso. */

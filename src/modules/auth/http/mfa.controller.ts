@@ -49,7 +49,8 @@ export class MfaController {
   @Get()
   @ApiOperation({
     operationId: 'mfa_get_status',
-    summary: 'Si el segundo factor está activo y cuántos códigos de recuperación quedan.',
+    summary:
+      'Si el segundo factor está activo, con qué método (`totp` o `email`), el correo enmascarado y cuántos códigos de recuperación quedan.',
   })
   @ApiOkResponse({ type: MfaStatusResponseDto })
   async status(@CurrentUserId() userId: string): Promise<Record<string, unknown>> {
@@ -91,7 +92,7 @@ export class MfaController {
   @ApiOperation({
     operationId: 'mfa_disable',
     summary:
-      'Desactiva el segundo factor. Pide la contraseña y un código. No disponible para propietarias y administradoras.',
+      'Desactiva el segundo factor. Pide la contraseña y un código (`code`, `emailCode` o `recoveryCode`). No disponible para propietarias y administradoras.',
   })
   @ApiNoContentResponse()
   async disable(@CurrentUserId() userId: string, @Body() body: MfaProofRequestDto): Promise<void> {
@@ -99,6 +100,7 @@ export class MfaController {
       userId,
       password: body.password,
       code: body.code,
+      emailCode: body.emailCode,
       recoveryCode: body.recoveryCode,
     });
   }
@@ -119,6 +121,7 @@ export class MfaController {
       userId,
       password: body.password,
       code: body.code,
+      emailCode: body.emailCode,
       recoveryCode: body.recoveryCode,
     });
     return { recoveryCodes };

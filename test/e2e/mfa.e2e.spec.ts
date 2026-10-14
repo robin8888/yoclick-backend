@@ -117,7 +117,12 @@ describe('second factor (TOTP) for sign-in and administrative roles', () => {
 
       const response = await send('GET', '/v1/me/mfa', undefined, session.accessToken);
 
-      expect(response.json()).toEqual({ isEnabled: false, recoveryCodesRemaining: 0 });
+      expect(response.json()).toEqual({
+        isEnabled: false,
+        method: null,
+        emailHint: 'r***@yopmail.com',
+        recoveryCodesRemaining: 0,
+      });
     });
 
     it('asks for the password before showing a secret', async () => {
@@ -141,7 +146,12 @@ describe('second factor (TOTP) for sign-in and administrative roles', () => {
 
       expect(recoveryCodes).toHaveLength(10);
       const status = await send('GET', '/v1/me/mfa', undefined, session.accessToken);
-      expect(status.json()).toEqual({ isEnabled: true, recoveryCodesRemaining: 10 });
+      expect(status.json()).toEqual({
+        isEnabled: true,
+        method: 'totp',
+        emailHint: 'r***@yopmail.com',
+        recoveryCodesRemaining: 10,
+      });
     });
 
     it('does not enable it with a wrong code', async () => {
@@ -186,7 +196,7 @@ describe('second factor (TOTP) for sign-in and administrative roles', () => {
         client.mfaFactor.findUniqueOrThrow({ where: { userId } }),
       );
       expect(stored.secretEncrypted).not.toContain(secret);
-      expect(stored.secretEncrypted.startsWith('v1.')).toBe(true);
+      expect(stored.secretEncrypted?.startsWith('v1.')).toBe(true);
     });
   });
 

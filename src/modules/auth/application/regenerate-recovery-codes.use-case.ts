@@ -9,6 +9,7 @@ export interface RegenerateRecoveryCodesCommand {
   readonly userId: string;
   readonly password: string;
   readonly code?: string | undefined;
+  readonly emailCode?: string | undefined;
   readonly recoveryCode?: string | undefined;
 }
 
@@ -30,6 +31,7 @@ export class RegenerateRecoveryCodesUseCase {
     await this.secondFactorVerifier.assertValid({
       account,
       code: command.code,
+      emailCode: command.emailCode,
       recoveryCode: command.recoveryCode,
       failureStatus: HTTP_STATUS.forbidden,
     });

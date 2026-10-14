@@ -13,12 +13,16 @@ export const recoveryCodeFieldSchema = z
   .min(MIN_RECOVERY_CODE_LENGTH)
   .max(MAX_RECOVERY_CODE_LENGTH);
 
-/** Exactamente uno de los dos: el código de la app o un código de recuperación. */
+/** Exactamente uno: el código de la app (`code`), el recibido por correo (`emailCode`) o uno de recuperación. */
 export function hasExactlyOneSecondFactorCode(body: {
   code?: unknown;
+  emailCode?: unknown;
   recoveryCode?: unknown;
 }): boolean {
-  return (body.code === undefined) !== (body.recoveryCode === undefined);
+  const providedCodes = [body.code, body.emailCode, body.recoveryCode].filter(
+    (candidate) => candidate !== undefined,
+  );
+  return providedCodes.length === 1;
 }
 
 export class MfaVerifyRequestDto extends createZodDto(
@@ -26,8 +30,9 @@ export class MfaVerifyRequestDto extends createZodDto(
     .strictObject({
       mfaToken: z.string().min(1).max(MAX_CHALLENGE_TOKEN_LENGTH),
       code: totpCodeSchema.optional(),
+      emailCode: totpCodeSchema.optional(),
       recoveryCode: recoveryCodeFieldSchema.optional(),
       deviceName: z.string().trim().min(1).max(MAX_DEVICE_NAME_LENGTH).optional(),
     })
-    .refine(hasExactlyOneSecondFactorCode, 'send either code or recoveryCode, not both'),
+    .refine(hasExactlyOneSecondFactorCode, 'send exactly one of code, emailCode or recoveryCode'),
 ) {}

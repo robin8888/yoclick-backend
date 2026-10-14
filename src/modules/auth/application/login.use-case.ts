@@ -2,6 +2,11 @@ import { Inject, Injectable } from '@nestjs/common';
 import { PasswordHasher } from '../../../shared/auth/password-hasher';
 import { DomainError } from '../../../shared/errors/domain-error';
 import { HTTP_STATUS } from '../../../shared/errors/http-status';
+import {
+  listLoginMethods,
+  maskEmailAddress,
+  type SecondFactorMethod,
+} from '../domain/email-second-factor';
 import { LoginFailureRecorder } from './login-failure-recorder';
 import { MFA_REPOSITORY, type MfaRepository } from './ports/mfa.repository';
 import {
@@ -27,6 +32,10 @@ export interface MfaRequiredLogin {
   readonly kind: 'mfa_required';
   readonly mfaToken: string;
   readonly mfaTokenExpiresAt: Date;
+  /** Con qué puede demostrar el segundo factor; el principal va primero y el correo siempre está. */
+  readonly methods: readonly SecondFactorMethod[];
+  /** El correo enmascarado al que llegaría el código. */
+  readonly emailHint: string;
 }
 
 export type LoginResult = AuthenticatedLogin | MfaRequiredLogin;
@@ -78,15 +87,11 @@ export class LoginUseCase {
       throw new DomainError('EMAIL_NOT_VERIFIED', HTTP_STATUS.forbidden);
     }
 
-    if (await this.hasConfirmedSecondFactor(account.id)) {
+    const factor = await this.mfa.findFactor(account.id);
+    if (factor?.isConfirmed) {
       // El contador de fallos NO se reinicia todavía: la persona aún no ha completado el acceso. Tampoco
       // se recalcula el hash aquí; ocurrirá en el primer acceso sin segundo factor o al cambiarla.
-      const challenge = await this.sessionIssuer.issueMfaChallenge(account.id);
-      return {
-        kind: 'mfa_required',
-        mfaToken: challenge.token,
-        mfaTokenExpiresAt: challenge.expiresAt,
-      };
+      return this.buildMfaChallenge(account, factor.method);
     }
 
     const upgradedHash = await this.upgradedHashFor(account, command.password);
@@ -103,13 +108,22 @@ export class LoginUseCase {
     };
   }
 
-  private isLocked(account: UserAccount, now: Date): boolean {
-    return account.lockedUntil !== null && account.lockedUntil > now;
+  private async buildMfaChallenge(
+    account: UserAccount,
+    method: SecondFactorMethod,
+  ): Promise<MfaRequiredLogin> {
+    const challenge = await this.sessionIssuer.issueMfaChallenge(account.id);
+    return {
+      kind: 'mfa_required',
+      mfaToken: challenge.token,
+      mfaTokenExpiresAt: challenge.expiresAt,
+      methods: listLoginMethods(method),
+      emailHint: maskEmailAddress(account.email),
+    };
   }
 
-  private async hasConfirmedSecondFactor(userId: string): Promise<boolean> {
-    const factor = await this.mfa.findFactor(userId);
-    return factor?.isConfirmed ?? false;
+  private isLocked(account: UserAccount, now: Date): boolean {
+    return account.lockedUntil !== null && account.lockedUntil > now;
   }
 
   /** Solo aquí se tiene la contraseña en claro: es el momento de recalcular un hash con parámetros antiguos. */

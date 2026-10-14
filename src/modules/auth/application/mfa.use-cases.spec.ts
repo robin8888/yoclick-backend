@@ -1,10 +1,12 @@
 import { ConfigService } from '@nestjs/config';
+import { type PinoLogger } from 'nestjs-pino';
 import * as OTPAuth from 'otpauth';
 import {
   FakeVerificationCodeHasher,
   InMemorySessionRepository,
   InMemoryMfaRepository,
   InMemoryUserAccountRepository,
+  InMemoryVerificationCodeRepository,
   RecordingEmailSender,
 } from '../../../../test/support/auth-fakes';
 import { type AccessTokenService } from '../../../shared/auth/access-token.service';
@@ -15,7 +17,10 @@ import { DomainError } from '../../../shared/errors/domain-error';
 import { MAX_FAILED_LOGIN_ATTEMPTS } from '../domain/login-policy';
 import { TotpEngine } from '../infrastructure/totp-engine';
 import { AccountSecurityNotifier } from './account-security-notifier';
+import { ConfirmEmailMfaUseCase } from './confirm-email-mfa.use-case';
 import { ConfirmTotpUseCase } from './confirm-totp.use-case';
+import { EmailSecondFactorCodeVerifier } from './email-second-factor-code-verifier';
+import { EmailSecondFactorCodeIssuer } from './email-second-factor-code-issuer';
 import { DisableMfaUseCase } from './disable-mfa.use-case';
 import { GetMfaStatusUseCase } from './get-mfa-status.use-case';
 import { LoginFailureRecorder } from './login-failure-recorder';
@@ -23,9 +28,17 @@ import { MfaActivator } from './mfa-activator';
 import { ReauthenticationChecker } from './reauthentication.checker';
 import { RecoveryCodeService } from './recovery-code-service';
 import { RegenerateRecoveryCodesUseCase } from './regenerate-recovery-codes.use-case';
+import { SecondFactorSecurityEvents } from './second-factor-security-events';
 import { SecondFactorVerifier } from './second-factor-verifier';
+import {
+  SendAccountEmailCodeUseCase,
+  SendLoginEmailCodeUseCase,
+} from './send-email-second-factor-code.use-cases';
+import { SetupEmailMfaUseCase } from './setup-email-mfa.use-case';
 import { SessionIssuer } from './session-issuer';
 import { SetupTotpUseCase } from './setup-totp.use-case';
+import { TotpCodeChecker } from './totp-code-checker';
+import { VerificationCodeChecker } from './verification-code-checker';
 import { VerifyMfaLoginUseCase } from './verify-mfa-login.use-case';
 
 const USER_ID = 'user-1';
@@ -60,7 +73,28 @@ function buildScenario() {
     spendTimeLikeAVerification: () => Promise.resolve(),
   } as unknown as PasswordHasher;
   const reauth = new ReauthenticationChecker(users, passwordHasher, failureRecorder);
-  const verifier = new SecondFactorVerifier(mfa, engine, encryptor, recoveryCodes, failureRecorder);
+  const codes = new InMemoryVerificationCodeRepository();
+  const codeHasher = new FakeVerificationCodeHasher();
+  const recordedEvents: string[] = [];
+  const securityEvents = new SecondFactorSecurityEvents({
+    info: (fields: { securityEvent: string }) => recordedEvents.push(fields.securityEvent),
+  } as unknown as PinoLogger);
+  const verifier = new SecondFactorVerifier(
+    mfa,
+    new TotpCodeChecker(engine, encryptor),
+    recoveryCodes,
+    failureRecorder,
+    new EmailSecondFactorCodeVerifier(
+      new VerificationCodeChecker(codes, codeHasher),
+      securityEvents,
+    ),
+  );
+  const emailCodeIssuer = new EmailSecondFactorCodeIssuer(
+    codes,
+    codeHasher,
+    emails,
+    securityEvents,
+  );
   const accessTokens = {
     issue: (userId: string, options?: { isMfaVerified: boolean }) =>
       Promise.resolve({
@@ -91,7 +125,17 @@ function buildScenario() {
     verifyLogin: new VerifyMfaLoginUseCase(users, verifier, issuer),
     disable: new DisableMfaUseCase(reauth, verifier, mfa, sessions, notifier),
     regenerate: new RegenerateRecoveryCodesUseCase(reauth, verifier, recoveryCodes, mfa),
-    status: new GetMfaStatusUseCase(mfa),
+    status: new GetMfaStatusUseCase(mfa, users),
+    codes,
+    recordedEvents,
+    setupEmail: new SetupEmailMfaUseCase(reauth, mfa, emailCodeIssuer),
+    confirmEmail: new ConfirmEmailMfaUseCase(
+      users,
+      verifier,
+      new MfaActivator(mfa, recoveryCodes, notifier),
+    ),
+    sendLoginEmailCode: new SendLoginEmailCodeUseCase(users, mfa, issuer, emailCodeIssuer),
+    sendAccountEmailCode: new SendAccountEmailCodeUseCase(users, mfa, emailCodeIssuer),
   };
 }
 
@@ -154,6 +198,8 @@ describe('setting up the second factor', () => {
 
     expect(await scenario.status.execute(USER_ID)).toEqual({
       isEnabled: false,
+      method: null,
+      emailHint: 'a***@gmail.com',
       recoveryCodesRemaining: 0,
     });
   });
@@ -187,6 +233,8 @@ describe('confirming the second factor', () => {
     expect(recoveryCodes).toHaveLength(10);
     expect(await scenario.status.execute(USER_ID)).toEqual({
       isEnabled: true,
+      method: 'totp',
+      emailHint: 'a***@gmail.com',
       recoveryCodesRemaining: 10,
     });
   });
@@ -459,6 +507,8 @@ describe('disabling the second factor', () => {
 
     expect(await scenario.status.execute(USER_ID)).toEqual({
       isEnabled: false,
+      method: null,
+      emailHint: 'a***@gmail.com',
       recoveryCodesRemaining: 0,
     });
     expect(scenario.sessions.activeTokensOf(USER_ID)).toBe(0);
@@ -554,5 +604,199 @@ describe('regenerating recovery codes', () => {
     );
 
     expect(error).toMatchObject({ code: 'MFA_CODE_INVALID' });
+  });
+});
+
+describe('second factor by email code', () => {
+  const MFA_CODE_INVALID = { code: 'MFA_CODE_INVALID' };
+  const CHALLENGE = `challenge-${USER_ID}`;
+
+  async function enableEmailFactor(scenario: Scenario): Promise<readonly string[]> {
+    await scenario.setupEmail.execute(USER_ID, PASSWORD);
+    const code = scenario.emails.lastCodeSentTo(EMAIL) ?? '';
+    const { recoveryCodes } = await scenario.confirmEmail.execute(USER_ID, code);
+    scenario.codes.makeCodesOlderThanCooldown();
+    return recoveryCodes;
+  }
+
+  async function requestLoginCode(scenario: Scenario): Promise<string> {
+    await scenario.sendLoginEmailCode.execute(CHALLENGE);
+    return scenario.emails.lastCodeSentTo(EMAIL) ?? '';
+  }
+
+  function verifyWith(scenario: Scenario, proof: { emailCode?: string; code?: string }) {
+    return scenario.verifyLogin.execute({ mfaToken: CHALLENGE, deviceName: null, ...proof });
+  }
+
+  it('sends a six-digit code with its lifetime and stores only its hash', async () => {
+    const scenario = buildScenario();
+
+    const setup = await scenario.setupEmail.execute(USER_ID, PASSWORD);
+
+    const message = scenario.emails.messagesTo(EMAIL)[0];
+    expect(message?.textBody).toMatch(/\b\d{6}\b/);
+    expect(message?.textBody).toContain('10 minutos');
+    expect(setup.emailHint).toBe('a***@gmail.com');
+    expect(scenario.codes.codes[0]?.codeHash).toMatch(/^hash:/);
+  });
+
+  it('asks for the password before sending anything', async () => {
+    const scenario = buildScenario();
+
+    const error = await captureError(scenario.setupEmail.execute(USER_ID, 'wrong password!!'));
+
+    expect(error).toMatchObject({ code: 'REAUTHENTICATION_FAILED' });
+    expect(scenario.emails.sent).toHaveLength(0);
+  });
+
+  it('activates the email method with the first code and hands out recovery codes', async () => {
+    const scenario = buildScenario();
+
+    const recoveryCodes = await enableEmailFactor(scenario);
+
+    expect(recoveryCodes).toHaveLength(10);
+    expect(await scenario.status.execute(USER_ID)).toMatchObject({
+      isEnabled: true,
+      method: 'email',
+      emailHint: 'a***@gmail.com',
+      recoveryCodesRemaining: 10,
+    });
+    expect(scenario.mfa.factors.get(USER_ID)?.encryptedSecret).toBeNull();
+  });
+
+  it('refuses to activate with a wrong code and keeps the factor unconfirmed', async () => {
+    const scenario = buildScenario();
+    await scenario.setupEmail.execute(USER_ID, PASSWORD);
+
+    const error = await captureError(scenario.confirmEmail.execute(USER_ID, '000000'));
+
+    expect(error).toMatchObject({ ...MFA_CODE_INVALID, httpStatus: 403 });
+    expect((await scenario.status.execute(USER_ID)).isEnabled).toBe(false);
+  });
+
+  it('answers 429 when another code is requested within 60 seconds', async () => {
+    const scenario = buildScenario();
+    await scenario.setupEmail.execute(USER_ID, PASSWORD);
+
+    const error = await captureError(scenario.setupEmail.execute(USER_ID, PASSWORD));
+
+    expect(error).toMatchObject({ code: 'RATE_LIMITED', httpStatus: 429 });
+    expect(scenario.emails.sent).toHaveLength(1);
+    expect(scenario.recordedEvents).toContain('mfa_email_code_send_throttled');
+  });
+
+  it('lets a new code be requested once 60 seconds have passed, invalidating the previous one', async () => {
+    const scenario = buildScenario();
+    await enableEmailFactor(scenario);
+    const firstCode = await requestLoginCode(scenario);
+    scenario.codes.makeCodesOlderThanCooldown();
+    await scenario.sendAccountEmailCode.execute(USER_ID);
+
+    const activeCodes = scenario.codes.codes.filter((stored) => stored.consumedAt === null);
+
+    expect(activeCodes).toHaveLength(1);
+    expect(activeCodes[0]?.codeHash).not.toBe(`hash:${firstCode}`);
+  });
+
+  it('signs in with the emailed code, once only', async () => {
+    const scenario = buildScenario();
+    await enableEmailFactor(scenario);
+    const code = await requestLoginCode(scenario);
+
+    const result = await verifyWith(scenario, { emailCode: code });
+    const reuse = await captureError(verifyWith(scenario, { emailCode: code }));
+
+    expect(result.kind).toBe('authenticated');
+    expect(reuse).toMatchObject(MFA_CODE_INVALID);
+    expect(scenario.recordedEvents).toEqual(
+      expect.arrayContaining(['mfa_email_code_used', 'mfa_email_code_failed']),
+    );
+  });
+
+  it('invalidates the code after five wrong attempts even if the sixth is right', async () => {
+    const scenario = buildScenario();
+    await enableEmailFactor(scenario);
+    const rightCode = await requestLoginCode(scenario);
+    const wrongCode = rightCode === '000000' ? '111111' : '000000';
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await captureError(verifyWith(scenario, { emailCode: wrongCode }));
+    }
+    const error = await captureError(verifyWith(scenario, { emailCode: rightCode }));
+
+    expect(error).toMatchObject(MFA_CODE_INVALID);
+  });
+
+  it('rejects an expired code', async () => {
+    const scenario = buildScenario();
+    await enableEmailFactor(scenario);
+    const code = await requestLoginCode(scenario);
+    scenario.codes.expireActiveCodes();
+
+    const error = await captureError(verifyWith(scenario, { emailCode: code }));
+
+    expect(error).toMatchObject(MFA_CODE_INVALID);
+  });
+
+  it('lets someone with the authenticator app sign in by email too, keeping the app as the method', async () => {
+    const scenario = buildScenario();
+    await enableSecondFactor(scenario);
+    const code = await requestLoginCode(scenario);
+
+    const result = await verifyWith(scenario, { emailCode: code });
+
+    expect(result.kind).toBe('authenticated');
+    expect((await scenario.status.execute(USER_ID)).method).toBe('totp');
+  });
+
+  it('does not accept an authenticator code from someone who chose the email method', async () => {
+    const scenario = buildScenario();
+    await enableEmailFactor(scenario);
+
+    const error = await captureError(verifyWith(scenario, { code: '123456' }));
+
+    expect(error).toMatchObject(MFA_CODE_INVALID);
+  });
+
+  it('accepts a recovery code when the method is email', async () => {
+    const scenario = buildScenario();
+    const recoveryCodes = await enableEmailFactor(scenario);
+
+    const result = await scenario.verifyLogin.execute({
+      mfaToken: CHALLENGE,
+      recoveryCode: recoveryCodes[0] ?? '',
+      deviceName: null,
+    });
+
+    expect(result.kind).toBe('authenticated');
+  });
+
+  it('disables the factor with a freshly sent email code', async () => {
+    const scenario = buildScenario();
+    await enableEmailFactor(scenario);
+    await scenario.sendAccountEmailCode.execute(USER_ID);
+    const code = scenario.emails.lastCodeSentTo(EMAIL) ?? '';
+
+    await scenario.disable.execute({ userId: USER_ID, password: PASSWORD, emailCode: code });
+
+    expect((await scenario.status.execute(USER_ID)).isEnabled).toBe(false);
+  });
+
+  it('refuses to send a code when no second factor is active', async () => {
+    const scenario = buildScenario();
+
+    const error = await captureError(scenario.sendAccountEmailCode.execute(USER_ID));
+
+    expect(error).toMatchObject({ code: 'MFA_NOT_ENABLED' });
+    expect(scenario.emails.sent).toHaveLength(0);
+  });
+
+  it('cannot replace an active factor with the email setup', async () => {
+    const scenario = buildScenario();
+    await enableSecondFactor(scenario);
+
+    const error = await captureError(scenario.setupEmail.execute(USER_ID, PASSWORD));
+
+    expect(error).toMatchObject({ code: 'MFA_ALREADY_ENABLED' });
   });
 });
