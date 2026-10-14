@@ -198,8 +198,9 @@ export class CreateRoomBlockUseCase {
     if (outcome.kind === 'has_bookings') {
       throw new DomainError('ROOM_HAS_BOOKINGS', HTTP_STATUS.conflict);
     }
+    const conflictCode = outcome.kind === 'in_the_past' ? 'in_the_past' : 'overlaps_block';
     throw new DomainError('CONFLICT', HTTP_STATUS.conflict, [
-      { path: 'startsAt', code: 'overlaps_block' },
+      { path: 'startsAt', code: conflictCode },
     ]);
   }
 }

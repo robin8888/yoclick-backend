@@ -785,30 +785,49 @@ describe('room schedules, fixed groups and room blocks', () => {
     expect(again.statusCode).toBe(404);
   });
 
-  it('blocks a room: schedule sessions inside are cancelled and no appointment can use it', async () => {
+  it('blocks a room only in a free future slot: classes are not cancelled by a block', async () => {
     const { series } = await createSeries();
     await call('POST', `/schedules/${series.seriesId}/enrollments`, {
       clientMembershipIds: [clients[0]!.membershipId],
     });
 
+    const overClass = await call('POST', `/rooms/${roomId}/blocks`, {
+      startsAt: zonedDateTimeToUtc(firstDate, '17:30', MADRID).toISOString(),
+      endsAt: zonedDateTimeToUtc(firstDate, '19:30', MADRID).toISOString(),
+      reason: 'rental',
+    });
+    expect(overClass.statusCode).toBe(409);
+    expect(overClass.json<{ code: string }>().code).toBe('ROOM_HAS_BOOKINGS');
+
+    const inThePast = await call('POST', `/rooms/${roomId}/blocks`, {
+      startsAt: zonedDateTimeToUtc(
+        addDaysToLocalDate(firstDate, -30),
+        '10:00',
+        MADRID,
+      ).toISOString(),
+      endsAt: zonedDateTimeToUtc(addDaysToLocalDate(firstDate, -30), '11:00', MADRID).toISOString(),
+      reason: 'rental',
+    });
+    expect(inThePast.statusCode).toBe(409);
+
     const blocked = await call('POST', `/rooms/${roomId}/blocks`, {
-      startsAt: zonedDateTimeToUtc(firstDate, '17:00', MADRID).toISOString(),
+      startsAt: zonedDateTimeToUtc(firstDate, '19:00', MADRID).toISOString(),
       endsAt: zonedDateTimeToUtc(firstDate, '20:00', MADRID).toISOString(),
       reason: 'rental',
       note: 'Alquilada a la asociación de vecinos',
     });
 
     expect(blocked.statusCode).toBe(201);
-    expect(blocked.json<{ cancelledSessionCount: number }>().cancelledSessionCount).toBe(1);
+    expect(blocked.json<{ cancelledSessionCount: number }>().cancelledSessionCount).toBe(0);
     const agenda = await readRoomAgenda(firstDate);
     const room = agenda.rooms.find(({ id }) => id === roomId);
     expect(room?.blocks).toEqual([expect.objectContaining({ reason: 'rental' })]);
-    expect(room?.sessions[0]).toMatchObject({ cancelledReason: 'blocked', bookedCount: 0 });
+    expect(room?.sessions[0]).toMatchObject({ cancelledReason: null, bookedCount: 1 });
 
     const appointment = await call('POST', '/agenda/bookings', {
       clientMembershipId: clients[1]!.membershipId,
       serviceId: privateServiceId,
-      startsAt: zonedDateTimeToUtc(firstDate, '18:00', MADRID).toISOString(),
+      startsAt: zonedDateTimeToUtc(firstDate, '19:00', MADRID).toISOString(),
       staffMembershipId: teacherAna.membershipId,
       roomId,
     });
@@ -816,7 +835,7 @@ describe('room schedules, fixed groups and room blocks', () => {
     expect(appointment.json<{ code: string }>().code).toBe('ROOM_UNAVAILABLE');
 
     const overlapping = await call('POST', `/rooms/${roomId}/blocks`, {
-      startsAt: zonedDateTimeToUtc(firstDate, '19:00', MADRID).toISOString(),
+      startsAt: zonedDateTimeToUtc(firstDate, '19:30', MADRID).toISOString(),
       endsAt: zonedDateTimeToUtc(firstDate, '21:00', MADRID).toISOString(),
       reason: 'event',
     });

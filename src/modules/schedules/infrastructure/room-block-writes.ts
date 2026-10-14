@@ -8,7 +8,6 @@ import {
 } from '../application/ports/schedule.repository';
 import { lockRoom } from './room-block-queries';
 import { BLOCK_VIEW_INCLUDE, toRoomBlockView } from './schedule-view.mapper';
-import { cancelSessionWithBookings } from './session-cancellation';
 
 export async function listBlocksInTransaction(
   client: TenantTransactionClient,
@@ -26,7 +25,7 @@ export async function listBlocksInTransaction(
   return blocks.map(toRoomBlockView);
 }
 
-/** Lo que ocupa la sala en el tramo del bloqueo, con sus plazas confirmadas (sueltas y de matrícula). */
+/** Las clases programadas que ocupan la sala en el tramo del bloqueo. */
 async function listSessionsInRange(client: TenantTransactionClient, newBlock: NewRoomBlock) {
   return client.classSession.findMany({
     where: {
@@ -35,14 +34,7 @@ async function listSessionsInRange(client: TenantTransactionClient, newBlock: Ne
       startsAt: { lt: newBlock.endsAt },
       endsAt: { gt: newBlock.startsAt },
     },
-    include: {
-      service: { select: { name: true } },
-      room: { select: { name: true } },
-      bookings: {
-        where: { status: 'confirmed' },
-        select: { id: true, clientMembershipId: true, source: true },
-      },
-    },
+    select: { id: true },
   });
 }
 
@@ -64,8 +56,8 @@ async function tryInsertBlock(
 }
 
 /**
- * Bloquea la sala. Las sesiones de horario sin citas sueltas que caigan dentro se cancelan (con aviso
- * a los matriculados); si alguna tiene citas sueltas, hay que resolverlas antes y no se bloquea nada.
+ * Bloquea la sala en un tramo futuro y libre: si empieza en el pasado o hay una clase asignada
+ * dentro, no se bloquea nada (la clase se cancela o se mueve antes, no la cancela el bloqueo).
  */
 export async function createBlockInTransaction(
   client: TenantTransactionClient,
@@ -77,30 +69,19 @@ export async function createBlockInTransaction(
     select: { id: true },
   });
   if (!room) return { kind: 'room_not_found' };
+  if (newBlock.startsAt < new Date()) return { kind: 'in_the_past' };
   await lockRoom(client, newBlock.roomId);
 
+  // Una sala solo se separa en un tramo libre: una clase ya asignada hay que cancelarla o moverla antes.
   const sessions = await listSessionsInRange(client, newBlock);
-  const withSingleBookings = sessions.filter((session) =>
-    session.bookings.some((booking) => booking.source === 'single'),
-  );
-  if (withSingleBookings.length > 0) {
-    return { kind: 'has_bookings', sessionCount: withSingleBookings.length };
-  }
-  for (const session of sessions) {
-    await cancelSessionWithBookings(client, actor, {
-      session,
-      reason: 'blocked',
-      now: newBlock.startsAt < new Date() ? newBlock.startsAt : new Date(),
-      shouldNotify: true,
-    });
-  }
+  if (sessions.length > 0) return { kind: 'has_bookings', sessionCount: sessions.length };
   const blockId = await tryInsertBlock(client, actor, newBlock);
   if (blockId === null) return { kind: 'overlaps_block' };
   const block = await client.roomBlock.findUniqueOrThrow({
     where: { id: blockId },
     include: BLOCK_VIEW_INCLUDE,
   });
-  return { kind: 'created', block: toRoomBlockView(block), cancelledSessionCount: sessions.length };
+  return { kind: 'created', block: toRoomBlockView(block), cancelledSessionCount: 0 };
 }
 
 export async function deleteBlockInTransaction(

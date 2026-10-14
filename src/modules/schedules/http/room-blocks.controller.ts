@@ -118,7 +118,7 @@ export class RoomBlocksController {
   @ApiOperation({
     operationId: 'room_blocks_create',
     summary:
-      'Bloquea la sala en un tramo (alquiler, mantenimiento, evento). Las sesiones de horario sin citas sueltas que caigan dentro se cancelan y se avisa a sus matriculados. 409 ROOM_HAS_BOOKINGS si hay citas sueltas en ese tramo; CONFLICT si se solapa con otro bloqueo.',
+      'Bloquea la sala en un tramo futuro y libre (alquiler, mantenimiento, evento). 409 ROOM_HAS_BOOKINGS si hay clases o citas en ese tramo; CONFLICT si empieza en el pasado o se solapa con otro bloqueo.',
   })
   @ApiCreatedResponse({ type: RoomBlockResponseDto })
   async create(

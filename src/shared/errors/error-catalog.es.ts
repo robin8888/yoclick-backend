@@ -87,7 +87,7 @@ export const ERROR_CATALOG = {
   },
   SESSION_NOT_CANCELLABLE: { title: 'Esta sesión ya ha empezado o ya estaba cancelada' },
   ROOM_HAS_BOOKINGS: {
-    title: 'Hay citas en ese tramo. Cancélalas o muévelas antes de bloquear la sala',
+    title: 'Hay clases o citas en ese tramo. Cancélalas o muévelas antes de bloquear la sala',
   },
   BOOKING_NOT_CANCELLABLE: { title: 'Esta reserva ya no se puede cancelar' },
   BOOKING_NOT_RESCHEDULABLE: { title: 'Esta reserva ya no se puede cambiar de hora' },

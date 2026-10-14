@@ -190,11 +190,12 @@ export type RoomBlockCreationOutcome =
   | {
       readonly kind: 'created';
       readonly block: RoomBlockView;
-      /** Sesiones de horario sin citas sueltas que se cancelaron para dejar la sala libre. */
+      /** Siempre 0: bloquear ya no cancela clases (se mantiene por compatibilidad del contrato). */
       readonly cancelledSessionCount: number;
     }
   | { readonly kind: 'room_not_found' }
-  /** Hay sesiones con citas en ese tramo: hay que cancelarlas o moverlas antes. */
+  | { readonly kind: 'in_the_past' }
+  /** Hay clases asignadas en ese tramo: hay que cancelarlas o moverlas antes. */
   | { readonly kind: 'has_bookings'; readonly sessionCount: number }
   | { readonly kind: 'overlaps_block' };
 
