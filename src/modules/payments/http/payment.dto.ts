@@ -48,6 +48,8 @@ export class PaymentSheetResponseDto extends createZodDto(
     /** Secreto del cobro para abrir la hoja de pago de Stripe; solo lo recibe quien paga. */
     clientSecret: z.string(),
     publishableKey: z.string(),
+    /** Cuenta del centro en la que vive el cobro: la hoja de pago de Stripe debe abrirse en ella. */
+    connectedAccountId: z.string(),
     amountCents: z.number().int(),
     /** El nombre del centro, que ve quien paga en la hoja. */
     merchantName: z.string(),

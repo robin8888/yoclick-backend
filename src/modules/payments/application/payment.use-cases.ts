@@ -21,8 +21,15 @@ export interface PaymentSheetView {
   readonly paymentId: string;
   readonly clientSecret: string;
   readonly publishableKey: string;
+  readonly connectedAccountId: string;
   readonly amountCents: number;
   readonly merchantName: string;
+}
+
+/** El centro que cobra: el cobro se crea en su cuenta de Stripe. */
+interface Merchant {
+  readonly accountId: string;
+  readonly name: string;
 }
 
 export interface PaymentConfirmationView {
@@ -132,38 +139,40 @@ export class PayTargetUseCase {
     }
     const payable = await this.payments.findPayableTarget(actor, target);
     if (!payable) throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
-    const sheet = await this.reuseOpenPayment(actor, payable, centerPayments.name);
-    return (
-      sheet ??
-      this.startPayment(actor, {
-        payable,
-        accountId: centerPayments.stripeAccountId,
-        merchantName: centerPayments.name,
-      })
-    );
+    const merchant = { accountId: centerPayments.stripeAccountId, name: centerPayments.name };
+    const sheet = await this.reuseOpenPayment(actor, payable, merchant);
+    return sheet ?? this.startPayment(actor, { payable, merchant });
   }
 
   /** Un intento sin terminar se retoma con su mismo secreto, para no dejar cobros huérfanos. */
   private async reuseOpenPayment(
     actor: ActorContext,
     payable: PayableTarget,
-    merchantName: string,
+    merchant: Merchant,
   ): Promise<PaymentSheetView | null> {
     const open = await this.payments.findPendingPayment(actor, payable.target);
     if (!open || open.amountCents !== payable.amountCents) return null;
-    const gatewayPayment = await this.gateway.readPayment(open.stripePaymentIntentId);
+    const gatewayPayment = await this.gateway.readPayment({
+      paymentIntentId: open.stripePaymentIntentId,
+      accountId: merchant.accountId,
+    });
     if (gatewayPayment.status !== 'pending') return null;
-    return this.toSheet(open.id, gatewayPayment.clientSecret, payable.amountCents, merchantName);
+    return this.toSheet({
+      paymentId: open.id,
+      clientSecret: gatewayPayment.clientSecret,
+      amountCents: payable.amountCents,
+      merchant,
+    });
   }
 
   private async startPayment(
     actor: ActorContext,
-    input: { payable: PayableTarget; accountId: string; merchantName: string },
+    input: { payable: PayableTarget; merchant: Merchant },
   ): Promise<PaymentSheetView> {
     const { payable } = input;
     const paymentId = generateUuidV7();
     const gatewayPayment = await this.gateway.createPayment({
-      accountId: input.accountId,
+      accountId: input.merchant.accountId,
       amountCents: payable.amountCents,
       description: payable.description,
       idempotencyKey: paymentId,
@@ -181,26 +190,27 @@ export class PayTargetUseCase {
       amountCents: payable.amountCents,
       stripePaymentIntentId: gatewayPayment.paymentIntentId,
     });
-    return this.toSheet(
+    return this.toSheet({
       paymentId,
-      gatewayPayment.clientSecret,
-      payable.amountCents,
-      input.merchantName,
-    );
+      clientSecret: gatewayPayment.clientSecret,
+      amountCents: payable.amountCents,
+      merchant: input.merchant,
+    });
   }
 
-  private toSheet(
-    paymentId: string,
-    clientSecret: string,
-    amountCents: number,
-    merchantName: string,
-  ): PaymentSheetView {
+  private toSheet(input: {
+    paymentId: string;
+    clientSecret: string;
+    amountCents: number;
+    merchant: Merchant;
+  }): PaymentSheetView {
     return {
-      paymentId,
-      clientSecret,
+      paymentId: input.paymentId,
+      clientSecret: input.clientSecret,
       publishableKey: this.gateway.publishableKey,
-      amountCents,
-      merchantName,
+      connectedAccountId: input.merchant.accountId,
+      amountCents: input.amountCents,
+      merchantName: input.merchant.name,
     };
   }
 }
@@ -215,9 +225,13 @@ export class SettlePaymentService {
 
   async settleFromGateway(input: {
     centerId: string;
+    accountId: string;
     stripePaymentIntentId: string;
   }): Promise<PaymentConfirmationView['status']> {
-    const gatewayPayment = await this.gateway.readPayment(input.stripePaymentIntentId);
+    const gatewayPayment = await this.gateway.readPayment({
+      paymentIntentId: input.stripePaymentIntentId,
+      accountId: input.accountId,
+    });
     if (gatewayPayment.status !== 'succeeded') return gatewayPayment.status;
     const outcome = await this.payments.settlePayment({
       centerId: input.centerId,
@@ -242,8 +256,12 @@ export class ConfirmPaymentUseCase {
     const payment: PaymentRecord | null = await this.payments.findPaymentOfActor(actor, paymentId);
     if (!payment) throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
     if (payment.status === 'succeeded') return { paymentId, status: 'succeeded' };
+    const centerPayments = await this.payments.getCenterPaymentsInfo(actor);
+    if (centerPayments?.stripeAccountId == null)
+      throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
     const status = await this.settlement.settleFromGateway({
       centerId: actor.centerId,
+      accountId: centerPayments.stripeAccountId,
       stripePaymentIntentId: payment.stripePaymentIntentId,
     });
     return { paymentId, status };
@@ -261,13 +279,17 @@ export class HandleStripeWebhookUseCase {
   async execute(input: { rawBody: Buffer; signatureHeader: string | undefined }): Promise<void> {
     const event = this.gateway.verifyWebhook({ ...input, now: new Date() });
     if (event === null) throw new DomainError('BAD_REQUEST', HTTP_STATUS.badRequest);
-    if (event.type !== 'payment_intent.succeeded' || event.paymentIntentId === null) return;
-    const payment = await this.gateway.readPayment(event.paymentIntentId);
+    const { paymentIntentId, accountId } = event;
+    const isSettleable =
+      event.type === 'payment_intent.succeeded' && paymentIntentId !== null && accountId !== null;
+    if (!isSettleable) return;
+    const payment = await this.gateway.readPayment({ paymentIntentId, accountId });
     const centerId = payment.metadata['centerId'];
     if (centerId === undefined) return;
     await this.settlement.settleFromGateway({
       centerId,
-      stripePaymentIntentId: event.paymentIntentId,
+      accountId,
+      stripePaymentIntentId: paymentIntentId,
     });
   }
 }

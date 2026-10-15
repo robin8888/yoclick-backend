@@ -95,6 +95,8 @@ const baseEnvironmentSchema = z.object({
   STRIPE_SECRET_KEY: optionalSetting,
   // Sin él los avisos de Stripe se rechazan y los cobros se confirman solo desde la app.
   STRIPE_WEBHOOK_SECRET: optionalSetting,
+  // Webhook de eventos Connect: los cobros directos del centro se avisan por aquí, no por el anterior.
+  STRIPE_CONNECT_WEBHOOK_SECRET: optionalSetting,
   // Clave pública: la app la recibe de la API al pagar, así que no vive en su configuración.
   STRIPE_PUBLISHABLE_KEY: optionalSetting,
   // A dónde vuelve el navegador tras el alta de cobros del centro en Stripe (Stripe pide https).

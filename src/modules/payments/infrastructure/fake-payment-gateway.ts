@@ -51,8 +51,8 @@ export class FakePaymentGateway implements PaymentGateway {
     return Promise.resolve(payment);
   }
 
-  readPayment(paymentIntentId: string): Promise<GatewayPayment> {
-    const payment = this.payments.get(paymentIntentId);
+  readPayment(input: { paymentIntentId: string }): Promise<GatewayPayment> {
+    const payment = this.payments.get(input.paymentIntentId);
     if (payment === undefined) return Promise.reject(new Error('Unknown fake payment'));
     return Promise.resolve(payment);
   }
@@ -66,8 +66,13 @@ export class FakePaymentGateway implements PaymentGateway {
     const body = JSON.parse(input.rawBody.toString('utf8')) as {
       type?: string;
       paymentIntentId?: string;
+      accountId?: string;
     };
-    return { type: body.type ?? '', paymentIntentId: body.paymentIntentId ?? null };
+    return {
+      type: body.type ?? '',
+      paymentIntentId: body.paymentIntentId ?? null,
+      accountId: body.accountId ?? null,
+    };
   }
 
   completeOnboarding(accountId: string): void {

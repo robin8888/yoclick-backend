@@ -19,8 +19,11 @@ const PAYMENT_CURRENCY = 'eur';
 
 export interface StripeGatewayConfig {
   readonly secretKey: string;
-  /** `null` mientras no exista el webhook en Stripe: los avisos se rechazan. */
-  readonly webhookSecret: string | null;
+  /**
+   * Secretos de los webhooks de Stripe: el de cuenta de la plataforma y el de eventos Connect (los
+   * cobros directos se avisan por este último). Vacío mientras no exista el webhook: se rechazan.
+   */
+  readonly webhookSecrets: readonly string[];
   readonly publishableKey: string;
   readonly returnUrl: string;
   readonly refreshUrl: string;
@@ -45,6 +48,8 @@ const paymentIntentSchema = z.object({
 
 const webhookEventSchema = z.object({
   type: z.string(),
+  /** Presente en los eventos Connect: la cuenta del centro en la que ocurrió. */
+  account: z.string().optional(),
   data: z.object({ object: z.object({ id: z.string().optional() }) }),
 });
 
@@ -101,6 +106,8 @@ interface StripeRequest<TSchema extends z.ZodType> {
   schema: TSchema;
   fields?: Readonly<Record<string, string>>;
   idempotencyKey?: string;
+  /** Opera en nombre de la cuenta del centro (cobros directos). */
+  stripeAccountId?: string;
 }
 
 interface StripeJsonRequest<TSchema extends z.ZodType> {
@@ -135,7 +142,7 @@ export class StripePaymentGateway implements PaymentGateway {
         identity: { country: 'ES' },
         dashboard: 'express',
         defaults: {
-          responsibilities: { fees_collector: 'application', losses_collector: 'application' },
+          responsibilities: { fees_collector: 'stripe', losses_collector: 'stripe' },
         },
         configuration: {
           merchant: { capabilities: { card_payments: { requested: true } } },
@@ -210,24 +217,27 @@ export class StripePaymentGateway implements PaymentGateway {
       path: '/payment_intents',
       schema: paymentIntentSchema,
       idempotencyKey: input.idempotencyKey,
+      stripeAccountId: input.accountId,
       fields: {
         amount: String(input.amountCents),
         currency: PAYMENT_CURRENCY,
         description: input.description,
         'automatic_payment_methods[enabled]': 'true',
-        // El dinero va a la cuenta del centro; Yoclick no cobra comisión por venta.
-        'transfer_data[destination]': input.accountId,
         ...prefixKeys('metadata', input.metadata),
       },
     });
     return this.toGatewayPayment(intent);
   }
 
-  async readPayment(paymentIntentId: string): Promise<GatewayPayment> {
+  async readPayment(input: {
+    paymentIntentId: string;
+    accountId: string;
+  }): Promise<GatewayPayment> {
     const intent = await this.send({
       method: 'GET',
-      path: `/payment_intents/${paymentIntentId}`,
+      path: `/payment_intents/${input.paymentIntentId}`,
       schema: paymentIntentSchema,
+      stripeAccountId: input.accountId,
     });
     return this.toGatewayPayment(intent);
   }
@@ -237,13 +247,14 @@ export class StripePaymentGateway implements PaymentGateway {
     signatureHeader: string | undefined;
     now: Date;
   }): GatewayWebhookEvent | null {
-    if (this.config.webhookSecret === null) return null;
-    const isValid = isValidStripeSignature({
-      rawBody: input.rawBody,
-      signatureHeader: input.signatureHeader,
-      secret: this.config.webhookSecret,
-      now: input.now,
-    });
+    const isValid = this.config.webhookSecrets.some((secret) =>
+      isValidStripeSignature({
+        rawBody: input.rawBody,
+        signatureHeader: input.signatureHeader,
+        secret,
+        now: input.now,
+      }),
+    );
     if (!isValid) return null;
     const parsed = webhookEventSchema.safeParse(JSON.parse(input.rawBody.toString('utf8')));
     if (!parsed.success) return null;
@@ -251,6 +262,7 @@ export class StripePaymentGateway implements PaymentGateway {
     return {
       type: parsed.data.type,
       paymentIntentId: isPaymentEvent ? (parsed.data.data.object.id ?? null) : null,
+      accountId: parsed.data.account ?? null,
     };
   }
 
@@ -267,7 +279,7 @@ export class StripePaymentGateway implements PaymentGateway {
   private async send<TSchema extends z.ZodType>(
     request: StripeRequest<TSchema>,
   ): Promise<z.infer<TSchema>> {
-    const { method, path, fields, idempotencyKey } = request;
+    const { method, path, fields, idempotencyKey, stripeAccountId } = request;
     return this.call({
       method,
       url: `${STRIPE_API_ORIGIN}/v1${path}`,
@@ -275,6 +287,7 @@ export class StripePaymentGateway implements PaymentGateway {
       headers: {
         ...(fields === undefined ? {} : { 'content-type': 'application/x-www-form-urlencoded' }),
         ...(idempotencyKey === undefined ? {} : { 'idempotency-key': idempotencyKey }),
+        ...(stripeAccountId === undefined ? {} : { 'stripe-account': stripeAccountId }),
       },
       ...(fields === undefined ? {} : { body: encodeForm(fields) }),
     });

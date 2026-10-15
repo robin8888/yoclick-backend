@@ -27,7 +27,10 @@ function createPaymentGateway(configService: ConfigService<Environment, true>): 
     configService.get(name, { infer: true });
   return new StripePaymentGateway({
     secretKey: read('STRIPE_SECRET_KEY'),
-    webhookSecret: configService.get('STRIPE_WEBHOOK_SECRET', { infer: true }) ?? null,
+    webhookSecrets: [
+      configService.get('STRIPE_WEBHOOK_SECRET', { infer: true }),
+      configService.get('STRIPE_CONNECT_WEBHOOK_SECRET', { infer: true }),
+    ].filter((secret): secret is string => secret !== undefined),
     publishableKey: read('STRIPE_PUBLISHABLE_KEY'),
     returnUrl: configService.get('STRIPE_CONNECT_RETURN_URL', { infer: true }),
     refreshUrl: configService.get('STRIPE_CONNECT_REFRESH_URL', { infer: true }),

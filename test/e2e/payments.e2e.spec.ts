@@ -19,6 +19,7 @@ interface SheetBody {
   paymentId: string;
   clientSecret: string;
   publishableKey: string;
+  connectedAccountId: string;
   amountCents: number;
 }
 
@@ -112,6 +113,12 @@ describe('payments (Stripe Connect, plan Premium)', () => {
     ownerUserId = await world.fixtures.createUser('owner');
     center = await world.createCenter(ownerUserId);
     centerId = center.centerId;
+    await world.tenantPrismaService.runInTenantContext(ownerActor(), async (prisma) => {
+      await prisma.center.update({
+        where: { id: centerId },
+        data: { contactEmail: 'contacto@academia.test' },
+      });
+    });
     ana = await world.addMember(centerId, 'ana', 'client');
     luis = await world.addMember(centerId, 'luis', 'client');
     const rate = await world.call('POST', url('/rates'), ownerUserId, {
@@ -156,6 +163,21 @@ describe('payments (Stripe Connect, plan Premium)', () => {
     const tooEarly = await payPass(ana, pass.id);
     expect(tooEarly.statusCode).toBe(409);
     expect(tooEarly.json<{ code: string }>().code).toBe('PAYMENTS_NOT_READY');
+  });
+
+  it('asks for a contact email before opening the Stripe account', async () => {
+    await setClientLimit(null);
+    await world.tenantPrismaService.runInTenantContext(ownerActor(), async (prisma) => {
+      await prisma.center.update({ where: { id: centerId }, data: { contactEmail: null } });
+    });
+
+    const link = await world.call('POST', url('/payments/connect/onboarding-link'), ownerUserId, {
+      centerId,
+    });
+
+    expect(link.statusCode).toBe(422);
+    expect(link.json<{ code: string }>().code).toBe('CENTER_CONTACT_EMAIL_REQUIRED');
+    expect(await readStatus(ownerUserId)).toBe('not_started');
   });
 
   it('activates a pass once Stripe says it was paid, and only for its owner', async () => {
@@ -208,7 +230,12 @@ describe('payments (Stripe Connect, plan Premium)', () => {
     const sheet = (await payPass(ana, pass.id)).json<SheetBody>();
     const paymentIntentId = await readPaymentIntentId(sheet.paymentId);
     gateway.succeed(paymentIntentId);
-    const event = { type: 'payment_intent.succeeded', paymentIntentId };
+    // Cobro directo: Stripe avisa con un evento Connect, que trae la cuenta del centro.
+    const event = {
+      type: 'payment_intent.succeeded',
+      paymentIntentId,
+      accountId: sheet.connectedAccountId,
+    };
 
     const forged = await world.call('POST', '/v1/webhooks/stripe', undefined, {
       headers: { 'stripe-signature': 'forged' },

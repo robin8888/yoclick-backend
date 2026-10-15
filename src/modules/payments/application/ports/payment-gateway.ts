@@ -19,7 +19,7 @@ export interface GatewayPayment {
 }
 
 export interface NewGatewayPayment {
-  /** Cuenta del centro (acct_...) a la que va el dinero. */
+  /** Cuenta del centro (acct_...): el cobro se crea en ella y el dinero no pasa por Yoclick. */
   readonly accountId: string;
   readonly amountCents: number;
   readonly description: string;
@@ -32,11 +32,14 @@ export interface NewGatewayPayment {
 export interface GatewayWebhookEvent {
   readonly type: string;
   readonly paymentIntentId: string | null;
+  /** Cuenta del centro en la que ocurrió el aviso (eventos Connect); `null` si es de la plataforma. */
+  readonly accountId: string | null;
 }
 
 /**
- * La pasarela de cobros (Stripe Connect). Los cobros van directos a la cuenta del centro: Yoclick no
- * custodia fondos (docs/spec/01-arquitectura.md).
+ * La pasarela de cobros (Stripe Connect). Cobros directos: el PaymentIntent vive en la cuenta del
+ * centro, que es el comerciante y asume comisiones, devoluciones y disputas; Yoclick solo es el
+ * software (docs/spec/01-arquitectura.md).
  */
 export interface PaymentGateway {
   /** Clave pública que necesita la app para abrir la hoja de pago. */
@@ -50,7 +53,7 @@ export interface PaymentGateway {
   createOnboardingLink(accountId: string): Promise<{ url: string }>;
   readConnectedAccount(accountId: string): Promise<ConnectedAccountState>;
   createPayment(input: NewGatewayPayment): Promise<GatewayPayment>;
-  readPayment(paymentIntentId: string): Promise<GatewayPayment>;
+  readPayment(input: { paymentIntentId: string; accountId: string }): Promise<GatewayPayment>;
   /** `null` si la firma no es válida o el aviso es antiguo (SEC-66). */
   verifyWebhook(input: {
     rawBody: Buffer;
