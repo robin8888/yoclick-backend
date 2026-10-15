@@ -34,6 +34,8 @@ export class ClientListQueryDto extends createZodDto(
      * ella; `center` son todas las del centro, para ponerle una cita a alguien nuevo.
      */
     scope: z.enum(['mine', 'center']).default('mine'),
+    /** `students` (por defecto), `guardians` (quienes no son alumnos: tutores, familias) o `all`. */
+    kind: z.enum(['students', 'guardians', 'all']).default('students'),
     limit: z.coerce
       .number()
       .int()
@@ -54,6 +56,8 @@ const clientShape = {
   /** Nuevo (primera semana), activo (cita en los últimos 30 días) o inactivo. */
   activity: z.enum(['new', 'active', 'inactive']),
   level: z.enum(CLIENT_LEVELS).nullable(),
+  /** `false`: es solo tutor, no cuenta como alumno. */
+  isStudent: z.boolean(),
   group: z.strictObject({ id: z.uuid(), name: z.string() }).nullable(),
   joinedAt: z.iso.datetime(),
   bookingCount: z.number().int(),
@@ -70,6 +74,8 @@ export class ClientListResponseDto extends createZodDto(
     totalClientCount: z.number().int(),
     /** Los que cumplen la búsqueda y el estado, antes de paginar. */
     matchingCount: z.number().int(),
+    /** Cuántas personas no son alumnos (la pestaña «Familias»). */
+    guardianCount: z.number().int(),
     clients: z.array(z.strictObject(clientShape)),
   }),
 ) {}
@@ -79,6 +85,8 @@ export class UpdateClientRequestDto extends createZodDto(
     .strictObject({
       level: z.enum(CLIENT_LEVELS).nullable().optional(),
       groupId: z.uuid().nullable().optional(),
+      /** `false` la deja como solo tutora: sale de la lista de alumnos y no cuenta para el plan. */
+      isStudent: z.boolean().optional(),
     })
     .refine((patch) => Object.keys(patch).length > 0, 'send at least one field to change'),
 ) {}

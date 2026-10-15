@@ -23,7 +23,7 @@ export class PrismaCenterSubscriptionRepository implements CenterSubscriptionRep
         },
       });
       const activeClientCount = await client.membership.count({
-        where: { role: 'client', status: 'active' },
+        where: { role: 'client', isStudent: true, status: 'active' },
       });
       const videoStorage = await client.video.aggregate({
         _sum: { sizeBytes: true },

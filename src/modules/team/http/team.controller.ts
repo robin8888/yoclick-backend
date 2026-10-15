@@ -145,6 +145,7 @@ export class TeamController {
       email: body.email,
       phone: body.phone,
       role: body.role,
+      isStudent: body.isStudent,
     });
     return { ...invitation, expiresAt: invitation.expiresAt.toISOString() };
   }

@@ -4564,6 +4564,16 @@ paths:
             enum:
               - mine
               - center
+        - name: kind
+          required: false
+          in: query
+          schema:
+            default: students
+            type: string
+            enum:
+              - students
+              - guardians
+              - all
         - name: limit
           required: false
           in: query
@@ -9058,6 +9068,8 @@ components:
             - admin
             - staff
             - client
+        isStudent:
+          type: boolean
       required:
         - role
       additionalProperties: false
@@ -14829,6 +14841,10 @@ components:
           type: integer
           minimum: -9007199254740991
           maximum: 9007199254740991
+        guardianCount:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
         clients:
           type: array
           items:
@@ -14864,6 +14880,8 @@ components:
                   - advanced
                   - null
                 nullable: true
+              isStudent:
+                type: boolean
               group:
                 type: object
                 properties:
@@ -14904,6 +14922,7 @@ components:
               - status
               - activity
               - level
+              - isStudent
               - group
               - joinedAt
               - bookingCount
@@ -14913,6 +14932,7 @@ components:
       required:
         - totalClientCount
         - matchingCount
+        - guardianCount
         - clients
       additionalProperties: false
     ImportClientsRequestDto:
@@ -15030,6 +15050,8 @@ components:
             - advanced
             - null
           nullable: true
+        isStudent:
+          type: boolean
         group:
           type: object
           properties:
@@ -15070,6 +15092,7 @@ components:
         - status
         - activity
         - level
+        - isStudent
         - group
         - joinedAt
         - bookingCount
@@ -15092,6 +15115,8 @@ components:
           format: uuid
           pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
           nullable: true
+        isStudent:
+          type: boolean
       additionalProperties: false
     GroupListResponseDto:
       type: object

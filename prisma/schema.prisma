@@ -413,6 +413,8 @@ model Membership {
   staffTitle     String?          @map("staff_title")
   /// Solo clientes: su nivel y el grupo al que pertenece (uno como máximo).
   level          ClientLevel?
+  /// Solo clientes: si cuenta como alumno. Un tutor que no da clase no lo es.
+  isStudent      Boolean          @default(true) @map("is_student")
   groupId        String?          @map("group_id") @db.Uuid
   /// Solo clientes: cómo se unió. Nulo si entró antes de que se registrara o por invitación.
   joinSource     JoinSource?      @map("join_source")
@@ -603,6 +605,8 @@ model Invitation {
   /// Teléfono al que se compartió el código, normalizado (`+34600111222`).
   phone            String?
   role             MembershipRole
+  /// Solo invitaciones de cliente: si entra como alumno o solo como tutor.
+  isStudent        Boolean        @default(true) @map("is_student")
   tokenHash        String         @unique @map("token_hash")
   invitedByUserId  String         @map("invited_by_user_id") @db.Uuid
   expiresAt        DateTime       @map("expires_at") @db.Timestamptz

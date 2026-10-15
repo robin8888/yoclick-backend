@@ -84,6 +84,7 @@ export class ClientsController {
       status: query.status ?? null,
       groupId: query.groupId ?? null,
       scope: query.scope,
+      kind: query.kind,
       limit: query.limit,
       offset: query.offset,
     });

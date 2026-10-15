@@ -26,7 +26,12 @@ export class PrismaCenterSharingRepository implements CenterSharingRepository {
       const monthStart = zonedDateTimeToUtc(`${month}-01`, '00:00', center.timezone);
       const grouped = await client.membership.groupBy({
         by: ['joinSource'],
-        where: { centerId: actor.centerId, role: 'client', joinedAt: { gte: monthStart } },
+        where: {
+          centerId: actor.centerId,
+          role: 'client',
+          isStudent: true,
+          joinedAt: { gte: monthStart },
+        },
         _count: { _all: true },
       });
       const countOf = (source: string | null): number =>

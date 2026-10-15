@@ -7,6 +7,8 @@ export interface NewInvitation {
   readonly email: string | null;
   readonly phone: string | null;
   readonly role: 'admin' | 'staff' | 'client';
+  /** Solo cliente: entra como alumno o solo como tutor. */
+  readonly isStudent: boolean;
   readonly tokenHash: string;
   readonly invitedByUserId: string;
   readonly expiresAt: Date;

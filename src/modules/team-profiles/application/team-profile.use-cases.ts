@@ -26,7 +26,8 @@ import {
 function toIntroductionOnly(profile: ProfileView): ProfileView {
   return {
     ...profile,
-    photoKey: profile.hasPublishConsent ? profile.photoKey : null,
+    // La foto es de lo que se publica: hasta entonces solo el nombre y el cargo.
+    photoKey: null,
     headline: null,
     bio: null,
     specialties: [],

@@ -71,6 +71,7 @@ function toClientView(
     status: membership.status === 'blocked' ? 'blocked' : 'active',
     activity: resolveClientActivity({ joinedAt: membership.joinedAt, lastBookingAt, now }),
     level: membership.level,
+    isStudent: membership.isStudent,
     group: membership.group,
     joinedAt: membership.joinedAt,
     bookingCount: stats?.bookingCount ?? 0,
@@ -82,6 +83,7 @@ function toClientView(
 function buildListFilter(query: ClientListQuery): Prisma.MembershipWhereInput {
   const contains = { contains: query.search ?? '', mode: 'insensitive' } as const;
   return {
+    ...(query.kind !== 'all' && { isStudent: query.kind === 'students' }),
     ...(query.search !== null && {
       OR: [{ user: { fullName: contains } }, { user: { email: contains } }],
     }),
@@ -124,13 +126,17 @@ export class PrismaClientRepository implements ClientRepository {
       const scope = { now: query.now, staffMembershipId: query.staffMembershipId };
       const [views, allViews] = await Promise.all([
         findClientViews(client, buildListFilter(query), scope),
-        findClientViews(client, {}, scope),
+        findClientViews(client, { isStudent: true }, scope),
       ]);
       const totalClientCount = allViews.length;
+      const guardianCount = await client.membership.count({
+        where: { role: 'client', isStudent: false, status: { in: [...LISTED_STATUSES] } },
+      });
       const matching = views.filter((view) => matchesStatusFilter(view, query.status));
       return {
         totalClientCount,
         matchingCount: matching.length,
+        guardianCount,
         clients: matching.slice(query.offset, query.offset + query.limit),
       };
     });
@@ -174,6 +180,7 @@ export class PrismaClientRepository implements ClientRepository {
         data: {
           ...(patch.level !== undefined && { level: patch.level }),
           ...(patch.groupId !== undefined && { groupId: patch.groupId }),
+          ...(patch.isStudent !== undefined && { isStudent: patch.isStudent }),
         },
       });
       const [saved] = await findClientViews(

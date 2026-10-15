@@ -191,4 +191,32 @@ describe('guardians (tutores)', () => {
         ?.lastMessage.body,
     ).toBe('Para child: Mañana no hay clase');
   });
+  it('keeps a tutor who is not a student out of the students list and the plan count', async () => {
+    const asTutorOnly = await world.call(
+      'PATCH',
+      url(`/clients/${mother.membershipId}`),
+      ownerUserId,
+      {
+        centerId,
+        body: { isStudent: false },
+      },
+    );
+    expect(asTutorOnly.statusCode).toBe(200);
+    expect(asTutorOnly.json<{ isStudent: boolean }>().isStudent).toBe(false);
+
+    const students = await world.call('GET', url('/clients'), ownerUserId, { centerId });
+    const families = await world.call('GET', url('/clients?kind=guardians'), ownerUserId, {
+      centerId,
+    });
+    const everyone = await world.call('GET', url('/clients?kind=all'), ownerUserId, { centerId });
+
+    const namesOf = (response: { json: () => unknown }): string[] =>
+      (response.json() as { clients: { fullName: string }[] }).clients.map(
+        ({ fullName }) => fullName,
+      );
+    expect(namesOf(students)).not.toContain('mother');
+    expect(namesOf(families)).toEqual(['mother']);
+    expect(namesOf(everyone)).toContain('mother');
+    expect(students.json<{ guardianCount: number }>().guardianCount).toBe(1);
+  });
 });

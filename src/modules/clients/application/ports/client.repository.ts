@@ -12,6 +12,8 @@ export interface ClientView {
   readonly status: 'active' | 'blocked';
   readonly activity: ClientActivity;
   readonly level: ClientLevelName | null;
+  /** `false`: es solo tutor (una persona de la familia que no da clase). */
+  readonly isStudent: boolean;
   readonly group: { readonly id: string; readonly name: string } | null;
   readonly joinedAt: Date;
   readonly bookingCount: number;
@@ -26,6 +28,8 @@ export interface ClientListQuery {
   readonly status: ClientStatusFilter | null;
   /** Solo las personas de este grupo. */
   readonly groupId: string | null;
+  /** `students` (por defecto), `guardians` (quienes no son alumnos) o `all`. */
+  readonly kind: 'students' | 'guardians' | 'all';
   /** Si lo pide una profesional, solo quienes tienen citas con ella (y las cuentas son suyas). */
   readonly staffMembershipId: string | null;
   readonly limit: number;
@@ -39,12 +43,15 @@ export interface ClientListResult {
   /** Los que cumplen la búsqueda y el estado, antes de paginar. */
   readonly matchingCount: number;
   readonly clients: readonly ClientView[];
+  /** Cuántas personas hay que no son alumnos (la pestaña «Familias»). */
+  readonly guardianCount: number;
 }
 
 /** Solo lo enviado cambia; `null` quita el nivel o saca al cliente de su grupo. */
 export interface ClientPatch {
   readonly level?: ClientLevelName | null | undefined;
   readonly groupId?: string | null | undefined;
+  readonly isStudent?: boolean | undefined;
 }
 
 export interface ClientChange {

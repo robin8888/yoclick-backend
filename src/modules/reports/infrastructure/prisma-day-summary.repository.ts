@@ -46,7 +46,11 @@ async function sumBookedMinutes(client: TenantTransactionClient, range: UtcRange
 
 async function countNewClients(client: TenantTransactionClient, range: UtcRange): Promise<number> {
   return client.membership.count({
-    where: { role: 'client', joinedAt: { gte: range.startsAt, lt: range.endsAt } },
+    where: {
+      role: 'client',
+      isStudent: true,
+      joinedAt: { gte: range.startsAt, lt: range.endsAt },
+    },
   });
 }
 
@@ -74,7 +78,7 @@ export class PrismaDaySummaryRepository implements DaySummaryRepository {
         bookedMinutes: await sumBookedMinutes(client, dayRange),
         newClientCount: await countNewClients(client, weekRange),
         activeClientCount: await client.membership.count({
-          where: { role: 'client', status: 'active' },
+          where: { role: 'client', isStudent: true, status: 'active' },
         }),
       };
     });

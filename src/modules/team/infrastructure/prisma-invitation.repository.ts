@@ -60,6 +60,11 @@ function isAddressedTo(invitation: InvitationRow, userEmail: string | null): boo
 
 type ExistingMembership = Awaited<ReturnType<TenantTransactionClient['membership']['findUnique']>>;
 
+/** Solo un alumno nuevo gasta plaza del plan: un tutor, o quien ya estaba dentro, no. */
+function countsAsNewStudent(invitation: InvitationRow, existing: ExistingMembership): boolean {
+  return invitation.role === 'client' && invitation.isStudent && existing?.status !== 'active';
+}
+
 /** Crea la pertenencia o reactiva la que había: quien sigue dentro nunca baja de rol. */
 async function upsertInvitedMembership(
   client: TenantTransactionClient,
@@ -73,6 +78,7 @@ async function upsertInvitedMembership(
         centerId: invitation.centerId,
         userId,
         role: invitation.role,
+        isStudent: invitation.isStudent,
         status: 'active',
       },
     });
@@ -239,7 +245,7 @@ export class PrismaInvitationRepository implements InvitationRepository {
     });
     if (existing?.status === 'blocked') return { kind: 'membership_blocked' };
 
-    const isLimitCheckNeeded = invitation.role === 'client' && existing?.status !== 'active';
+    const isLimitCheckNeeded = countsAsNewStudent(invitation, existing);
     if (isLimitCheckNeeded && (await this.isClientLimitReached(client, centerId))) {
       return { kind: 'client_limit_reached' };
     }
@@ -272,7 +278,7 @@ export class PrismaInvitationRepository implements InvitationRepository {
     });
     if (center.maxClients === null) return false;
     const activeClients = await client.membership.count({
-      where: { centerId, role: 'client', status: 'active' },
+      where: { centerId, role: 'client', isStudent: true, status: 'active' },
     });
     return activeClients >= center.maxClients;
   }

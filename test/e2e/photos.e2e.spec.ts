@@ -587,14 +587,17 @@ describe('profile photos', () => {
       }
     });
 
-    it('hides everything from a client until the profile is published', async () => {
-      expect(
-        (await call('GET', `/team-profiles/${staff.membershipId}`, ana.userId)).statusCode,
-      ).toBe(404);
+    it('hides the photos from a client until the profile is published', async () => {
+      const detail = await call('GET', `/team-profiles/${staff.membershipId}`, ana.userId);
+      expect(detail.statusCode).toBe(200);
+      expect(detail.json<ProfileBody>()).toMatchObject({ photoUrl: null, photos: [] });
       const listed = (await call('GET', '/team-profiles', ana.userId)).json<{
         members: ProfileBody[];
       }>();
-      expect(listed.members).toEqual([]);
+      const listedStaff = listed.members.find(
+        ({ membershipId }) => membershipId === staff.membershipId,
+      );
+      expect(listedStaff).toMatchObject({ photoUrl: null, photos: [] });
       expect(staffEntryIn(await servicesSeenBy(ana.userId))).toMatchObject({
         photoUrl: null,
         photos: [],

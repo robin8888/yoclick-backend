@@ -64,7 +64,7 @@ export class PrismaClientImportRepository implements ClientImportRepository {
     });
     if (center.maxClients === null) return null;
     const activeClientCount = await client.membership.count({
-      where: { centerId, role: 'client', status: 'active' },
+      where: { centerId, role: 'client', isStudent: true, status: 'active' },
     });
     return Math.max(center.maxClients - activeClientCount, 0);
   }

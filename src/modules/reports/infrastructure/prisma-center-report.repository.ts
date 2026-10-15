@@ -73,7 +73,7 @@ export class PrismaCenterReportRepository implements CenterReportRepository {
       });
       const team = await findTeam(client);
       const clients = await client.membership.findMany({
-        where: { role: 'client', status: 'active' },
+        where: { role: 'client', isStudent: true, status: 'active' },
         select: { id: true, joinedAt: true },
       });
 

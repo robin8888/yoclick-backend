@@ -70,6 +70,8 @@ export class InviteRequestDto extends createZodDto(
       email: z.email().max(MAX_EMAIL_LENGTH).optional(),
       phone: z.string().trim().min(1).max(MAX_PHONE_INPUT_LENGTH).optional(),
       role: z.enum(['admin', 'staff', 'client']),
+      /** Solo con `client`: `false` invita a un tutor que no es alumno. */
+      isStudent: z.boolean().optional(),
     })
     .refine(
       ({ email, phone }) => (email === undefined) !== (phone === undefined),

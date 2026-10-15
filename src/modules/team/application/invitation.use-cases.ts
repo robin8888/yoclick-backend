@@ -29,6 +29,8 @@ export interface InviteRequest {
   readonly email?: string | undefined;
   readonly phone?: string | undefined;
   readonly role: 'admin' | 'staff' | 'client';
+  /** Solo cliente: `false` invita a un tutor que no es alumno. Por defecto, alumno. */
+  readonly isStudent?: boolean | undefined;
 }
 
 export interface CreatedInvitation {
@@ -67,6 +69,7 @@ export class InviteToCenterUseCase {
       email,
       phone,
       role,
+      isStudent: request.isStudent ?? true,
       tokenHash: hashInvitationCode(code),
       invitedByUserId: actor.userId,
       expiresAt: new Date(now.getTime() + INVITATION_VALID_DAYS * MILLISECONDS_PER_DAY),
