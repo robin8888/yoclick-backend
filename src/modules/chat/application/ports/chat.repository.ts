@@ -78,6 +78,10 @@ export interface NewMessage {
   readonly sentAt: Date;
 }
 
+export type GroupBroadcastOutcome =
+  | { readonly kind: 'group_not_found' }
+  | { readonly kind: 'sent'; readonly sentCount: number; readonly skippedMinorCount: number };
+
 export interface ChatRepository {
   listConversations(actor: ActorContext): Promise<ConversationView[]>;
   listContacts(actor: ActorContext): Promise<ContactList>;
@@ -101,6 +105,11 @@ export interface ChatRepository {
   ): Promise<MessageView[]>;
   appendMessage(actor: ActorContext, message: NewMessage): Promise<MessageView>;
   markRead(actor: ActorContext, request: { conversationId: string; readAt: Date }): Promise<void>;
+  /** El mismo mensaje a cada persona de un grupo, en su conversación con el centro. */
+  broadcastToGroup(
+    actor: ActorContext,
+    request: { groupId: string; body: string; sentAt: Date },
+  ): Promise<GroupBroadcastOutcome>;
 }
 
 export const CHAT_REPOSITORY = Symbol('CHAT_REPOSITORY');

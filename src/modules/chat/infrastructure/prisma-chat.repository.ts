@@ -10,6 +10,7 @@ import {
   type ContactList,
   type ConversationAccess,
   type ConversationView,
+  type GroupBroadcastOutcome,
   type MessageView,
   type NewMessage,
   type StartConversationContext,
@@ -17,7 +18,9 @@ import {
 import { isMinor, MAX_CONVERSATIONS } from '../domain/chat-rules';
 import { listContactsInTransaction } from './chat-contacts';
 import { buildPersonContext, toConversationView } from './chat-conversations';
-import { markMessageNoticesRead, recordMessageNotices } from './chat-notices';
+import { broadcastToGroupInTransaction } from './chat-broadcast';
+import { appendMessageInTransaction } from './chat-messages';
+import { markMessageNoticesRead } from './chat-notices';
 import { MESSAGE_INCLUDE, PERSON_SELECT, toMessageView } from './chat-views';
 
 const CONVERSATION_INCLUDE = {
@@ -25,53 +28,6 @@ const CONVERSATION_INCLUDE = {
   counterpart: { select: PERSON_SELECT },
   messages: { orderBy: { createdAt: 'desc' }, take: 1, include: MESSAGE_INCLUDE },
 } as const;
-
-function findAttachmentFields(message: NewMessage): Record<string, unknown> {
-  if (message.attachment === null) return {};
-  return {
-    attachmentKey: message.attachment.key,
-    attachmentKind: message.attachment.kind,
-    attachmentName: message.attachment.name,
-    attachmentSizeBytes: message.attachment.sizeBytes,
-  };
-}
-
-/** Guarda el mensaje, adelanta la conversación y deja el aviso a la otra parte. */
-async function appendMessageInTransaction(
-  client: TenantTransactionClient,
-  input: { actor: ActorContext; message: NewMessage },
-): Promise<MessageView> {
-  const { actor, message } = input;
-  const stored = await client.message.create({
-    data: {
-      id: message.id,
-      centerId: actor.centerId,
-      conversationId: message.conversationId,
-      senderMembershipId: actor.membershipId,
-      body: message.body,
-      createdAt: message.sentAt,
-      ...findAttachmentFields(message),
-    },
-    include: MESSAGE_INCLUDE,
-  });
-  const conversation = await client.conversation.findUniqueOrThrow({
-    where: { id: message.conversationId },
-  });
-  const isMember = conversation.memberMembershipId === actor.membershipId;
-  await client.conversation.update({
-    where: { id: conversation.id },
-    data: {
-      lastMessageAt: message.sentAt,
-      ...(isMember ? { memberLastReadAt: message.sentAt } : { otherLastReadAt: message.sentAt }),
-    },
-  });
-  await recordMessageNotices(client, {
-    conversation,
-    senderMembershipId: actor.membershipId,
-    senderName: stored.sender.user.fullName,
-  });
-  return toMessageView(stored);
-}
 
 async function loadCenterContext(
   client: TenantTransactionClient,
@@ -198,6 +154,15 @@ export class PrismaChatRepository implements ChatRepository {
   async appendMessage(actor: ActorContext, message: NewMessage): Promise<MessageView> {
     return this.tenantPrismaService.runInTenantContext(actor, (client) =>
       appendMessageInTransaction(client, { actor, message }),
+    );
+  }
+
+  async broadcastToGroup(
+    actor: ActorContext,
+    request: { groupId: string; body: string; sentAt: Date },
+  ): Promise<GroupBroadcastOutcome> {
+    return this.tenantPrismaService.runInTenantContext(actor, (client) =>
+      broadcastToGroupInTransaction(client, { actor, ...request }),
     );
   }
 

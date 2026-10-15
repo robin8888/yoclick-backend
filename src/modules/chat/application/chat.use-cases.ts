@@ -14,6 +14,7 @@ import {
   CHAT_REPOSITORY,
   type ChatRepository,
   type ContactList,
+  type GroupBroadcastOutcome,
   type ConversationAccess,
   type ConversationView,
   type MessageView,
@@ -165,5 +166,21 @@ export class MarkConversationReadUseCase {
     const access = await this.chat.loadAccess(actor, { conversationId, now: new Date() });
     if (access === null) throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
     await this.chat.markRead(actor, { conversationId, readAt: new Date() });
+  }
+}
+
+@Injectable()
+export class BroadcastToGroupUseCase {
+  constructor(@Inject(CHAT_REPOSITORY) private readonly chat: ChatRepository) {}
+
+  /** La administración escribe a todas las personas de un grupo, cada una en su conversación con el centro. */
+  async execute(
+    actor: ActorContext,
+    request: { groupId: string; body: string },
+  ): Promise<Extract<GroupBroadcastOutcome, { kind: 'sent' }>> {
+    const outcome = await this.chat.broadcastToGroup(actor, { ...request, sentAt: new Date() });
+    if (outcome.kind === 'group_not_found')
+      throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
+    return outcome;
   }
 }

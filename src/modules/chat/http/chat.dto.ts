@@ -113,3 +113,16 @@ export class SendMessageRequestDto extends createZodDto(
 export class SendAttachmentQueryDto extends createZodDto(
   z.strictObject({ fileName: z.string().max(MAX_ATTACHMENT_NAME_LENGTH).optional() }),
 ) {}
+
+export class GroupBroadcastRequestDto extends createZodDto(
+  z.strictObject({ groupId: z.uuid(), body: z.string().trim().min(1).max(MAX_MESSAGE_LENGTH) }),
+) {}
+
+export class GroupBroadcastResponseDto extends createZodDto(
+  z.strictObject({
+    /** A cuántas personas del grupo les ha llegado. */
+    sentCount: z.number().int(),
+    /** Menores del grupo a los que no se escribe (solo a través de su tutor). */
+    skippedMinorCount: z.number().int(),
+  }),
+) {}

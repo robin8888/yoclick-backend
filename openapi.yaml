@@ -5154,6 +5154,46 @@ paths:
       summary: Marca la conversación como leída por quien pregunta.
       tags:
         - chat
+  /v1/centers/{centerId}/conversations/broadcast:
+    post:
+      operationId: chat_broadcast_to_group
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GroupBroadcastRequestDto"
+      responses:
+        "201":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupBroadcastResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: La administración escribe a todas las personas de un grupo; cada una lo recibe en su conversación con el centro y las respuestas vuelven por separado. Los menores no reciben. 404 si el grupo no existe.
+      tags:
+        - chat
   /v1/centers/{centerId}/conversations/{conversationId}/messages:
     get:
       operationId: chat_list_messages
@@ -15234,6 +15274,36 @@ components:
           pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
       required:
         - conversationId
+      additionalProperties: false
+    GroupBroadcastRequestDto:
+      type: object
+      properties:
+        groupId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        body:
+          type: string
+          minLength: 1
+          maxLength: 2000
+      required:
+        - groupId
+        - body
+      additionalProperties: false
+    GroupBroadcastResponseDto:
+      type: object
+      properties:
+        sentCount:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        skippedMinorCount:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+      required:
+        - sentCount
+        - skippedMinorCount
       additionalProperties: false
     MessageListResponseDto:
       type: object

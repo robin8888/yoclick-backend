@@ -1,4 +1,5 @@
 import { type NestFastifyApplication } from '@nestjs/platform-fastify';
+import { v7 as generateUuidV7 } from 'uuid';
 import { PrismaService } from '../../src/shared/database/prisma.service';
 import { BookingWorld, type CreatedTestCenter } from '../support/booking-world';
 import { resetTestDatabase } from '../support/test-database';
@@ -173,6 +174,60 @@ describe('chat', () => {
       );
       expect(opened.statusCode).toBe(201);
       expect((await listOf(luis.userId)).conversations[0]?.counterpart.kind).toBe('center');
+    });
+  });
+
+  describe('to a group', () => {
+    const asOwner = () => ({ userId: ownerUserId, membershipId: center.ownerMembershipId });
+
+    async function createGroupWith(members: Person[]): Promise<string> {
+      const created = await world.call('POST', url('/groups'), ownerUserId, {
+        centerId,
+        body: { name: 'Grupo mañanas' },
+      });
+      const groupId = created.json<{ id: string }>().id;
+      for (const member of members) {
+        await world.call('PATCH', url(`/clients/${member.membershipId}`), ownerUserId, {
+          centerId,
+          body: { groupId },
+        });
+      }
+      return groupId;
+    }
+
+    it('lets the center write to everyone in a group, each in their own conversation', async () => {
+      const groupId = await createGroupWith([ana, luis, child]);
+
+      const sent = await world.call('POST', url('/conversations/broadcast'), ownerUserId, {
+        centerId,
+        body: { groupId, body: 'Mañana no hay clase' },
+      });
+
+      expect(sent.statusCode).toBe(201);
+      expect(sent.json()).toEqual({ sentCount: 2, skippedMinorCount: 1 });
+      for (const person of [ana, luis]) {
+        const list = await listOf(person.userId);
+        expect(list.conversations[0]?.counterpart.kind).toBe('center');
+        expect(list.conversations[0]?.lastMessage?.body).toBe('Mañana no hay clase');
+        expect(list.unreadTotal).toBe(1);
+      }
+      expect((await listOf(child.userId)).conversations).toEqual([]);
+      expect((await listOf(asOwner().userId)).conversations).toHaveLength(2);
+    });
+
+    it('is only for the administration and needs an existing group', async () => {
+      const groupId = await createGroupWith([ana]);
+      const byTeacher = await world.call('POST', url('/conversations/broadcast'), teacher.userId, {
+        centerId,
+        body: { groupId, body: 'Hola' },
+      });
+      const unknown = await world.call('POST', url('/conversations/broadcast'), ownerUserId, {
+        centerId,
+        body: { groupId: generateUuidV7(), body: 'Hola' },
+      });
+
+      expect(byTeacher.statusCode).toBe(403);
+      expect(unknown.statusCode).toBe(404);
     });
   });
 
