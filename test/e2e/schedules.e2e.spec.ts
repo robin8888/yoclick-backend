@@ -768,6 +768,22 @@ describe('room schedules, fixed groups and room blocks', () => {
     ).toBe('Hoy empezamos 10 minutos antes');
   });
 
+  it('does not enrol someone without an active pass for the service of the class', async () => {
+    const { series } = await createSeries();
+    const withoutPass = await world.addMember(center.centerId, 'nopass', 'client');
+
+    const enrolled = await call('POST', `/schedules/${series.seriesId}/enrollments`, {
+      clientMembershipIds: [withoutPass.membershipId],
+    });
+
+    expect(enrolled.statusCode).toBe(201);
+    const body = enrolled.json<EnrollBody>();
+    expect(body.enrollments).toEqual([]);
+    expect(body.skipped).toEqual([
+      { clientMembershipId: withoutPass.membershipId, reason: 'no_active_pass' },
+    ]);
+  });
+
   it('enrolls people up to the capacity and gives them a seat in every future session', async () => {
     const { series } = await createSeries();
 

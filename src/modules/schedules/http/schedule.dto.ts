@@ -185,7 +185,7 @@ export class EnrollResponseDto extends createZodDto(
     skipped: z.array(
       z.strictObject({
         clientMembershipId: z.uuid(),
-        reason: z.enum(['client_not_found', 'already_enrolled', 'series_full']),
+        reason: z.enum(['client_not_found', 'already_enrolled', 'series_full', 'no_active_pass']),
       }),
     ),
     /** Días en los que una persona matriculada no entra porque ya tenía otra cita. */

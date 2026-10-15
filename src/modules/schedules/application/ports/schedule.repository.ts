@@ -132,7 +132,7 @@ export interface NewEnrollments {
 
 export interface SkippedEnrollment {
   readonly clientMembershipId: string;
-  readonly reason: 'client_not_found' | 'already_enrolled' | 'series_full';
+  readonly reason: 'client_not_found' | 'already_enrolled' | 'series_full' | 'no_active_pass';
 }
 
 /** Una sesión en la que una persona matriculada no pudo entrar porque ya tenía otra cita. */

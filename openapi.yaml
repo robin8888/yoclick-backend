@@ -14618,6 +14618,7 @@ components:
                   - client_not_found
                   - already_enrolled
                   - series_full
+                  - no_active_pass
             required:
               - clientMembershipId
               - reason

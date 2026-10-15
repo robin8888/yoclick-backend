@@ -3,6 +3,7 @@ import { type TenantTransactionClient } from '../../../shared/database/tenant-pr
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
 import { toLocalDate } from '../../../shared/time/zoned-time';
 import { hasOverlappingBooking } from '../../bookings/infrastructure/client-overlap';
+import { countBookableClasses } from '../../passes/infrastructure/pass-availability';
 import {
   type EnrollmentView,
   type EnrollOutcome,
@@ -34,6 +35,7 @@ async function isActiveClient(
 }
 
 interface SeriesFacts {
+  readonly serviceId: string;
   readonly scheduleIds: readonly string[];
   readonly capacity: number;
   readonly startsOn: string;
@@ -46,11 +48,12 @@ async function findActiveSeriesFacts(
 ): Promise<SeriesFacts | null> {
   const rows = await client.sessionSchedule.findMany({
     where: { seriesId, status: 'active' },
-    select: { id: true, capacity: true, startsOn: true, endsOn: true },
+    select: { id: true, serviceId: true, capacity: true, startsOn: true, endsOn: true },
   });
   const [first] = rows;
   if (!first) return null;
   return {
+    serviceId: first.serviceId,
     scheduleIds: rows.map(({ id }) => id),
     capacity: Math.min(...rows.map(({ capacity }) => capacity)),
     startsOn: toDateOnly(first.startsOn),
@@ -60,7 +63,13 @@ async function findActiveSeriesFacts(
 
 async function findEnrollmentRefusal(
   client: TenantTransactionClient,
-  input: { seriesId: string; clientMembershipId: string; capacity: number },
+  input: {
+    seriesId: string;
+    clientMembershipId: string;
+    capacity: number;
+    serviceId: string;
+    now: Date;
+  },
 ): Promise<SkippedEnrollment['reason'] | null> {
   if (!(await isActiveClient(client, input.clientMembershipId))) return 'client_not_found';
   const existing = await client.scheduleEnrollment.count({
@@ -74,7 +83,14 @@ async function findEnrollmentRefusal(
   const enrolledCount = await client.scheduleEnrollment.count({
     where: { seriesId: input.seriesId, status: 'active' },
   });
-  return enrolledCount >= input.capacity ? 'series_full' : null;
+  if (enrolledCount >= input.capacity) return 'series_full';
+  // Solo se matricula a quien tiene un bono en vigor y clases por agendar para este servicio.
+  const bookableClasses = await countBookableClasses(client, {
+    clientMembershipId: input.clientMembershipId,
+    serviceId: input.serviceId,
+    now: input.now,
+  });
+  return bookableClasses === null || bookableClasses <= 0 ? 'no_active_pass' : null;
 }
 
 interface EnrollmentPeriod {
@@ -221,6 +237,8 @@ async function enrollEach(
       seriesId: input.request.seriesId,
       clientMembershipId,
       capacity: input.series.capacity,
+      serviceId: input.series.serviceId,
+      now: input.request.now,
     });
     if (reason !== null) {
       skipped.push({ clientMembershipId, reason });
