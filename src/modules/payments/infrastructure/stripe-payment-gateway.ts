@@ -144,11 +144,10 @@ export class StripePaymentGateway implements PaymentGateway {
         defaults: {
           responsibilities: { fees_collector: 'stripe', losses_collector: 'stripe' },
         },
+        // Cobros directos: basta la configuración de comerciante. `recipient` (transferencias desde
+        // la plataforma) es de destination charges y Stripe lo rechaza junto a `fees_collector: stripe`.
         configuration: {
           merchant: { capabilities: { card_payments: { requested: true } } },
-          recipient: {
-            capabilities: { stripe_balance: { stripe_transfers: { requested: true } } },
-          },
         },
         metadata: { centerId: input.centerId },
       },
