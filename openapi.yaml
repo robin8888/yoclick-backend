@@ -9915,6 +9915,47 @@ components:
                 nullable: true
               hasSchedule:
                 type: boolean
+              schedules:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                    weekday:
+                      type: integer
+                      minimum: 1
+                      maximum: 7
+                    startsAtTime:
+                      type: string
+                    endsAtTime:
+                      type: string
+                    room:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        name:
+                          type: string
+                      required:
+                        - id
+                        - name
+                      additionalProperties: false
+                      nullable: true
+                    teacherName:
+                      type: string
+                  required:
+                    - id
+                    - weekday
+                    - startsAtTime
+                    - endsAtTime
+                    - room
+                    - teacherName
+                  additionalProperties: false
               staff:
                 type: array
                 items:
@@ -9965,6 +10006,7 @@ components:
               - isVisible
               - room
               - hasSchedule
+              - schedules
               - staff
             additionalProperties: false
       required:
@@ -10088,6 +10130,47 @@ components:
           nullable: true
         hasSchedule:
           type: boolean
+        schedules:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              weekday:
+                type: integer
+                minimum: 1
+                maximum: 7
+              startsAtTime:
+                type: string
+              endsAtTime:
+                type: string
+              room:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  name:
+                    type: string
+                required:
+                  - id
+                  - name
+                additionalProperties: false
+                nullable: true
+              teacherName:
+                type: string
+            required:
+              - id
+              - weekday
+              - startsAtTime
+              - endsAtTime
+              - room
+              - teacherName
+            additionalProperties: false
         staff:
           type: array
           items:
@@ -10138,6 +10221,7 @@ components:
         - isVisible
         - room
         - hasSchedule
+        - schedules
         - staff
       additionalProperties: false
     UpdateServiceRequestDto:

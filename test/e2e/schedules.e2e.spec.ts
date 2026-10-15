@@ -202,6 +202,28 @@ describe('room schedules, fixed groups and room blocks', () => {
     expect(listed.map(({ seriesId }) => seriesId)).toEqual([created.series.seriesId]);
   });
 
+  it('lists the weekly schedule of a service with its room and teacher, so clients see when it runs', async () => {
+    await createSeries();
+
+    const response = await call('GET', '/services');
+    const services = response.json<{
+      services: {
+        id: string;
+        hasSchedule: boolean;
+        schedules: { startsAtTime: string; endsAtTime: string; room: { id: string } | null }[];
+      }[];
+    }>().services;
+    const service = services.find(({ id }) => id === groupServiceId);
+
+    expect(service?.hasSchedule).toBe(true);
+    expect(service?.schedules[0]).toMatchObject({
+      startsAtTime: '18:00',
+      endsAtTime: '19:00',
+      room: { id: roomId },
+    });
+    expect(services.find(({ id }) => id === privateServiceId)?.hasSchedule).toBe(false);
+  });
+
   it('uses the room teacher when none is given, and refuses a mode the service does not offer', async () => {
     const withoutTeacher = await call('POST', '/schedules', {
       serviceId: groupServiceId,

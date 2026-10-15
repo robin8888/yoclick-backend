@@ -11,6 +11,17 @@ export interface ServiceStaffMember {
 }
 
 /** Un servicio tal y como lo ve la app. */
+export interface ServiceScheduleView {
+  readonly id: string;
+  /** 1 = lunes … 7 = domingo. */
+  readonly weekday: number;
+  /** Hora local del centro, `HH:MM`. */
+  readonly startsAtTime: string;
+  readonly endsAtTime: string;
+  readonly room: { readonly id: string; readonly name: string } | null;
+  readonly teacherName: string;
+}
+
 export interface ServiceView {
   readonly id: string;
   readonly name: string;
@@ -28,6 +39,8 @@ export interface ServiceView {
   readonly room: { readonly id: string; readonly name: string } | null;
   /** Si el centro ya le ha puesto horario (con su sala y profesor): hasta entonces no se puede reservar. */
   readonly hasSchedule: boolean;
+  /** Sus horarios semanales activos, con la sala y quien los da. */
+  readonly schedules: readonly ServiceScheduleView[];
   readonly staff: readonly ServiceStaffMember[];
 }
 

@@ -19,7 +19,22 @@ const TEAM_ROLES = ['owner', 'admin', 'staff'] as const;
 /** Solo cuenta quien sigue en el equipo: una baja no debe aparecer como profesional. */
 const WITH_ACTIVE_STAFF = {
   room: { select: { id: true, name: true } },
-  _count: { select: { schedules: { where: { status: 'active' as const } } } },
+  schedules: {
+    where: { status: 'active' as const },
+    orderBy: [
+      { weekday: 'asc' as const },
+      { startsAtTime: 'asc' as const },
+      { id: 'asc' as const },
+    ],
+    select: {
+      id: true,
+      weekday: true,
+      startsAtTime: true,
+      endsAtTime: true,
+      room: { select: { id: true, name: true } },
+      staffMembership: { select: { user: { select: { fullName: true } } } },
+    },
+  },
   staff: {
     where: { membership: { status: 'active', role: { in: [...TEAM_ROLES] } } },
     orderBy: [{ membership: { joinedAt: 'asc' } }, { membershipId: 'asc' }],
@@ -59,7 +74,15 @@ function toServiceView(service: ServiceWithStaff): ServiceView {
     minNoticeMinutes: service.minNoticeMinutes,
     isVisible: service.isVisible,
     room: service.room,
-    hasSchedule: service._count.schedules > 0,
+    hasSchedule: service.schedules.length > 0,
+    schedules: service.schedules.map((schedule) => ({
+      id: schedule.id,
+      weekday: schedule.weekday,
+      startsAtTime: schedule.startsAtTime,
+      endsAtTime: schedule.endsAtTime,
+      room: schedule.room,
+      teacherName: schedule.staffMembership.user.fullName,
+    })),
     staff: service.staff.map(({ membership }) => ({
       membershipId: membership.id,
       fullName: membership.user.fullName,

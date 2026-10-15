@@ -28,6 +28,10 @@ const serviceStaffShape = {
   photos: z.array(z.strictObject({ id: z.uuid(), url: z.string() })),
 };
 
+/** 1 = lunes … 7 = domingo. */
+const FIRST_WEEKDAY = 1;
+const LAST_WEEKDAY = 7;
+
 const serviceShape = {
   id: z.uuid(),
   name: z.string(),
@@ -47,6 +51,17 @@ const serviceShape = {
   room: z.strictObject({ id: z.uuid(), name: z.string() }).nullable(),
   /** El centro ya le ha asignado horario; sin él la clientela no puede reservarlo. */
   hasSchedule: z.boolean(),
+  /** Los horarios semanales activos: día (1 = lunes … 7 = domingo), horas locales, sala y profesor. */
+  schedules: z.array(
+    z.strictObject({
+      id: z.uuid(),
+      weekday: z.number().int().min(FIRST_WEEKDAY).max(LAST_WEEKDAY),
+      startsAtTime: z.string(),
+      endsAtTime: z.string(),
+      room: z.strictObject({ id: z.uuid(), name: z.string() }).nullable(),
+      teacherName: z.string(),
+    }),
+  ),
   staff: z.array(z.strictObject(serviceStaffShape)),
 };
 

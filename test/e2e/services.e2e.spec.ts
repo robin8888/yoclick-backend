@@ -97,6 +97,7 @@ describe('services', () => {
         minNoticeMinutes: 120,
         isVisible: true,
         hasSchedule: false,
+        schedules: [],
         room: null,
         staff: [
           { membershipId: center.ownerMembershipId, fullName: 'owner', photoUrl: null, photos: [] },
