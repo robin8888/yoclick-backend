@@ -50,7 +50,7 @@ const seriesShape = {
   startsOn: z.iso.date(),
   endsOn: z.iso.date().nullable(),
   service: z.strictObject({ id: z.uuid(), name: z.string(), color: z.string().nullable() }),
-  staff: personShape,
+  staff: personShape.nullable(),
   room: z.strictObject({ id: z.uuid(), name: z.string() }).nullable(),
   /** Un elemento por día de la semana (1 = lunes … 7 = domingo). */
   days: z.array(

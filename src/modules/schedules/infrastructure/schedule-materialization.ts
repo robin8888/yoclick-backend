@@ -76,7 +76,8 @@ interface StoredSchedule {
   readonly seriesId: string;
   readonly roomId: string | null;
   readonly serviceId: string;
-  readonly staffMembershipId: string;
+  /** `null` en los alquileres. */
+  readonly staffMembershipId: string | null;
   readonly mode: 'private' | 'group';
   readonly capacity: number;
   readonly weekday: number;
@@ -294,7 +295,10 @@ async function materializeSchedule(
   const context: MaterializationContext = {
     calendar: input.calendar,
     window,
-    absences: await listAbsences(client, { staffMembershipId: schedule.staffMembershipId, window }),
+    absences:
+      schedule.staffMembershipId === null
+        ? []
+        : await listAbsences(client, { staffMembershipId: schedule.staffMembershipId, window }),
   };
   const skipped: SkippedOccurrence[] = [];
   for (const date of dates) {

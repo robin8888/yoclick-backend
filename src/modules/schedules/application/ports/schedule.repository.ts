@@ -24,7 +24,8 @@ export interface ScheduleSeriesView {
   readonly startsOn: string;
   readonly endsOn: string | null;
   readonly service: { readonly id: string; readonly name: string; readonly color: string | null };
-  readonly staff: PersonRef;
+  /** `null` en los alquileres: la sala se cede sin profesor. */
+  readonly staff: PersonRef | null;
   readonly room: { readonly id: string; readonly name: string } | null;
   readonly days: readonly ScheduleDayView[];
   /** Personas matriculadas (grupo fijo) ahora mismo. */

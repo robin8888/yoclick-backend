@@ -87,7 +87,7 @@ const roomSessionShape = z.strictObject({
   /** Plazas ocupadas por reservas no canceladas. */
   bookedCount: z.number().int(),
   service: z.strictObject({ id: z.uuid(), name: z.string(), color: z.string().nullable() }),
-  teacher: z.strictObject({ membershipId: z.uuid(), fullName: z.string() }),
+  teacher: z.strictObject({ membershipId: z.uuid(), fullName: z.string() }).nullable(),
   /** Horario del que nació la sesión; `null` si se creó al dar una cita. */
   schedule: z.strictObject({ seriesId: z.uuid(), label: z.string().nullable() }).nullable(),
   /** Cancelada por el centro ese día y por qué (festivo, ausencia, bloqueo…); `null` si sigue en pie. */

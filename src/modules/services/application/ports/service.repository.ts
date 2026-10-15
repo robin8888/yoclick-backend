@@ -19,7 +19,8 @@ export interface ServiceScheduleView {
   readonly startsAtTime: string;
   readonly endsAtTime: string;
   readonly room: { readonly id: string; readonly name: string } | null;
-  readonly teacherName: string;
+  /** `null` en los alquileres. */
+  readonly teacherName: string | null;
 }
 
 export interface ServiceView {
@@ -35,6 +36,8 @@ export interface ServiceView {
   readonly bookingWindowDays: number;
   readonly minNoticeMinutes: number;
   readonly isVisible: boolean;
+  /** Alquiler de sala: sus clases se crean sin profesor. */
+  readonly isRental: boolean;
   /** Sala o recurso donde se da; `null` = sin sala fija. */
   readonly room: { readonly id: string; readonly name: string } | null;
   /** Si el centro ya le ha puesto horario (con su sala y profesor): hasta entonces no se puede reservar. */
@@ -54,6 +57,7 @@ export interface NewService {
   readonly bookingWindowDays: number | undefined;
   readonly minNoticeMinutes: number | undefined;
   readonly isVisible: boolean | undefined;
+  readonly isRental: boolean | undefined;
   readonly roomId: string | null;
   readonly staffMembershipIds: readonly string[];
 }
@@ -69,6 +73,7 @@ export interface ServicePatch {
   readonly bookingWindowDays?: number | undefined;
   readonly minNoticeMinutes?: number | undefined;
   readonly isVisible?: boolean | undefined;
+  readonly isRental?: boolean | undefined;
   readonly roomId?: string | null | undefined;
   readonly staffMembershipIds?: readonly string[] | undefined;
 }

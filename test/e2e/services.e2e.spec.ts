@@ -96,6 +96,7 @@ describe('services', () => {
         bookingWindowDays: 30,
         minNoticeMinutes: 120,
         isVisible: true,
+        isRental: false,
         hasSchedule: false,
         schedules: [],
         room: null,
@@ -144,7 +145,6 @@ describe('services', () => {
         'a booking window of zero days',
         { name: 'Clase', durationMinutes: 60, bookingWindowDays: 0 },
       ],
-      ['an empty team', { name: 'Clase', durationMinutes: 60, staffMembershipIds: [] }],
       [
         'fields the API does not accept (center, kind, capacity)',
         { name: 'Clase', durationMinutes: 60, kind: 'group', capacity: 8 },

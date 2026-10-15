@@ -1,3 +1,4 @@
+import { requireTeacher } from './require-teacher';
 import { Injectable } from '@nestjs/common';
 import {
   TenantPrismaService,
@@ -72,7 +73,7 @@ export class PrismaSessionRecordRepository implements SessionRecordRepository {
       const visible = await findManageableBooking(client, actor, command.bookingId);
       if (!visible) return { kind: 'not_found' };
       const staffMembershipId = visible.classSession.staffMembershipId;
-      await lockStaffSessions(client, staffMembershipId);
+      await lockStaffSessions(client, requireTeacher(staffMembershipId));
 
       // Se vuelve a leer ya con el cerrojo: otra petición pudo iniciarla mientras esperábamos.
       const booking = toBookingView(await reloadBooking(client, command.bookingId));

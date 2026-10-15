@@ -249,7 +249,8 @@ export interface RoomSessionView {
   readonly capacity: number;
   readonly bookedCount: number;
   readonly service: { readonly id: string; readonly name: string; readonly color: string | null };
-  readonly teacher: { readonly membershipId: string; readonly fullName: string };
+  /** `null` en los alquileres. */
+  readonly teacher: { readonly membershipId: string; readonly fullName: string } | null;
   /** Horario del que nació la sesión (con su etiqueta); `null` si se creó al dar una cita. */
   readonly schedule: { readonly seriesId: string; readonly label: string | null } | null;
   /** Cancelada por el centro ese día (festivo, profesor enfermo…) y por qué; `null` si sigue en pie. */

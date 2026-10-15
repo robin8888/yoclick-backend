@@ -5,7 +5,8 @@ export type ScheduleOverlapKind = 'room_schedule_overlap' | 'teacher_schedule_ov
 
 export interface ScheduleCandidate {
   readonly roomId: string | null;
-  readonly staffMembershipId: string;
+  /** `null` en los alquileres: no hay profesor que pueda estar en dos sitios. */
+  readonly staffMembershipId: string | null;
   /** 1 = lunes … 7 = domingo. */
   readonly weekdays: readonly number[];
   /** `HH:MM`. */
@@ -51,6 +52,7 @@ export async function findScheduleOverlap(
     });
     if (roomCount > 0) return 'room_schedule_overlap';
   }
+  if (candidate.staffMembershipId === null) return null;
   const teacherCount = await client.sessionSchedule.count({
     where: { ...filter, staffMembershipId: candidate.staffMembershipId },
   });

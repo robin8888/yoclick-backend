@@ -21,7 +21,7 @@ export interface CancelledSessionNotice {
   readonly session: {
     readonly id: string;
     readonly startsAt: Date;
-    readonly staffMembershipId: string;
+    readonly staffMembershipId: string | null;
     readonly service: { readonly name: string };
     readonly room: { readonly name: string } | null;
   };
@@ -35,7 +35,8 @@ export async function recordSessionCancelledNotices(
   actor: ActorContext,
   notice: CancelledSessionNotice,
 ): Promise<void> {
-  const recipients = new Set([...notice.recipientMembershipIds, notice.session.staffMembershipId]);
+  const recipients = new Set(notice.recipientMembershipIds);
+  if (notice.session.staffMembershipId !== null) recipients.add(notice.session.staffMembershipId);
   recipients.delete(actor.membershipId);
   if (recipients.size === 0) return;
   const noticeData: SessionCancelledNotificationData = {
@@ -62,7 +63,7 @@ export interface EnrollmentNotice {
   readonly series: {
     readonly label: string | null;
     readonly service: { readonly name: string };
-    readonly staff: { readonly fullName: string };
+    readonly staff: { readonly fullName: string } | null;
     readonly room: { readonly name: string } | null;
   };
 }
@@ -78,7 +79,7 @@ export async function recordEnrollmentNotices(
   const noticeData: EnrollmentNotificationData = {
     serviceName: notice.series.service.name,
     label: notice.series.label ?? '',
-    staffName: notice.series.staff.fullName,
+    staffName: notice.series.staff?.fullName ?? '',
     roomName: notice.series.room?.name ?? '',
     actorName: await findFullName(client, actor.membershipId),
   };

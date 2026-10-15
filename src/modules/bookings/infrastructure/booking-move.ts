@@ -1,3 +1,4 @@
+import { requireTeacher } from './require-teacher';
 import { MILLISECONDS_PER_DAY, MILLISECONDS_PER_MINUTE } from '../../../shared/time/time-units';
 import { type TenantTransactionClient } from '../../../shared/database/tenant-prisma.service';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
@@ -145,7 +146,7 @@ export async function moveBookingToSessionInTransaction(
     change: 'rescheduled',
     bookingId: booking.id,
     clientMembershipId: booking.clientMembershipId,
-    staffMembershipId: session.staffMembershipId,
+    staffMembershipId: requireTeacher(session.staffMembershipId),
     serviceName: session.service.name,
     startsAt: session.startsAt,
     actorMembershipId: actor.membershipId,

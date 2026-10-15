@@ -1,3 +1,4 @@
+import { requireTeacher } from './require-teacher';
 import { type TenantTransactionClient } from '../../../shared/database/tenant-prisma.service';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
 import { recordBookingNotification } from '../../notifications/infrastructure/booking-notification.recorder';
@@ -92,7 +93,7 @@ async function reserveReplacementSession(
     serviceId: previousSession.service.id,
     startsAt: command.startsAt,
     preferredStaffMembershipId:
-      command.preferredStaffMembershipId ?? previousSession.staffMembership.id,
+      command.preferredStaffMembershipId ?? requireTeacher(previousSession.staffMembership).id,
     idempotencyKey: null,
     now: command.now,
     clientMembershipId: booking.clientMembershipId,
@@ -176,7 +177,7 @@ export async function rescheduleByTeamInTransaction(
   const isSameTime = previousSession.startsAt.getTime() === command.startsAt.getTime();
   const isSameStaff =
     command.preferredStaffMembershipId === undefined ||
-    command.preferredStaffMembershipId === previousSession.staffMembership.id;
+    command.preferredStaffMembershipId === requireTeacher(previousSession.staffMembership).id;
   if (isSameTime && isSameStaff) {
     return { kind: 'rescheduled', booking: toBookingView(booking), hasChangedTime: false };
   }

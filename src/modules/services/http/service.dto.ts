@@ -47,6 +47,8 @@ const serviceShape = {
   bookingWindowDays: z.number().int(),
   minNoticeMinutes: z.number().int(),
   isVisible: z.boolean(),
+  /** Alquiler de sala: sus clases se crean sin profesor. */
+  isRental: z.boolean(),
   /** Sala o recurso donde se da; `null` = sin sala fija. */
   room: z.strictObject({ id: z.uuid(), name: z.string() }).nullable(),
   /** El centro ya le ha asignado horario; sin él la clientela no puede reservarlo. */
@@ -59,7 +61,7 @@ const serviceShape = {
       startsAtTime: z.string(),
       endsAtTime: z.string(),
       room: z.strictObject({ id: z.uuid(), name: z.string() }).nullable(),
-      teacherName: z.string(),
+      teacherName: z.string().nullable(),
     }),
   ),
   staff: z.array(z.strictObject(serviceStaffShape)),
@@ -89,7 +91,6 @@ const bookingWindowSchema = z
 const minNoticeSchema = z.number().int().min(0).max(MAX_MIN_NOTICE_MINUTES);
 const staffIdsSchema = z
   .array(z.uuid())
-  .min(1)
   .max(MAX_STAFF_PER_SERVICE)
   .refine((ids) => new Set(ids).size === ids.length, 'duplicated');
 
@@ -105,6 +106,7 @@ export class CreateServiceRequestDto extends createZodDto(
     bookingWindowDays: bookingWindowSchema.optional(),
     minNoticeMinutes: minNoticeSchema.optional(),
     isVisible: z.boolean().optional(),
+    isRental: z.boolean().optional(),
     roomId: z.uuid().optional(),
     staffMembershipIds: staffIdsSchema.optional(),
   }),
@@ -123,6 +125,7 @@ export class UpdateServiceRequestDto extends createZodDto(
       bookingWindowDays: bookingWindowSchema.optional(),
       minNoticeMinutes: minNoticeSchema.optional(),
       isVisible: z.boolean().optional(),
+      isRental: z.boolean().optional(),
       roomId: z.uuid().nullable().optional(),
       staffMembershipIds: staffIdsSchema.optional(),
     })

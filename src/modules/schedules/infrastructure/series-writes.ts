@@ -98,7 +98,7 @@ interface ActiveSeriesRow {
   readonly startsOn: Date;
   readonly serviceId: string;
   readonly roomId: string | null;
-  readonly staffMembershipId: string;
+  readonly staffMembershipId: string | null;
   readonly mode: 'private' | 'group';
   readonly capacity: number;
   readonly label: string | null;

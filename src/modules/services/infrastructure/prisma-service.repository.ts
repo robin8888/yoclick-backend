@@ -73,6 +73,7 @@ function toServiceView(service: ServiceWithStaff): ServiceView {
     bookingWindowDays: service.bookingWindowDays,
     minNoticeMinutes: service.minNoticeMinutes,
     isVisible: service.isVisible,
+    isRental: service.isRental,
     room: service.room,
     hasSchedule: service.schedules.length > 0,
     schedules: service.schedules.map((schedule) => ({
@@ -81,7 +82,7 @@ function toServiceView(service: ServiceWithStaff): ServiceView {
       startsAtTime: schedule.startsAtTime,
       endsAtTime: schedule.endsAtTime,
       room: schedule.room,
-      teacherName: schedule.staffMembership.user.fullName,
+      teacherName: schedule.staffMembership?.user.fullName ?? null,
     })),
     staff: service.staff.map(({ membership }) => ({
       membershipId: membership.id,
@@ -188,6 +189,7 @@ export class PrismaServiceRepository implements ServiceRepository {
             minNoticeMinutes: newService.minNoticeMinutes,
           }),
           ...(newService.isVisible !== undefined && { isVisible: newService.isVisible }),
+          ...(newService.isRental !== undefined && { isRental: newService.isRental }),
         },
       });
       await replaceStaff(client, serviceId, newService.staffMembershipIds);

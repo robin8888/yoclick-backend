@@ -36,12 +36,16 @@ async function findSessions(
       },
     },
   });
-  return sessions.map((session) => ({
-    ...session,
-    bookings: session.bookings.flatMap(({ status, clientMembershipId }) =>
-      status === 'cancelled' ? [] : [{ status, clientMembershipId }],
-    ),
-  }));
+  return sessions
+    .flatMap(({ staffMembershipId, ...session }) =>
+      staffMembershipId === null ? [] : [{ ...session, staffMembershipId }],
+    )
+    .map((session) => ({
+      ...session,
+      bookings: session.bookings.flatMap(({ status, clientMembershipId }) =>
+        status === 'cancelled' ? [] : [{ status, clientMembershipId }],
+      ),
+    }));
 }
 
 async function findTeam(client: TenantTransactionClient) {

@@ -686,6 +686,67 @@ describe('room schedules, fixed groups and room blocks', () => {
     expect(outsider.json<{ code: string }>().code).toBe('STAFF_NOT_FOR_SERVICE');
   });
 
+  describe('a rental service is given without a teacher', () => {
+    async function createRentalService(): Promise<string> {
+      const response = await call('POST', '/services', {
+        name: 'Alquiler de sala',
+        durationMinutes: 60,
+        mode: 'group',
+        isRental: true,
+        staffMembershipIds: [],
+      });
+      expect(response.statusCode).toBe(201);
+      expect(response.json<{ isRental: boolean; staff: unknown[] }>()).toMatchObject({
+        isRental: true,
+        staff: [],
+      });
+      return response.json<{ id: string }>().id;
+    }
+
+    async function createFreeRoom(name: string): Promise<string> {
+      const response = await call('POST', '/rooms', { name, capacity: 4 });
+      return response.json<{ id: string }>().id;
+    }
+
+    it('creates the class without a teacher and shows it in the room agenda', async () => {
+      const rentalServiceId = await createRentalService();
+      const rentalRoomId = await createFreeRoom('Sala alquiler');
+
+      const response = await call('POST', '/schedules', {
+        serviceId: rentalServiceId,
+        roomId: rentalRoomId,
+        mode: 'group',
+        weekdays: [getScheduleWeekdayOfLocalDate(firstDate)],
+        startsAtTime: '20:00',
+        endsAtTime: '21:00',
+        startsOn: firstDate,
+      });
+
+      expect(response.statusCode).toBe(201);
+      expect(response.json<{ series: { staff: unknown } }>().series.staff).toBeNull();
+      const agenda = await readRoomAgenda(firstDate);
+      const rentalRoom = agenda.rooms.find((room) => room.id === rentalRoomId);
+      expect(rentalRoom?.sessions).toHaveLength(1);
+      expect(rentalRoom?.sessions[0]).toMatchObject({ teacher: null });
+    });
+
+    it('still requires a teacher when the service is not a rental', async () => {
+      const rentalRoomId = await createFreeRoom('Sala sin profesor');
+
+      const response = await call('POST', '/schedules', {
+        serviceId: groupServiceId,
+        roomId: rentalRoomId,
+        mode: 'group',
+        weekdays: [getScheduleWeekdayOfLocalDate(firstDate)],
+        startsAtTime: '20:00',
+        endsAtTime: '21:00',
+        startsOn: firstDate,
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+  });
+
   it('repeats a configured week into the next one with a single call, without duplicating', async () => {
     const weekday = getScheduleWeekdayOfLocalDate(firstDate);
     const weekStart = addDaysToLocalDate(firstDate, -(weekday - 1));

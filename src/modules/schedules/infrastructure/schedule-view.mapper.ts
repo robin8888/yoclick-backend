@@ -33,10 +33,13 @@ function toSeriesView(
     startsOn: toDateOnly(first.startsOn),
     endsOn: first.endsOn === null ? null : toDateOnly(first.endsOn),
     service: first.service,
-    staff: {
-      membershipId: first.staffMembership.id,
-      fullName: first.staffMembership.user.fullName,
-    },
+    staff:
+      first.staffMembership === null
+        ? null
+        : {
+            membershipId: first.staffMembership.id,
+            fullName: first.staffMembership.user.fullName,
+          },
     room: first.room,
     days: [...rows]
       .sort((left, right) => left.weekday - right.weekday)

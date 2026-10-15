@@ -10194,6 +10194,8 @@ components:
                 maximum: 9007199254740991
               isVisible:
                 type: boolean
+              isRental:
+                type: boolean
               room:
                 type: object
                 properties:
@@ -10243,6 +10245,7 @@ components:
                       nullable: true
                     teacherName:
                       type: string
+                      nullable: true
                   required:
                     - id
                     - weekday
@@ -10299,6 +10302,7 @@ components:
               - bookingWindowDays
               - minNoticeMinutes
               - isVisible
+              - isRental
               - room
               - hasSchedule
               - schedules
@@ -10345,12 +10349,13 @@ components:
           maximum: 86400
         isVisible:
           type: boolean
+        isRental:
+          type: boolean
         roomId:
           type: string
           format: uuid
           pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
         staffMembershipIds:
-          minItems: 1
           maxItems: 50
           type: array
           items:
@@ -10409,6 +10414,8 @@ components:
           maximum: 9007199254740991
         isVisible:
           type: boolean
+        isRental:
+          type: boolean
         room:
           type: object
           properties:
@@ -10458,6 +10465,7 @@ components:
                 nullable: true
               teacherName:
                 type: string
+                nullable: true
             required:
               - id
               - weekday
@@ -10514,6 +10522,7 @@ components:
         - bookingWindowDays
         - minNoticeMinutes
         - isVisible
+        - isRental
         - room
         - hasSchedule
         - schedules
@@ -10560,13 +10569,14 @@ components:
           maximum: 86400
         isVisible:
           type: boolean
+        isRental:
+          type: boolean
         roomId:
           type: string
           format: uuid
           pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
           nullable: true
         staffMembershipIds:
-          minItems: 1
           maxItems: 50
           type: array
           items:
@@ -11893,6 +11903,7 @@ components:
                         - membershipId
                         - fullName
                       additionalProperties: false
+                      nullable: true
                     schedule:
                       type: object
                       properties:
@@ -12064,6 +12075,7 @@ components:
                   - membershipId
                   - fullName
                 additionalProperties: false
+                nullable: true
               schedule:
                 type: object
                 properties:
@@ -14170,6 +14182,7 @@ components:
                   - membershipId
                   - fullName
                 additionalProperties: false
+                nullable: true
               room:
                 type: object
                 properties:
@@ -14352,6 +14365,7 @@ components:
                 - membershipId
                 - fullName
               additionalProperties: false
+              nullable: true
             room:
               type: object
               properties:

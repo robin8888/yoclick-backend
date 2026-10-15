@@ -8,6 +8,8 @@ export interface SeriesService {
   readonly mode: 'private' | 'group' | 'both';
   readonly capacity: number;
   readonly roomId: string | null;
+  /** Alquiler: la clase puede darse sin profesor. */
+  readonly isRental: boolean;
 }
 
 export interface SeriesRoom {
@@ -31,7 +33,8 @@ export type ResolvedSeriesParts =
       readonly kind: 'resolved';
       readonly service: SeriesService;
       readonly room: SeriesRoom | null;
-      readonly staffMembershipId: string;
+      /** `null` solo en los alquileres. */
+      readonly staffMembershipId: string | null;
     }
   | { readonly kind: SeriesRefusal };
 
@@ -41,7 +44,7 @@ export async function findSeriesService(
 ): Promise<SeriesService | null> {
   return client.service.findFirst({
     where: { id: serviceId, archivedAt: null },
-    select: { id: true, mode: true, capacity: true, roomId: true },
+    select: { id: true, mode: true, capacity: true, roomId: true, isRental: true },
   });
 }
 
@@ -69,7 +72,7 @@ async function isActiveTeamMember(
 /** Si la sala puede dar ese servicio con esa persona: sala con servicio fijo, servicio con sala fija y profesor fijo. */
 function isRoomUsable(
   room: SeriesRoom,
-  input: { service: SeriesService; staffMembershipId: string },
+  input: { service: SeriesService; staffMembershipId: string | null },
 ): boolean {
   if (room.serviceId !== null && room.serviceId !== input.service.id) return false;
   if (input.service.roomId !== null && input.service.roomId !== room.id) return false;
@@ -101,7 +104,7 @@ async function resolveRoom(
 }
 
 type StaffResolution =
-  | { readonly kind: 'resolved'; readonly staffMembershipId: string }
+  | { readonly kind: 'resolved'; readonly staffMembershipId: string | null }
   | { readonly kind: 'staff_required' | 'staff_not_found' };
 
 /**
@@ -123,11 +126,20 @@ async function teachesService(
 /** La persona pedida o, si no, la fija de la sala; tiene que ser del equipo activo. */
 async function resolveStaff(
   client: TenantTransactionClient,
-  input: { requestedStaffMembershipId: string | null; room: SeriesRoom | null },
+  input: {
+    requestedStaffMembershipId: string | null;
+    room: SeriesRoom | null;
+    isRental: boolean;
+  },
 ): Promise<StaffResolution> {
   const staffMembershipId =
     input.requestedStaffMembershipId ?? input.room?.staffMembershipId ?? null;
-  if (staffMembershipId === null) return { kind: 'staff_required' };
+  if (staffMembershipId === null) {
+    // Un alquiler cede la sala sin profesor.
+    return input.isRental
+      ? { kind: 'resolved', staffMembershipId: null }
+      : { kind: 'staff_required' };
+  }
   if (!(await isActiveTeamMember(client, staffMembershipId))) return { kind: 'staff_not_found' };
   return { kind: 'resolved', staffMembershipId };
 }
@@ -151,12 +163,14 @@ export async function resolveSeriesParts(
   const staffResolution = await resolveStaff(client, {
     requestedStaffMembershipId: request.staffMembershipId,
     room,
+    isRental: service.isRental,
   });
   if (staffResolution.kind !== 'resolved') return staffResolution;
   const { staffMembershipId } = staffResolution;
-  if (!(await teachesService(client, { serviceId: service.id, membershipId: staffMembershipId }))) {
-    return { kind: 'staff_not_for_service' };
-  }
+  const isTeacherRejected =
+    staffMembershipId !== null &&
+    !(await teachesService(client, { serviceId: service.id, membershipId: staffMembershipId }));
+  if (isTeacherRejected) return { kind: 'staff_not_for_service' };
 
   if (room !== null && !isRoomUsable(room, { service, staffMembershipId })) {
     return { kind: 'room_not_for_service' };

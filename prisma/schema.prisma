@@ -645,6 +645,8 @@ model Service {
   cancelNoticeMinutes Int?        @map("cancel_notice_minutes")
   isVisible           Boolean     @default(true) @map("is_visible")
   sortOrder           Int         @default(0) @map("sort_order")
+  /// Alquiler de sala: sus clases se crean sin profesor.
+  isRental            Boolean     @default(false) @map("is_rental")
   /// Sala o recurso donde se da; nulo = sin sala fija.
   roomId              String?     @map("room_id") @db.Uuid
   archivedAt          DateTime?   @map("archived_at") @db.Timestamptz
@@ -904,7 +906,8 @@ model ClassSession {
   id                      String             @id @db.Uuid
   centerId                String             @map("center_id") @db.Uuid
   serviceId               String             @map("service_id") @db.Uuid
-  staffMembershipId       String             @map("staff_membership_id") @db.Uuid
+  /// Nulo en los alquileres: la sala se cede sin profesor.
+  staffMembershipId       String?            @map("staff_membership_id") @db.Uuid
   startsAt                DateTime           @map("starts_at") @db.Timestamptz
   endsAt                  DateTime           @map("ends_at") @db.Timestamptz
   capacity                Int                @default(1)
@@ -921,7 +924,7 @@ model ClassSession {
 
   center          Center           @relation(fields: [centerId], references: [id])
   service         Service          @relation(fields: [serviceId], references: [id])
-  staffMembership Membership       @relation("StaffClassSessions", fields: [staffMembershipId], references: [id])
+  staffMembership Membership?      @relation("StaffClassSessions", fields: [staffMembershipId], references: [id])
   room            Room?            @relation(fields: [roomId], references: [id])
   schedule        SessionSchedule? @relation(fields: [scheduleId], references: [id])
   cancelledBy     Membership?      @relation("ClassSessionCancelledBy", fields: [cancelledByMembershipId], references: [id])
@@ -941,7 +944,8 @@ model SessionSchedule {
   seriesId              String         @map("series_id") @db.Uuid
   roomId                String?        @map("room_id") @db.Uuid
   serviceId             String         @map("service_id") @db.Uuid
-  staffMembershipId     String         @map("staff_membership_id") @db.Uuid
+  /// Nulo en los alquileres: la sala se cede sin profesor.
+  staffMembershipId     String?        @map("staff_membership_id") @db.Uuid
   mode                  SessionMode    @default(group)
   capacity              Int            @default(1)
   /// 1 = lunes … 7 = domingo.
@@ -962,7 +966,7 @@ model SessionSchedule {
   center          Center         @relation(fields: [centerId], references: [id])
   room            Room?          @relation(fields: [roomId], references: [id])
   service         Service        @relation(fields: [serviceId], references: [id])
-  staffMembership Membership     @relation("ScheduleTeacher", fields: [staffMembershipId], references: [id])
+  staffMembership Membership?    @relation("ScheduleTeacher", fields: [staffMembershipId], references: [id])
   createdBy       Membership     @relation("ScheduleCreator", fields: [createdByMembershipId], references: [id])
   classSessions   ClassSession[]
 

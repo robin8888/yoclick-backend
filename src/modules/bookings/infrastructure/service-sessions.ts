@@ -1,3 +1,4 @@
+import { requireTeacher } from './require-teacher';
 import { type TenantTransactionClient } from '../../../shared/database/tenant-prisma.service';
 import { getUtcRangeOfLocalDates } from '../../../shared/time/zoned-time';
 import {
@@ -24,7 +25,7 @@ async function findSessions(
   limit?: number,
 ) {
   return client.classSession.findMany({
-    where: { ...where, status: 'scheduled' },
+    where: { ...where, status: 'scheduled', staffMembershipId: { not: null } },
     include: SESSION_INCLUDE,
     orderBy: [{ startsAt: 'asc' }, { id: 'asc' }],
     ...(limit === undefined ? {} : { take: limit }),
@@ -43,8 +44,8 @@ function toView(session: StoredSession): ServiceSessionView {
     remainingSeats: Math.max(session.capacity - bookedCount, 0),
     room: session.room,
     teacher: {
-      membershipId: session.staffMembership.id,
-      fullName: session.staffMembership.user.fullName,
+      membershipId: requireTeacher(session.staffMembership).id,
+      fullName: requireTeacher(session.staffMembership).user.fullName,
     },
     label: session.schedule?.label ?? null,
   };

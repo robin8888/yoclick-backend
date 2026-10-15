@@ -12,7 +12,7 @@ const SESSION_CANCELLATION_INCLUDE = {
 export interface CancellableSession {
   readonly id: string;
   readonly startsAt: Date;
-  readonly staffMembershipId: string;
+  readonly staffMembershipId: string | null;
   readonly service: { readonly name: string };
   readonly room: { readonly name: string } | null;
   readonly bookings: readonly { readonly id: string; readonly clientMembershipId: string }[];

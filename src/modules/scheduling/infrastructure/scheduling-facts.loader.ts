@@ -89,7 +89,7 @@ async function findBusyIntervals(
   staff: readonly StaffCandidate[],
   range: UtcRange,
 ): Promise<BusyInterval[]> {
-  return client.classSession.findMany({
+  const sessions = await client.classSession.findMany({
     where: {
       status: 'scheduled',
       staffMembershipId: { in: staff.map((member) => member.membershipId) },
@@ -98,6 +98,9 @@ async function findBusyIntervals(
     },
     select: { staffMembershipId: true, startsAt: true, endsAt: true },
   });
+  return sessions.flatMap(({ staffMembershipId, startsAt, endsAt }) =>
+    staffMembershipId === null ? [] : [{ staffMembershipId, startsAt, endsAt }],
+  );
 }
 
 /**

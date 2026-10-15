@@ -1,3 +1,4 @@
+import { requireTeacher } from './require-teacher';
 import { Injectable } from '@nestjs/common';
 import { type Prisma } from '../../../generated/prisma/client';
 import {
@@ -92,7 +93,7 @@ async function recordCancellationNotice(
     change: 'cancelled',
     bookingId: booking.id,
     clientMembershipId: booking.clientMembershipId,
-    staffMembershipId: booking.classSession.staffMembership.id,
+    staffMembershipId: requireTeacher(booking.classSession.staffMembership).id,
     serviceName: booking.classSession.service.name,
     startsAt: booking.classSession.startsAt,
     actorMembershipId: actor.membershipId,
@@ -139,8 +140,8 @@ async function listEmptySessions(
     service: session.service,
     room: session.room,
     staff: {
-      membershipId: session.staffMembership.id,
-      fullName: session.staffMembership.user.fullName,
+      membershipId: requireTeacher(session.staffMembership).id,
+      fullName: requireTeacher(session.staffMembership).user.fullName,
     },
   }));
 }

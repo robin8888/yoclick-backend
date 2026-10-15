@@ -1,3 +1,4 @@
+import { requireTeacher } from './require-teacher';
 import { MILLISECONDS_PER_DAY, MILLISECONDS_PER_MINUTE } from '../../../shared/time/time-units';
 import { v7 as generateUuidV7 } from 'uuid';
 import { type TenantTransactionClient } from '../../../shared/database/tenant-prisma.service';
@@ -453,7 +454,7 @@ async function createJoinedBooking(
     clientMembershipId: command.clientMembershipId,
     serviceName: session.service.name,
     startsAt: session.startsAt,
-    booking: { id: booking.id, staffMembershipId: session.staffMembershipId },
+    booking: { id: booking.id, staffMembershipId: requireTeacher(session.staffMembershipId) },
   });
   // El centro apunta a la persona: la clase se descuenta ya (y se devuelve si se cancela).
   if (command.isClientBooking !== true) {

@@ -78,10 +78,13 @@ function toRoomSessionView(session: StoredSession): RoomSessionView {
     capacity: session.capacity,
     bookedCount: session.bookings.length,
     service: session.service,
-    teacher: {
-      membershipId: session.staffMembership.id,
-      fullName: session.staffMembership.user.fullName,
-    },
+    teacher:
+      session.staffMembership === null
+        ? null
+        : {
+            membershipId: session.staffMembership.id,
+            fullName: session.staffMembership.user.fullName,
+          },
     schedule: session.schedule,
     cancelledReason: session.status === 'cancelled' ? session.cancelledReason : null,
     attendees: session.bookings.map((booking) => ({

@@ -1,3 +1,4 @@
+import { requireTeacher } from './require-teacher';
 import { type Prisma } from '../../../generated/prisma/client';
 import { type BookingView } from '../application/ports/booking.repository';
 
@@ -50,8 +51,8 @@ export function toBookingView(booking: BookingWithSessionDetails): BookingView {
       color: classSession.service.color,
     },
     staff: {
-      membershipId: classSession.staffMembership.id,
-      fullName: classSession.staffMembership.user.fullName,
+      membershipId: requireTeacher(classSession.staffMembership).id,
+      fullName: requireTeacher(classSession.staffMembership).user.fullName,
     },
     room: classSession.room,
     session: {

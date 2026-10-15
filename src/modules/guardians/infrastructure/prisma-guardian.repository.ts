@@ -50,7 +50,7 @@ async function findUpcomingBookings(
     id: booking.id,
     serviceName: booking.classSession.service.name,
     startsAt: booking.classSession.startsAt,
-    teacherName: booking.classSession.staffMembership.user.fullName,
+    teacherName: booking.classSession.staffMembership?.user.fullName ?? '',
   }));
 }
 

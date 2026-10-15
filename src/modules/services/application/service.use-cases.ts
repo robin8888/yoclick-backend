@@ -94,7 +94,9 @@ export class CreateServiceUseCase {
   ) {}
 
   async execute({ actor, service }: CreateServiceRequest): Promise<SignedService> {
-    const staffMembershipIds = service.staffMembershipIds ?? [actor.membershipId];
+    // Un alquiler se cede sin profesor: no se apunta a quien lo crea.
+    const defaultStaff = service.isRental === true ? [] : [actor.membershipId];
+    const staffMembershipIds = service.staffMembershipIds ?? defaultStaff;
     const created = unwrapWriteOutcome(
       await this.services.createService(actor, { ...service, staffMembershipIds }),
     );
