@@ -275,6 +275,32 @@ describe('passes (bonos)', () => {
     });
   });
 
+  describe('running out', () => {
+    it('warns the client when one class is left and again when the pass is used up', async () => {
+      const rate = (
+        await createRate({ name: 'Bono 2', sessionsCount: 2, validDays: 30, priceCents: 1000 })
+      ).json<RateBody>();
+      await world.call('POST', url('/passes/assign'), ownerUserId, {
+        centerId,
+        body: { rateId: rate.id, clientMembershipId: ana.membershipId },
+      });
+      const kindsOfNotices = async (): Promise<string[]> =>
+        (await world.call('GET', url('/notifications'), ana.userId, { centerId }))
+          .json<{ notifications: { kind: string }[] }>()
+          .notifications.map(({ kind }) => kind);
+
+      await attendClass(await insertBooking(ana));
+      expect(await kindsOfNotices()).toContain('pass_running_low');
+      expect(await kindsOfNotices()).not.toContain('pass_exhausted');
+
+      const secondBookingId = await insertBooking(ana, { startsInMinutes: -180 });
+      await world.call('POST', url(`/bookings/${secondBookingId}/attendance`), staff.userId, {
+        centerId,
+      });
+      expect(await kindsOfNotices()).toContain('pass_exhausted');
+    });
+  });
+
   describe('using a class', () => {
     it('takes one class off the pass when the class is finished, and only once', async () => {
       const pass = await createActivePass(ana);

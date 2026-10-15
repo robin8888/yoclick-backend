@@ -25,6 +25,8 @@ export const NOTIFICATION_KINDS = [
   'pass_activated',
   'room_rental_assigned',
   'payment_received',
+  'pass_running_low',
+  'pass_exhausted',
 ] as const;
 export type NotificationKindName = (typeof NOTIFICATION_KINDS)[number];
 

@@ -173,6 +173,8 @@ enum NotificationKind {
   pass_activated
   room_rental_assigned
   payment_received
+  pass_running_low
+  pass_exhausted
 
   @@map("notification_kind")
 }

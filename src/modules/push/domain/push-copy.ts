@@ -39,6 +39,8 @@ const COPY_BY_KIND: Readonly<Record<string, PushCopy>> = {
   pass_activated: { title: 'Tu bono está activo', body: OPEN_APP_BODY },
   room_rental_assigned: { title: 'Tienes un alquiler de sala', body: OPEN_APP_BODY },
   payment_received: { title: 'Has recibido un pago', body: OPEN_APP_BODY },
+  pass_running_low: { title: 'Tu bono se está acabando', body: OPEN_APP_BODY },
+  pass_exhausted: { title: 'Tu bono se ha agotado', body: OPEN_APP_BODY },
 };
 
 const FALLBACK_COPY: PushCopy = { title: 'Tienes un aviso nuevo', body: OPEN_APP_BODY };

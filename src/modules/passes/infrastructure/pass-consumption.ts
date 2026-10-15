@@ -2,6 +2,9 @@ import { v7 as generateUuidV7 } from 'uuid';
 import { type TenantTransactionClient } from '../../../shared/database/tenant-prisma.service';
 import { pickPassToConsume } from '../domain/pass-rules';
 
+/** Con tantas sesiones o menos se avisa a la persona de que su bono se acaba. */
+const LOW_PASS_SESSION_COUNT = 1;
+
 interface ConsumableBooking {
   readonly centerId: string;
   readonly clientMembershipId: string;
@@ -77,6 +80,28 @@ export async function consumePassForBooking(
       bookingId: input.bookingId,
       delta: -1,
       reason: 'consumed',
+    },
+  });
+  await notifyIfPassIsRunningLow(client, { passId, centerId: booking.centerId });
+}
+
+/** Avisa al cliente cuando le queda la última sesión y cuando ya no le queda ninguna. */
+async function notifyIfPassIsRunningLow(
+  client: TenantTransactionClient,
+  input: { passId: string; centerId: string },
+): Promise<void> {
+  const pass = await client.clientPass.findUniqueOrThrow({
+    where: { id: input.passId },
+    select: { name: true, remainingSessions: true, clientMembershipId: true },
+  });
+  if (pass.remainingSessions > LOW_PASS_SESSION_COUNT) return;
+  await client.notification.create({
+    data: {
+      id: generateUuidV7(),
+      centerId: input.centerId,
+      recipientMembershipId: pass.clientMembershipId,
+      kind: pass.remainingSessions === 0 ? 'pass_exhausted' : 'pass_running_low',
+      data: { rateName: pass.name },
     },
   });
 }
