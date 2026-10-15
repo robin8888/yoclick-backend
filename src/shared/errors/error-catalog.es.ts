@@ -96,6 +96,9 @@ export const ERROR_CATALOG = {
   PAYMENTS_NOT_READY: {
     title: 'Este centro aún no puede cobrar online. Pídele que complete el alta de cobros',
   },
+  GUARDIAN_MUST_BE_ADULT: { title: 'El tutor tiene que ser una persona adulta' },
+  GUARDIAN_INVALID_PEOPLE: { title: 'No se puede enlazar a una persona consigo misma' },
+  GUARDIAN_ALREADY_LINKED: { title: 'Esta persona ya es tutora de ese menor' },
   CHAT_NOT_ALLOWED: { title: 'No puedes escribir a esta persona' },
   CHAT_MINOR_REQUIRES_GUARDIAN: {
     title: 'A los menores solo se les escribe a través de su tutor',

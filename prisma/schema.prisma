@@ -381,6 +381,7 @@ model Center {
   roomBlocks          RoomBlock[]
   conversations       Conversation[]
   messages            Message[]
+  guardianLinks       GuardianLink[]
 
   @@map("centers")
 }
@@ -445,6 +446,9 @@ model Membership {
   conversationsAsMember      Conversation[]       @relation("ConversationMember")
   conversationsAsCounterpart Conversation[]       @relation("ConversationCounterpart")
   sentMessages               Message[]            @relation("MessageSender")
+  guardianLinksAsGuardian    GuardianLink[]       @relation("GuardianOfChild")
+  guardianLinksAsChild       GuardianLink[]       @relation("ChildOfGuardian")
+  createdGuardianLinks       GuardianLink[]       @relation("GuardianLinkCreator")
   clientPasses               ClientPass[]         @relation("ClientPasses")
   payments                   Payment[]            @relation("ClientPayments")
   rentedRoomBlocks           RoomBlock[]          @relation("RoomBlockRenter")
@@ -1489,4 +1493,23 @@ model Message {
 
   @@index([conversationId, createdAt])
   @@map("messages")
+}
+
+/// Una persona adulta del centro responsable de un menor: escribe y reserva por él.
+model GuardianLink {
+  id                    String   @id @db.Uuid
+  centerId              String   @map("center_id") @db.Uuid
+  guardianMembershipId  String   @map("guardian_membership_id") @db.Uuid
+  childMembershipId     String   @map("child_membership_id") @db.Uuid
+  createdByMembershipId String   @map("created_by_membership_id") @db.Uuid
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  center    Center     @relation(fields: [centerId], references: [id])
+  guardian  Membership @relation("GuardianOfChild", fields: [guardianMembershipId], references: [id], onDelete: Cascade)
+  child     Membership @relation("ChildOfGuardian", fields: [childMembershipId], references: [id], onDelete: Cascade)
+  createdBy Membership @relation("GuardianLinkCreator", fields: [createdByMembershipId], references: [id])
+
+  @@unique([guardianMembershipId, childMembershipId])
+  @@index([centerId, childMembershipId])
+  @@map("guardian_links")
 }

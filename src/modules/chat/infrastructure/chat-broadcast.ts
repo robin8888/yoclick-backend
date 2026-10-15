@@ -31,7 +31,7 @@ async function findOrCreateConversation(
 
 interface RecipientCandidate {
   readonly id: string;
-  readonly user: { readonly birthDate: Date | null };
+  readonly user: { readonly birthDate: Date | null; readonly fullName: string };
 }
 
 type Audience = { readonly candidates: RecipientCandidate[] } | null;
@@ -54,7 +54,7 @@ async function findGroupAudience(
   if (!group) return null;
   const candidates = await client.membership.findMany({
     where: { groupId, role: 'client', status: 'active' },
-    select: { id: true, user: { select: { birthDate: true } } },
+    select: { id: true, user: { select: { birthDate: true, fullName: true } } },
   });
   return { candidates };
 }
@@ -80,7 +80,11 @@ async function findSeriesAudience(
       OR: [{ endsOn: null }, { endsOn: { gte: input.today } }],
       clientMembership: { status: 'active', role: 'client' },
     },
-    select: { clientMembership: { select: { id: true, user: { select: { birthDate: true } } } } },
+    select: {
+      clientMembership: {
+        select: { id: true, user: { select: { birthDate: true, fullName: true } } },
+      },
+    },
   });
   return { candidates: enrollments.map(({ clientMembership }) => clientMembership) };
 }
@@ -94,10 +98,48 @@ function findAudience(
   return findSeriesAudience(client, { seriesId: target.seriesId, today, actor });
 }
 
+interface Delivery {
+  recipientMembershipId: string;
+  body: string;
+}
+
+/** Quien tiene tutores recibe por ellos: el mensaje de un menor va a su tutor, diciendo de quién es. */
+async function planDeliveries(
+  client: TenantTransactionClient,
+  input: { candidates: readonly RecipientCandidate[]; body: string; now: Date },
+): Promise<{ deliveries: Delivery[]; skippedMinorCount: number }> {
+  const { candidates, body, now } = input;
+  const adults = candidates.filter(({ user }) => !isMinor(user.birthDate, now));
+  const minors = candidates.filter(({ user }) => isMinor(user.birthDate, now));
+  const links = await client.guardianLink.findMany({
+    where: { childMembershipId: { in: minors.map(({ id }) => id) } },
+    select: { guardianMembershipId: true, childMembershipId: true },
+  });
+  const childNamesByGuardian = new Map<string, string[]>();
+  for (const link of links) {
+    const child = minors.find(({ id }) => id === link.childMembershipId);
+    const names = childNamesByGuardian.get(link.guardianMembershipId) ?? [];
+    childNamesByGuardian.set(link.guardianMembershipId, [...names, child?.user.fullName ?? '']);
+  }
+  const linkedChildIds = new Set(links.map(({ childMembershipId }) => childMembershipId));
+  const guardianDeliveries = [...childNamesByGuardian].map(([recipientMembershipId, names]) => ({
+    recipientMembershipId,
+    body: `Para ${names.join(', ')}: ${body}`,
+  }));
+  return {
+    deliveries: [
+      ...adults.map(({ id }) => ({ recipientMembershipId: id, body })),
+      ...guardianDeliveries,
+    ],
+    skippedMinorCount: minors.filter(({ id }) => !linkedChildIds.has(id)).length,
+  };
+}
+
 /**
  * Manda el mismo mensaje a cada persona de un grupo o de una clase fija, cada una en su
- * conversación con el centro: así las respuestas vuelven por separado y nadie ve quién más lo ha
- * recibido. Los menores no reciben (solo se les escribe a través de su tutor) y se cuentan aparte.
+ * conversación: así las respuestas vuelven por separado y nadie ve quién más lo ha recibido. Los
+ * menores no tienen cuenta con la que hablar: el mensaje llega a su tutor y, si no tienen, se cuenta
+ * aparte.
  */
 export async function broadcastInTransaction(
   client: TenantTransactionClient,
@@ -106,20 +148,26 @@ export async function broadcastInTransaction(
   const { actor, target, body, sentAt } = input;
   const audience = await findAudience(client, { target, today: sentAt, actor });
   if (audience === null) return { kind: 'group_not_found' };
-  const recipients = audience.candidates.filter(({ user }) => !isMinor(user.birthDate, sentAt));
-  for (const recipient of recipients) {
+  const plan = await planDeliveries(client, { candidates: audience.candidates, body, now: sentAt });
+  for (const delivery of plan.deliveries) {
     const conversationId = await findOrCreateConversation(client, {
       actor,
-      clientMembershipId: recipient.id,
+      clientMembershipId: delivery.recipientMembershipId,
     });
     await appendMessageInTransaction(client, {
       actor,
-      message: { id: generateUuidV7(), conversationId, body, attachment: null, sentAt },
+      message: {
+        id: generateUuidV7(),
+        conversationId,
+        body: delivery.body,
+        attachment: null,
+        sentAt,
+      },
     });
   }
   return {
     kind: 'sent',
-    sentCount: recipients.length,
-    skippedMinorCount: audience.candidates.length - recipients.length,
+    sentCount: plan.deliveries.length,
+    skippedMinorCount: plan.skippedMinorCount,
   };
 }

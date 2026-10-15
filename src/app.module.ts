@@ -12,6 +12,7 @@ import { SchedulingModule } from './modules/scheduling/scheduling.module';
 import { BookingsModule } from './modules/bookings/bookings.module';
 import { ContentModule } from './modules/content/content.module';
 import { ChatModule } from './modules/chat/chat.module';
+import { GuardiansModule } from './modules/guardians/guardians.module';
 import { PhotosModule } from './modules/photos/photos.module';
 import { RoutinesModule } from './modules/routines/routines.module';
 import { TeamProfilesModule } from './modules/team-profiles/team-profiles.module';
@@ -73,6 +74,7 @@ import { buildLoggerOptions } from './shared/logging/build-logger-options';
     ClientsModule,
     NotificationsModule,
     ChatModule,
+    GuardiansModule,
     PushModule,
     RoutinesModule,
     TeamProfilesModule,
