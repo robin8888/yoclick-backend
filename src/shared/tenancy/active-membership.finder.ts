@@ -18,6 +18,37 @@ export interface ActiveMembership {
 export class ActiveMembershipFinder {
   constructor(private readonly tenantPrismaService: TenantPrismaService) {}
 
+  /**
+   * El menor al que un tutor representa, si de verdad es su tutor: el enlace lo crea el centro y se
+   * lee con el contexto del propio tutor, que la RLS limita a sus enlaces.
+   */
+  async findChildOfGuardian(guardian: {
+    userId: string;
+    centerId: string;
+    membershipId: string;
+    childMembershipId: string;
+  }): Promise<ActiveMembership | null> {
+    const link = await this.tenantPrismaService.runInTenantContext(
+      {
+        userId: guardian.userId,
+        centerId: guardian.centerId,
+        membershipId: guardian.membershipId,
+        role: 'client',
+        permissions: [],
+      },
+      (client) =>
+        client.guardianLink.findFirst({
+          where: {
+            guardianMembershipId: guardian.membershipId,
+            childMembershipId: guardian.childMembershipId,
+            child: { status: 'active', role: 'client' },
+          },
+          select: { childMembershipId: true },
+        }),
+    );
+    return link ? { membershipId: link.childMembershipId, role: 'client', permissions: [] } : null;
+  }
+
   async find(userId: string, centerId: string): Promise<ActiveMembership | null> {
     const membership = await this.tenantPrismaService.runInUserContext(userId, (client) =>
       client.membership.findFirst({

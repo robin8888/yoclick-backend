@@ -219,4 +219,84 @@ describe('guardians (tutores)', () => {
     expect(namesOf(everyone)).toContain('mother');
     expect(students.json<{ guardianCount: number }>().guardianCount).toBe(1);
   });
+  it('lets a guardian book and cancel in the name of the child, and only for their own', async () => {
+    await link(mother);
+    const asChild = (person: Person, childId: string) => ({ 'x-acting-for': childId, ...{} });
+    const mineAsMother = await world.call(
+      'GET',
+      url('/bookings/mine?scope=upcoming'),
+      mother.userId,
+      {
+        centerId,
+        headers: asChild(mother, child.membershipId),
+      },
+    );
+    const forStranger = await world.call(
+      'GET',
+      url('/bookings/mine?scope=upcoming'),
+      mother.userId,
+      {
+        centerId,
+        headers: asChild(mother, stranger.membershipId),
+      },
+    );
+
+    expect(mineAsMother.statusCode).toBe(200);
+    expect(forStranger.statusCode).toBe(403);
+
+    await bookClass(child);
+    const listed = await world.call('GET', url('/bookings/mine?scope=upcoming'), mother.userId, {
+      centerId,
+      headers: asChild(mother, child.membershipId),
+    });
+    const [booking] = listed.json<{ bookings: { id: string }[] }>().bookings;
+    const cancelled = await world.call(
+      'POST',
+      url(`/bookings/${booking?.id ?? ''}/cancel`),
+      mother.userId,
+      { centerId, headers: asChild(mother, child.membershipId) },
+    );
+    const asMotherHerself = await world.call(
+      'POST',
+      url(`/bookings/${booking?.id ?? ''}/cancel`),
+      mother.userId,
+      { centerId },
+    );
+
+    expect(cancelled.statusCode).toBe(200);
+    expect(asMotherHerself.statusCode).toBe(404);
+  });
+
+  it('copies the notices of a minor to their guardian, saying whose they are', async () => {
+    await link(mother);
+    await bookClass(child);
+    await world.tenantPrismaService.runInTenantContext(
+      {
+        userId: ownerUserId,
+        centerId,
+        membershipId: center.ownerMembershipId,
+        role: 'owner',
+        permissions: [],
+      },
+      (prisma) =>
+        prisma.notification.create({
+          data: {
+            id: generateUuidV7(),
+            centerId,
+            recipientMembershipId: child.membershipId,
+            kind: 'booking_cancelled_by_team',
+            data: { serviceName: 'Karate' },
+          },
+        }),
+    );
+
+    const notices = await world.call('GET', url('/notifications'), mother.userId, { centerId });
+    const [first] = notices.json<{
+      notifications: { kind: string; data: Record<string, string> }[];
+    }>().notifications;
+    expect(first).toMatchObject({
+      kind: 'booking_cancelled_by_team',
+      data: { forChildName: 'child', serviceName: 'Karate' },
+    });
+  });
 });
