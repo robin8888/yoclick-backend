@@ -14,6 +14,7 @@ const STRIPE_API_ORIGIN = 'https://api.stripe.com';
 /** Versión de la API con la que se habla a Accounts v2 (cuentas conectadas y sus enlaces). */
 const STRIPE_V2_API_VERSION = '2026-09-30.endive';
 const V1_ACCOUNT_IN_V2_ERROR_CODE = 'v1_account_instead_of_v2_account';
+const STRIPE_DASHBOARD_URL = 'https://dashboard.stripe.com/';
 const REQUEST_TIMEOUT_MS = 15_000;
 const PAYMENT_CURRENCY = 'eur';
 
@@ -140,7 +141,9 @@ export class StripePaymentGateway implements PaymentGateway {
         display_name: input.businessName,
         ...(input.contactEmail === null ? {} : { contact_email: input.contactEmail }),
         identity: { country: 'ES' },
-        dashboard: 'express',
+        // Panel completo de Stripe: Stripe cobra comisiones y asume pérdidas, y el centro hace sus
+        // reembolsos y disputas. Con `express` Stripe rechaza `fees_collector: stripe`.
+        dashboard: 'full',
         defaults: {
           responsibilities: { fees_collector: 'stripe', losses_collector: 'stripe' },
         },
@@ -201,14 +204,9 @@ export class StripePaymentGateway implements PaymentGateway {
     return { url: link.url };
   }
 
-  async createDashboardLink(accountId: string): Promise<{ url: string }> {
-    const link = await this.send({
-      method: 'POST',
-      path: `/accounts/${accountId}/login_links`,
-      schema: accountLinkSchema,
-      fields: {},
-    });
-    return { url: link.url };
+  /** Las cuentas con panel completo no tienen enlace de acceso: el centro entra con su email. */
+  createDashboardLink(): Promise<{ url: string }> {
+    return Promise.resolve({ url: STRIPE_DASHBOARD_URL });
   }
 
   async readConnectedAccount(accountId: string): Promise<ConnectedAccountState> {

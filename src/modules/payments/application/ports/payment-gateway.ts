@@ -51,7 +51,7 @@ export interface PaymentGateway {
   }): Promise<{ accountId: string }>;
   /** Enlace de un solo uso al formulario de alta de Stripe. */
   createOnboardingLink(accountId: string): Promise<{ url: string }>;
-  /** Enlace de un solo uso al panel Express del centro, donde hace reembolsos y ve disputas. */
+  /** Dónde entra el centro a su panel de Stripe para hacer reembolsos y ver disputas. */
   createDashboardLink(accountId: string): Promise<{ url: string }>;
   readConnectedAccount(accountId: string): Promise<ConnectedAccountState>;
   createPayment(input: NewGatewayPayment): Promise<GatewayPayment>;

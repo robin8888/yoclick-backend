@@ -71,7 +71,7 @@ export class PaymentsConnectController {
   @ApiOperation({
     operationId: 'payments_open_dashboard',
     summary:
-      'Enlace de un solo uso al panel de Stripe del centro (reembolsos, disputas, pagos a su banco). 409 PAYMENTS_NOT_READY si aún no cobra.',
+      'Enlace al panel de Stripe del centro (reembolsos, disputas, pagos a su banco). 409 PAYMENTS_NOT_READY si aún no cobra.',
   })
   @ApiCreatedResponse({ type: OnboardingLinkResponseDto })
   async dashboardLink(
