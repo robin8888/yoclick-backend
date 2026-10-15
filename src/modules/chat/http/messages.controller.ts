@@ -68,7 +68,9 @@ export class MessagesController {
       before: query.before === undefined ? null : new Date(query.before),
       limit: query.limit,
     });
-    return { messages: messages.map((message) => this.presenter.message(message)) };
+    return {
+      messages: messages.map((message) => this.presenter.message(message, actor.membershipId)),
+    };
   }
 
   @Post('messages')
@@ -89,7 +91,7 @@ export class MessagesController {
       conversationId: params.conversationId,
       body: body.body,
     });
-    return this.presenter.message(message);
+    return this.presenter.message(message, actor.membershipId);
   }
 
   @Post('attachments')
@@ -118,6 +120,6 @@ export class MessagesController {
       bytes: request.body,
       fileName: query.fileName,
     });
-    return this.presenter.message(message);
+    return this.presenter.message(message, actor.membershipId);
   }
 }

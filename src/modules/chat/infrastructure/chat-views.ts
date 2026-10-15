@@ -24,6 +24,7 @@ export interface StoredPerson {
 
 export const MESSAGE_INCLUDE = {
   sender: { select: { user: { select: { fullName: true } } } },
+  conversation: { select: { memberMembershipId: true } },
 } as const;
 
 export interface StoredMessage {
@@ -37,6 +38,7 @@ export interface StoredMessage {
   readonly attachmentSizeBytes: number | null;
   readonly createdAt: Date;
   readonly sender: { readonly user: { readonly fullName: string } };
+  readonly conversation: { readonly memberMembershipId: string };
 }
 
 function toAttachment(message: StoredMessage): AttachmentView | null {
@@ -54,6 +56,7 @@ export function toMessageView(message: StoredMessage): MessageView {
   return {
     id: message.id,
     conversationId: message.conversationId,
+    memberMembershipId: message.conversation.memberMembershipId,
     senderMembershipId: message.senderMembershipId,
     senderName: message.sender.user.fullName,
     body: message.body,

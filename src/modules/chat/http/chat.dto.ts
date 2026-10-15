@@ -28,6 +28,8 @@ const MESSAGE_SCHEMA = z.strictObject({
   conversationId: z.uuid(),
   senderMembershipId: z.uuid(),
   senderName: z.string(),
+  /** Del lado de quien mira (para pintar la burbuja a la derecha). */
+  isMine: z.boolean(),
   body: z.string().nullable(),
   attachment: ATTACHMENT_SCHEMA.nullable(),
   createdAt: z.iso.datetime(),

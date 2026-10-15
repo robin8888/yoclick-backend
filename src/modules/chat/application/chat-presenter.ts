@@ -12,13 +12,17 @@ import {
 export class ChatPresenter {
   constructor(private readonly urlSigner: PhotoUrlSigner) {}
 
-  message(message: MessageView): Record<string, unknown> {
+  message(message: MessageView, viewerMembershipId: string): Record<string, unknown> {
     const { attachment } = message;
+    const isViewerTheMember = viewerMembershipId === message.memberMembershipId;
+    const isFromMember = message.senderMembershipId === message.memberMembershipId;
     return {
       id: message.id,
       conversationId: message.conversationId,
       senderMembershipId: message.senderMembershipId,
       senderName: message.senderName,
+      /** Del lado de quien mira: sus propios mensajes y, en el centro, los de toda la administración. */
+      isMine: isViewerTheMember === isFromMember,
       body: message.body,
       attachment:
         attachment === null
@@ -33,11 +37,16 @@ export class ChatPresenter {
     };
   }
 
-  conversation(conversation: ConversationView): Record<string, unknown> {
+  conversation(
+    conversation: ConversationView,
+    viewerMembershipId: string,
+  ): Record<string, unknown> {
     return {
       id: conversation.id,
       counterpart: this.counterpart(conversation.counterpart),
-      lastMessage: conversation.lastMessage ? this.message(conversation.lastMessage) : null,
+      lastMessage: conversation.lastMessage
+        ? this.message(conversation.lastMessage, viewerMembershipId)
+        : null,
       lastMessageAt: conversation.lastMessageAt.toISOString(),
       unreadCount: conversation.unreadCount,
     };

@@ -27,6 +27,8 @@ export interface AttachmentView {
 export interface MessageView {
   readonly id: string;
   readonly conversationId: string;
+  /** La persona de la conversación: de su lado están sus mensajes; del otro, los de quien la atiende. */
+  readonly memberMembershipId: string;
   readonly senderMembershipId: string;
   readonly senderName: string;
   readonly body: string | null;

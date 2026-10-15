@@ -60,7 +60,9 @@ export class ConversationsController {
     const conversations = await this.listConversations.execute(actor);
     return {
       unreadTotal: conversations.reduce((total, { unreadCount }) => total + unreadCount, 0),
-      conversations: conversations.map((conversation) => this.presenter.conversation(conversation)),
+      conversations: conversations.map((conversation) =>
+        this.presenter.conversation(conversation, actor.membershipId),
+      ),
     };
   }
 

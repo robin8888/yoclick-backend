@@ -15028,6 +15028,8 @@ components:
                     pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
                   senderName:
                     type: string
+                  isMine:
+                    type: boolean
                   body:
                     type: string
                     nullable: true
@@ -15063,6 +15065,7 @@ components:
                   - conversationId
                   - senderMembershipId
                   - senderName
+                  - isMine
                   - body
                   - attachment
                   - createdAt
@@ -15164,6 +15167,8 @@ components:
                 pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
               senderName:
                 type: string
+              isMine:
+                type: boolean
               body:
                 type: string
                 nullable: true
@@ -15199,6 +15204,7 @@ components:
               - conversationId
               - senderMembershipId
               - senderName
+              - isMine
               - body
               - attachment
               - createdAt
@@ -15233,6 +15239,8 @@ components:
           pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
         senderName:
           type: string
+        isMine:
+          type: boolean
         body:
           type: string
           nullable: true
@@ -15268,6 +15276,7 @@ components:
         - conversationId
         - senderMembershipId
         - senderName
+        - isMine
         - body
         - attachment
         - createdAt
