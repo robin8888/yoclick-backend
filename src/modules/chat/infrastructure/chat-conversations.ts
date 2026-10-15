@@ -65,23 +65,6 @@ export async function toConversationView(
   };
 }
 
-async function haveSharedClass(
-  client: TenantTransactionClient,
-  input: { actorRole: ActorContext['role']; actorId: string; target: StoredPerson },
-): Promise<boolean> {
-  const { actorRole, actorId, target } = input;
-  const isClientWithStaff =
-    (actorRole === 'client' && target.role === 'staff') ||
-    (actorRole === 'staff' && target.role === 'client');
-  if (!isClientWithStaff) return false;
-  const clientId = actorRole === 'client' ? actorId : target.id;
-  const staffId = actorRole === 'client' ? target.id : actorId;
-  const shared = await client.booking.count({
-    where: { clientMembershipId: clientId, classSession: { staffMembershipId: staffId } },
-  });
-  return shared > 0;
-}
-
 /** Quién es la persona de la conversación y quién la otra parte (nula: el centro). */
 function assignParties(
   actor: ActorContext,
@@ -96,10 +79,12 @@ function assignParties(
   return { memberMembershipId: actor.membershipId, counterpartMembershipId: target.id };
 }
 
-export async function buildPersonContext(
-  client: TenantTransactionClient,
-  input: { actor: ActorContext; target: StoredPerson; isActorMinor: boolean; now: Date },
-): Promise<StartConversationContext> {
+export function buildPersonContext(input: {
+  actor: ActorContext;
+  target: StoredPerson;
+  isActorMinor: boolean;
+  now: Date;
+}): StartConversationContext {
   const { actor, target, isActorMinor, now } = input;
   return {
     facts: {
@@ -107,11 +92,6 @@ export async function buildPersonContext(
       counterpart: { kind: 'person', role: target.role },
       isActorMinor,
       isCounterpartMinor: isMinor(target.user.birthDate, now),
-      haveSharedClass: await haveSharedClass(client, {
-        actorRole: actor.role,
-        actorId: actor.membershipId,
-        target,
-      }),
     },
     ...assignParties(actor, target),
   };

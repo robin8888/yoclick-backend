@@ -13,7 +13,6 @@ const BASE: StartConversationFacts = {
   counterpart: { kind: 'person', role: 'staff' },
   isActorMinor: false,
   isCounterpartMinor: false,
-  haveSharedClass: true,
 };
 
 describe('isMinor', () => {
@@ -29,10 +28,9 @@ describe('isMinor', () => {
 
 describe('decideStartConversation', () => {
   it.each([
-    ['client with a teacher they shared a class with', BASE, 'allowed'],
-    ['client with a teacher without a shared class', { ...BASE, haveSharedClass: false }, 'denied'],
+    ['client with a teacher ', BASE, 'allowed'],
     [
-      'teacher with a client they shared a class with',
+      'teacher with a client ',
       { ...BASE, actorRole: 'staff', counterpart: { kind: 'person', role: 'client' } },
       'allowed',
     ],

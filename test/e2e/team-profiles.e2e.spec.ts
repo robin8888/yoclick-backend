@@ -31,6 +31,7 @@ class RecordingPushSender implements PushSender {
 interface ProfileBody {
   membershipId: string;
   isMe: boolean;
+  role: string;
   fullName: string;
   headline: string | null;
   bio: string | null;
@@ -204,13 +205,17 @@ describe('team profiles', () => {
   });
 
   describe('what each person sees', () => {
-    it('shows the clients only the published profiles', async () => {
+    it('shows the clients the whole team, but only the name and role of the unpublished ones', async () => {
       await saveContent(staff.userId);
       await call('POST', '/team-profiles/me/submit', staff.userId);
 
-      expect(await listFor(ana.userId)).toEqual([]);
+      const listed = await listFor(ana.userId);
+      const unpublished = listed.find(({ membershipId }) => membershipId === staff.membershipId);
+      expect(unpublished).toMatchObject({ role: 'staff', bio: null, headline: null });
+      expect(listed.map(({ role }) => role)).toContain('owner');
       const detail = await call('GET', `/team-profiles/${staff.membershipId}`, ana.userId);
-      expect(detail.statusCode).toBe(404);
+      expect(detail.statusCode).toBe(200);
+      expect(detail.json<ProfileBody>().bio).toBeNull();
     });
 
     it('shows the team the published ones and their own, and the administration all', async () => {
@@ -220,7 +225,7 @@ describe('team profiles', () => {
       const seenByStaff = (await listFor(staff.userId)).map(({ membershipId }) => membershipId);
       const seenByOwner = (await listFor(owner)).map(({ membershipId }) => membershipId);
 
-      expect(seenByStaff).toEqual([staff.membershipId]);
+      expect(seenByStaff).toEqual(expect.arrayContaining([staff.membershipId]));
       expect(seenByOwner).toEqual(
         expect.arrayContaining([
           center.ownerMembershipId,
@@ -249,12 +254,15 @@ describe('team profiles', () => {
 
       await saveContent(staff.userId, { ...CONTENT, bio: 'Texto nuevo.' });
 
-      expect(await listFor(ana.userId)).toEqual([]);
+      const bioSeenByClient = async (): Promise<string | null | undefined> =>
+        (await listFor(ana.userId)).find(({ membershipId }) => membershipId === staff.membershipId)
+          ?.bio;
+      expect(await bioSeenByClient()).toBeNull();
       await call('POST', '/team-profiles/me/submit', staff.userId);
       await call('POST', `/team-profiles/${staff.membershipId}/review`, owner, {
         decision: 'approve',
       });
-      expect((await listFor(ana.userId)).map(({ bio }) => bio)).toEqual(['Texto nuevo.']);
+      expect(await bioSeenByClient()).toBe('Texto nuevo.');
     });
   });
 
@@ -274,9 +282,12 @@ describe('team profiles', () => {
       expect(response.json<ProfileBody>().status).toBe('published');
       expect(await noticeKindsOf(staff.userId)).toContain('staff_profile_reviewed');
       expect(pushSender.tokensFor('staff_profile_reviewed')).toEqual([TOKEN_STAFF]);
-      expect((await listFor(ana.userId)).map(({ membershipId }) => membershipId)).toEqual([
-        staff.membershipId,
-      ]);
+      const seenByClient = await listFor(ana.userId);
+      expect(
+        seenByClient.find(({ membershipId }) => membershipId === staff.membershipId),
+      ).toMatchObject({
+        status: 'published',
+      });
     });
 
     it('asks for changes with a note that only the person and the administration read', async () => {
@@ -296,7 +307,10 @@ describe('team profiles', () => {
       expect((await profileOf(staff.userId, staff.membershipId))?.reviewNote).toBe(
         'Cuenta algo más de ti.',
       );
-      expect(await listFor(ana.userId)).toEqual([]);
+      const seenByClient = (await listFor(ana.userId)).find(
+        ({ membershipId }) => membershipId === staff.membershipId,
+      );
+      expect(seenByClient).toMatchObject({ bio: null, reviewNote: null });
     });
 
     it('is only for the administration and cannot be done twice', async () => {

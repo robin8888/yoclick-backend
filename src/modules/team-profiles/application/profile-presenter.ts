@@ -18,6 +18,7 @@ export class ProfilePresenter {
     return {
       membershipId: profile.membershipId,
       isMe: profile.membershipId === actor.membershipId,
+      role: profile.role,
       fullName: profile.fullName,
       photoUrl: this.photoUrlSigner.sign(profile.photoKey),
       photos: this.photoUrlSigner.signGallery(profile.photos),

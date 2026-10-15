@@ -84,7 +84,6 @@ async function loadCenterContext(
       counterpart: { kind: 'center' },
       isActorMinor: await isActorMinor(client, { actor, now }),
       isCounterpartMinor: false,
-      haveSharedClass: false,
     },
     memberMembershipId: actor.membershipId,
     counterpartMembershipId: null,
@@ -138,7 +137,7 @@ export class PrismaChatRepository implements ChatRepository {
       });
       if (!target || target.id === actor.membershipId) return null;
       const isMinorActor = await isActorMinor(client, { actor, now });
-      return buildPersonContext(client, { actor, target, isActorMinor: isMinorActor, now });
+      return buildPersonContext({ actor, target, isActorMinor: isMinorActor, now });
     });
   }
 

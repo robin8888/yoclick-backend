@@ -99,6 +99,8 @@ const profileShape = {
   membershipId: z.uuid(),
   /** `true` en el perfil de quien hace la petición. */
   isMe: z.boolean(),
+  /** Dueño o administración (el centro) frente al equipo que da las clases. */
+  role: z.enum(['owner', 'admin', 'staff']),
   fullName: z.string(),
   /** Foto de perfil de la persona; la clientela solo la ve si el perfil está publicado. */
   photoUrl: z.string().nullable(),

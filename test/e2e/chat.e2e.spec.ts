@@ -1,12 +1,9 @@
 import { type NestFastifyApplication } from '@nestjs/platform-fastify';
-import { v7 as generateUuidV7 } from 'uuid';
 import { PrismaService } from '../../src/shared/database/prisma.service';
 import { BookingWorld, type CreatedTestCenter } from '../support/booking-world';
 import { resetTestDatabase } from '../support/test-database';
 import { createTestApplication } from './create-test-application';
 
-const MILLISECONDS_PER_MINUTE = 60_000;
-const CLASS_DURATION_MINUTES = 60;
 const MINOR_BIRTH_YEAR = new Date().getUTCFullYear() - 12;
 const PNG_SIGNATURE = Buffer.from('89504e470d0a1a0a', 'hex');
 const PNG_PADDING_BYTES = 64;
@@ -40,47 +37,6 @@ describe('chat', () => {
   let child: Person;
 
   const url = (path: string): string => `/v1/centers/${centerId}${path}`;
-  const actorOf = (person: Person, role: 'client' | 'staff') =>
-    ({
-      userId: person.userId,
-      centerId,
-      membershipId: person.membershipId,
-      role,
-      permissions: [],
-    }) as const;
-
-  /** Una clase del profesor en la que está apuntada una alumna: es lo que las pone en contacto. */
-  async function shareAClass(client: Person): Promise<void> {
-    const serviceId = (
-      await world.createService(ownerUserId, centerId, { name: 'Karate', durationMinutes: 60 })
-    ).id;
-    const startsAt = new Date(Date.now() + 5 * MILLISECONDS_PER_MINUTE);
-    const sessionId = generateUuidV7();
-    await world.tenantPrismaService.runInTenantContext(
-      actorOf(teacher, 'staff'),
-      async (prisma) => {
-        await prisma.classSession.create({
-          data: {
-            id: sessionId,
-            centerId,
-            serviceId,
-            staffMembershipId: teacher.membershipId,
-            startsAt,
-            endsAt: new Date(startsAt.getTime() + CLASS_DURATION_MINUTES * MILLISECONDS_PER_MINUTE),
-          },
-        });
-        await prisma.booking.create({
-          data: {
-            id: generateUuidV7(),
-            centerId,
-            classSessionId: sessionId,
-            clientMembershipId: client.membershipId,
-            status: 'confirmed',
-          },
-        });
-      },
-    );
-  }
 
   async function openWith(person: Person, withMembershipId: string | null) {
     return world.call('POST', url('/conversations'), person.userId, {
@@ -116,7 +72,6 @@ describe('chat', () => {
       where: { id: child.userId },
       data: { birthDate: new Date(Date.UTC(MINOR_BIRTH_YEAR, 0, 1)) },
     });
-    await shareAClass(ana);
   });
 
   afterAll(async () => {
@@ -167,10 +122,9 @@ describe('chat', () => {
       expect((await listOf(teacher.userId)).unreadTotal).toBe(0);
     });
 
-    it('does not let a client write to a teacher they never shared a class with', async () => {
-      const denied = await openWith(luis, teacher.membershipId);
-      expect(denied.statusCode).toBe(403);
-      expect(denied.json<{ code: string }>().code).toBe('CHAT_NO_SHARED_CLASS');
+    it('lets a client write to any teacher of the center, even without a shared class', async () => {
+      const opened = await openWith(luis, teacher.membershipId);
+      expect(opened.statusCode).toBe(201);
     });
 
     it('does not let two clients write to each other', async () => {
@@ -179,8 +133,8 @@ describe('chat', () => {
       expect(denied.json<{ code: string }>().code).toBe('CHAT_NOT_ALLOWED');
     });
 
-    it('offers only the teachers the client shared a class with', async () => {
-      const contacts = await world.call('GET', url('/conversations/contacts'), ana.userId, {
+    it('offers every teacher of the center to a client, and the center itself', async () => {
+      const contacts = await world.call('GET', url('/conversations/contacts'), luis.userId, {
         centerId,
       });
       const body = contacts.json<{

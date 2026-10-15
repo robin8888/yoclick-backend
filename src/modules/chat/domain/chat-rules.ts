@@ -31,15 +31,13 @@ export interface StartConversationFacts {
   readonly counterpart: ChatCounterpart;
   readonly isActorMinor: boolean;
   readonly isCounterpartMinor: boolean;
-  /** Si el alumno y el profesor han coincidido en alguna clase (una cita o un horario fijo). */
-  readonly haveSharedClass: boolean;
 }
 
 export type StartConversationDecision =
   | { readonly kind: 'allowed' }
   | {
       readonly kind: 'denied';
-      readonly code: 'CHAT_NOT_ALLOWED' | 'CHAT_NO_SHARED_CLASS' | 'CHAT_MINOR_REQUIRES_GUARDIAN';
+      readonly code: 'CHAT_NOT_ALLOWED' | 'CHAT_MINOR_REQUIRES_GUARDIAN';
     };
 
 const ALLOWED: StartConversationDecision = { kind: 'allowed' };
@@ -49,21 +47,14 @@ function isAdministration(role: MembershipRoleName): boolean {
   return role === 'owner' || role === 'admin';
 }
 
-/** Alumno y profesor solo hablan si han coincidido en una clase. */
-function decideClientAndStaff(haveSharedClass: boolean): StartConversationDecision {
-  return haveSharedClass ? ALLOWED : { kind: 'denied', code: 'CHAT_NO_SHARED_CLASS' };
-}
-
 function decideBetweenPeople(
   actorRole: MembershipRoleName,
   counterpartRole: MembershipRoleName,
-  haveSharedClass: boolean,
 ): StartConversationDecision {
   const isClientWithStaff =
     (actorRole === 'client' && counterpartRole === 'staff') ||
     (actorRole === 'staff' && counterpartRole === 'client');
-  if (isClientWithStaff) return decideClientAndStaff(haveSharedClass);
-  return NOT_ALLOWED;
+  return isClientWithStaff ? ALLOWED : NOT_ALLOWED;
 }
 
 /** Cuál de las dos partes es un alumno menor; mientras no haya tutores en la app, no se les escribe. */
@@ -80,7 +71,7 @@ function involvesMinorClient(facts: StartConversationFacts): boolean {
  * Quién puede abrir una conversación con quién:
  * - la administración, con cualquier alumno o profesor (habla en nombre del centro);
  * - un alumno o un profesor, con el centro;
- * - un alumno y un profesor, si han coincidido en alguna clase;
+ * - un alumno y un profesor del mismo centro;
  * - nunca alumno con alumno, ni profesor con profesor, ni con menores (solo sus tutores).
  */
 export function decideStartConversation(facts: StartConversationFacts): StartConversationDecision {
@@ -95,7 +86,7 @@ export function decideStartConversation(facts: StartConversationFacts): StartCon
     const isPersonOfTheCenter = counterpart.role === 'client' || counterpart.role === 'staff';
     return isPersonOfTheCenter ? ALLOWED : NOT_ALLOWED;
   }
-  return decideBetweenPeople(actorRole, counterpart.role, facts.haveSharedClass);
+  return decideBetweenPeople(actorRole, counterpart.role);
 }
 
 export type AttachmentDecision =

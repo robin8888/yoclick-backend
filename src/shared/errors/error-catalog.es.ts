@@ -97,9 +97,6 @@ export const ERROR_CATALOG = {
     title: 'Este centro aún no puede cobrar online. Pídele que complete el alta de cobros',
   },
   CHAT_NOT_ALLOWED: { title: 'No puedes escribir a esta persona' },
-  CHAT_NO_SHARED_CLASS: {
-    title: 'Solo puedes escribir a un profesor con quien hayas coincidido en alguna clase',
-  },
   CHAT_MINOR_REQUIRES_GUARDIAN: {
     title: 'A los menores solo se les escribe a través de su tutor',
   },

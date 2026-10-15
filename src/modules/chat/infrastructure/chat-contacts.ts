@@ -21,18 +21,12 @@ async function listAllPeopleOfCenter(
   });
 }
 
-/** Los profesores con los que el alumno ha coincidido en alguna clase. */
-async function listTeachersOfClient(
-  client: TenantTransactionClient,
-  actor: ActorContext,
-): Promise<StoredPerson[]> {
+/** Los profesores del centro: el alumno puede escribir a cualquiera. */
+async function listTeachers(client: TenantTransactionClient): Promise<StoredPerson[]> {
   return client.membership.findMany({
     where: {
       status: 'active',
       role: 'staff',
-      taughtClassSessions: {
-        some: { bookings: { some: { clientMembershipId: actor.membershipId } } },
-      },
     },
     select: PERSON_SELECT,
     orderBy: { user: { fullName: 'asc' } },
@@ -40,16 +34,12 @@ async function listTeachersOfClient(
   });
 }
 
-/** Los alumnos que han reservado alguna clase de este profesor. */
-async function listClientsOfTeacher(
-  client: TenantTransactionClient,
-  actor: ActorContext,
-): Promise<StoredPerson[]> {
+/** Los alumnos del centro: el profesor puede escribir a cualquiera. */
+async function listClients(client: TenantTransactionClient): Promise<StoredPerson[]> {
   return client.membership.findMany({
     where: {
       status: 'active',
       role: 'client',
-      bookings: { some: { classSession: { staffMembershipId: actor.membershipId } } },
     },
     select: PERSON_SELECT,
     orderBy: { user: { fullName: 'asc' } },
@@ -81,9 +71,9 @@ export async function listContactsInTransaction(
   if (actor.role === 'client') {
     const isActorMinor = isMinor(await findActorBirthDate(client, actor), now);
     if (isActorMinor) return { canWriteToCenter: false, people: [] };
-    const teachers = await listTeachersOfClient(client, actor);
+    const teachers = await listTeachers(client);
     return { canWriteToCenter: true, people: teachers.map(toContact) };
   }
-  const clients = adultsOnly(await listClientsOfTeacher(client, actor), now);
+  const clients = adultsOnly(await listClients(client), now);
   return { canWriteToCenter: true, people: clients.map(toContact) };
 }

@@ -19,11 +19,32 @@ import {
   type TeamSettings,
 } from './ports/team-profile.repository';
 
-/** Lo que cada persona puede ver de un perfil: la clientela solo lo publicado; el equipo, lo publicado y lo suyo. */
+/**
+ * Quien aún no ha publicado su perfil sale igualmente en el equipo (la clientela tiene que saber
+ * quién le da clase), pero solo con su nombre y su cargo: nada de lo que está sin revisar.
+ */
+function toIntroductionOnly(profile: ProfileView): ProfileView {
+  return {
+    ...profile,
+    photoKey: profile.hasPublishConsent ? profile.photoKey : null,
+    headline: null,
+    bio: null,
+    specialties: [],
+    languages: [],
+    reviewNote: null,
+    certifications: [],
+    introVideo: null,
+    techniqueVideos: [],
+    rating: null,
+    photos: [],
+  };
+}
+
+/** Lo que cada persona puede ver de un perfil: la clientela todo lo publicado y, del resto, su nombre y cargo; el equipo, lo publicado y lo suyo. */
 function shapeProfileForViewer(profile: ProfileView, actor: ActorContext): ProfileView | null {
   const isAdministrator = actor.role === 'owner' || actor.role === 'admin';
   if (isAdministrator || profile.membershipId === actor.membershipId) return profile;
-  if (!canClientsSeeProfile(profile.status)) return null;
+  if (!canClientsSeeProfile(profile.status)) return toIntroductionOnly(profile);
   return {
     ...profile,
     reviewNote: null,
