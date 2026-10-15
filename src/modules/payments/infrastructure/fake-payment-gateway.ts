@@ -30,6 +30,10 @@ export class FakePaymentGateway implements PaymentGateway {
     return Promise.resolve({ url: `https://connect.fake.local/onboarding/${accountId}` });
   }
 
+  createDashboardLink(accountId: string): Promise<{ url: string }> {
+    return Promise.resolve({ url: `https://connect.fake.local/dashboard/${accountId}` });
+  }
+
   readConnectedAccount(accountId: string): Promise<ConnectedAccountState> {
     const canCharge = this.chargeableAccounts.has(accountId);
     return Promise.resolve({ canCharge, hasSubmittedDetails: canCharge });

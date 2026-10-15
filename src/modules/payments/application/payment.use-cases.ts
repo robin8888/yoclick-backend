@@ -121,6 +121,25 @@ export class StartPaymentsOnboardingUseCase {
   }
 }
 
+/** El centro entra en su panel de Stripe (reembolsos y disputas son suyos, no de Yoclick). */
+@Injectable()
+export class OpenPaymentsDashboardUseCase {
+  constructor(
+    @Inject(PAYMENT_GATEWAY) private readonly gateway: PaymentGateway,
+    private readonly statusReader: PaymentsStatusReader,
+  ) {}
+
+  async execute(actor: ActorContext): Promise<{ url: string }> {
+    const centerPayments = await this.statusReader.readInfo(actor);
+    if (!centerPayments.isPremium)
+      throw new DomainError('PAYMENTS_NOT_INCLUDED', HTTP_STATUS.forbidden);
+    if (centerPayments.stripeAccountId === null || !centerPayments.stripeChargesEnabled) {
+      throw new DomainError('PAYMENTS_NOT_READY', HTTP_STATUS.conflict);
+    }
+    return this.gateway.createDashboardLink(centerPayments.stripeAccountId);
+  }
+}
+
 @Injectable()
 export class PayTargetUseCase {
   constructor(

@@ -9,11 +9,16 @@ import {
   PayTargetUseCase,
   PaymentsStatusReader,
   SettlePaymentService,
+  OpenPaymentsDashboardUseCase,
   StartPaymentsOnboardingUseCase,
 } from './application/payment.use-cases';
 import { PAYMENT_GATEWAY, type PaymentGateway } from './application/ports/payment-gateway';
 import { PAYMENT_REPOSITORY } from './application/ports/payment.repository';
-import { PaymentsController, PaymentWebhooksController } from './http/payments.controller';
+import {
+  PaymentsConnectController,
+  PaymentsController,
+  PaymentWebhooksController,
+} from './http/payments.controller';
 import { FakePaymentGateway } from './infrastructure/fake-payment-gateway';
 import { PrismaPaymentRepository } from './infrastructure/prisma-payment.repository';
 import { StripePaymentGateway } from './infrastructure/stripe-payment-gateway';
@@ -38,11 +43,12 @@ function createPaymentGateway(configService: ConfigService<Environment, true>): 
 }
 
 @Module({
-  controllers: [PaymentsController, PaymentWebhooksController],
+  controllers: [PaymentsController, PaymentsConnectController, PaymentWebhooksController],
   providers: [
     { provide: PAYMENT_GATEWAY, inject: [ConfigService], useFactory: createPaymentGateway },
     { provide: PAYMENT_REPOSITORY, useClass: PrismaPaymentRepository },
     PaymentsStatusReader,
+    OpenPaymentsDashboardUseCase,
     SettlePaymentService,
     GetPaymentsStatusUseCase,
     ListPaymentsUseCase,

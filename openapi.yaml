@@ -3699,40 +3699,6 @@ paths:
       summary: Los últimos 50 cobros online del centro, de más reciente a más antiguo.
       tags:
         - payments
-  /v1/centers/{centerId}/payments/connect/onboarding-link:
-    post:
-      operationId: payments_start_onboarding
-      parameters:
-        - name: X-Center-Id
-          in: header
-          required: true
-          schema:
-            type: string
-        - name: centerId
-          required: true
-          in: path
-          schema:
-            format: uuid
-            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
-            type: string
-      responses:
-        "201":
-          description: ""
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/OnboardingLinkResponseDto"
-        default:
-          description: Error RFC 9457
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetailsDto"
-      security:
-        - bearer: []
-      summary: Abre (o retoma) el alta de cobros del centro en Stripe y devuelve el enlace de un solo uso. 403 PAYMENTS_NOT_INCLUDED si el plan no es Premium.
-      tags:
-        - payments
   /v1/centers/{centerId}/passes/{passId}/pay:
     post:
       operationId: payments_pay_pass
@@ -3854,6 +3820,74 @@ paths:
       security:
         - bearer: []
       summary: "Tras cerrar la hoja de pago: el servidor lo comprueba en Stripe y, si está pagado, activa lo comprado."
+      tags:
+        - payments
+  /v1/centers/{centerId}/payments/connect/onboarding-link:
+    post:
+      operationId: payments_start_onboarding
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "201":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnboardingLinkResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Abre (o retoma) el alta de cobros del centro en Stripe y devuelve el enlace de un solo uso. 403 PAYMENTS_NOT_INCLUDED si el plan no es Premium.
+      tags:
+        - payments
+  /v1/centers/{centerId}/payments/connect/dashboard-link:
+    post:
+      operationId: payments_open_dashboard
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "201":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnboardingLinkResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Enlace de un solo uso al panel de Stripe del centro (reembolsos, disputas, pagos a su banco). 409 PAYMENTS_NOT_READY si aún no cobra.
       tags:
         - payments
   /v1/webhooks/stripe:
@@ -13224,15 +13258,6 @@ components:
       required:
         - payments
       additionalProperties: false
-    OnboardingLinkResponseDto:
-      type: object
-      properties:
-        url:
-          type: string
-          format: uri
-      required:
-        - url
-      additionalProperties: false
     PaymentSheetResponseDto:
       type: object
       properties:
@@ -13276,6 +13301,15 @@ components:
       required:
         - paymentId
         - status
+      additionalProperties: false
+    OnboardingLinkResponseDto:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+      required:
+        - url
       additionalProperties: false
     RepeatWeekRequestDto:
       type: object

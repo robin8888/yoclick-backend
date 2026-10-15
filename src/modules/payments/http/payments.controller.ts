@@ -23,6 +23,7 @@ import {
   GetPaymentsStatusUseCase,
   HandleStripeWebhookUseCase,
   ListPaymentsUseCase,
+  OpenPaymentsDashboardUseCase,
   PayTargetUseCase,
   StartPaymentsOnboardingUseCase,
 } from '../application/payment.use-cases';
@@ -43,11 +44,54 @@ import {
 @ApiHeader({ name: 'X-Center-Id', required: true })
 @ApiDefaultResponse({ type: ProblemDetailsDto, description: 'Error RFC 9457' })
 @Controller('centers/:centerId')
+export class PaymentsConnectController {
+  constructor(
+    private readonly startOnboarding: StartPaymentsOnboardingUseCase,
+    private readonly openDashboard: OpenPaymentsDashboardUseCase,
+  ) {}
+
+  @Post('payments/connect/onboarding-link')
+  @Roles('owner')
+  @ApiOperation({
+    operationId: 'payments_start_onboarding',
+    summary:
+      'Abre (o retoma) el alta de cobros del centro en Stripe y devuelve el enlace de un solo uso. 403 PAYMENTS_NOT_INCLUDED si el plan no es Premium.',
+  })
+  @ApiCreatedResponse({ type: OnboardingLinkResponseDto })
+  async onboardingLink(
+    @CurrentActor() actor: ActorContext,
+    @Param() params: CenterRouteParamsDto,
+  ): Promise<Record<string, unknown>> {
+    assertRouteTargetsActorCenter(actor, params.centerId);
+    return { ...(await this.startOnboarding.execute(actor)) };
+  }
+
+  @Post('payments/connect/dashboard-link')
+  @Roles('owner')
+  @ApiOperation({
+    operationId: 'payments_open_dashboard',
+    summary:
+      'Enlace de un solo uso al panel de Stripe del centro (reembolsos, disputas, pagos a su banco). 409 PAYMENTS_NOT_READY si aún no cobra.',
+  })
+  @ApiCreatedResponse({ type: OnboardingLinkResponseDto })
+  async dashboardLink(
+    @CurrentActor() actor: ActorContext,
+    @Param() params: CenterRouteParamsDto,
+  ): Promise<Record<string, unknown>> {
+    assertRouteTargetsActorCenter(actor, params.centerId);
+    return { ...(await this.openDashboard.execute(actor)) };
+  }
+}
+
+@ApiTags('payments')
+@ApiBearerAuth('bearer')
+@ApiHeader({ name: 'X-Center-Id', required: true })
+@ApiDefaultResponse({ type: ProblemDetailsDto, description: 'Error RFC 9457' })
+@Controller('centers/:centerId')
 export class PaymentsController {
   constructor(
     private readonly getStatus: GetPaymentsStatusUseCase,
     private readonly listPayments: ListPaymentsUseCase,
-    private readonly startOnboarding: StartPaymentsOnboardingUseCase,
     private readonly payTarget: PayTargetUseCase,
     private readonly confirmPayment: ConfirmPaymentUseCase,
   ) {}
@@ -88,22 +132,6 @@ export class PaymentsController {
         paidAt: payment.paidAt?.toISOString() ?? null,
       })),
     };
-  }
-
-  @Post('payments/connect/onboarding-link')
-  @Roles('owner')
-  @ApiOperation({
-    operationId: 'payments_start_onboarding',
-    summary:
-      'Abre (o retoma) el alta de cobros del centro en Stripe y devuelve el enlace de un solo uso. 403 PAYMENTS_NOT_INCLUDED si el plan no es Premium.',
-  })
-  @ApiCreatedResponse({ type: OnboardingLinkResponseDto })
-  async onboardingLink(
-    @CurrentActor() actor: ActorContext,
-    @Param() params: CenterRouteParamsDto,
-  ): Promise<Record<string, unknown>> {
-    assertRouteTargetsActorCenter(actor, params.centerId);
-    return { ...(await this.startOnboarding.execute(actor)) };
   }
 
   @Post('passes/:passId/pay')

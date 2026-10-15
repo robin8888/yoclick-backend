@@ -202,6 +202,16 @@ export class StripePaymentGateway implements PaymentGateway {
     return { url: link.url };
   }
 
+  async createDashboardLink(accountId: string): Promise<{ url: string }> {
+    const link = await this.send({
+      method: 'POST',
+      path: `/accounts/${accountId}/login_links`,
+      schema: accountLinkSchema,
+      fields: {},
+    });
+    return { url: link.url };
+  }
+
   async readConnectedAccount(accountId: string): Promise<ConnectedAccountState> {
     const account = await this.send({
       method: 'GET',

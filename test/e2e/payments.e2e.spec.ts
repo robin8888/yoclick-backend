@@ -180,6 +180,31 @@ describe('payments (Stripe Connect, plan Premium)', () => {
     expect(await readStatus(ownerUserId)).toBe('not_started');
   });
 
+  it('gives the owner a link to the Stripe dashboard only once the center can charge', async () => {
+    await setClientLimit(null);
+    const tooEarly = await world.call(
+      'POST',
+      url('/payments/connect/dashboard-link'),
+      ownerUserId,
+      {
+        centerId,
+      },
+    );
+    expect(tooEarly.statusCode).toBe(409);
+
+    await makeCenterReadyToCharge();
+    const link = await world.call('POST', url('/payments/connect/dashboard-link'), ownerUserId, {
+      centerId,
+    });
+    expect(link.statusCode).toBe(201);
+    expect(link.json<{ url: string }>().url).toContain('dashboard');
+
+    const byClient = await world.call('POST', url('/payments/connect/dashboard-link'), ana.userId, {
+      centerId,
+    });
+    expect(byClient.statusCode).toBe(403);
+  });
+
   it('activates a pass once Stripe says it was paid, and only for its owner', async () => {
     await makeCenterReadyToCharge();
     const pass = await requestPass(ana);
