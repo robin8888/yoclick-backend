@@ -3946,6 +3946,54 @@ paths:
       summary: "Copia a la semana siguiente todos los horarios de una semana (los que empiezan y terminan dentro de ella): mismo servicio, sala, profesor, horas y aforo. Los que ya estaban copiados no se duplican; las fechas que chocan se devuelven en `skipped`."
       tags:
         - schedules
+  /v1/centers/{centerId}/schedules/busy-times:
+    get:
+      operationId: schedules_busy_times
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: roomId
+          required: false
+          in: query
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: staffMembershipId
+          required: false
+          in: query
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BusyTimesResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: "Las franjas de la semana que ya ocupan una sala y/o un profesor con clases activas: lo que no se puede elegir al crear una clase nueva."
+      tags:
+        - schedules
   /v1/centers/{centerId}/schedules:
     get:
       operationId: schedules_list
@@ -14013,6 +14061,46 @@ components:
         - alreadyCopiedSeriesCount
         - failedSeriesCount
         - skipped
+      additionalProperties: false
+    BusyTimesResponseDto:
+      type: object
+      properties:
+        busy:
+          type: array
+          items:
+            type: object
+            properties:
+              weekday:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+              startsAtTime:
+                type: string
+              endsAtTime:
+                type: string
+              source:
+                type: string
+                enum:
+                  - room
+                  - teacher
+              className:
+                type: string
+              startsOn:
+                type: string
+              endsOn:
+                type: string
+                nullable: true
+            required:
+              - weekday
+              - startsAtTime
+              - endsAtTime
+              - source
+              - className
+              - startsOn
+              - endsOn
+            additionalProperties: false
+      required:
+        - busy
       additionalProperties: false
     ScheduleSeriesListResponseDto:
       type: object
