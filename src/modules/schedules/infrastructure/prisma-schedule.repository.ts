@@ -13,6 +13,7 @@ import {
   type RoomBlockCreationOutcome,
   type RentalView,
   type RoomBlockView,
+  type BusyTimeView,
   type ScheduleRepository,
   type ScheduleSeriesCreationOutcome,
   type ScheduleSeriesPatch,
@@ -27,6 +28,7 @@ import {
   deleteBlockInTransaction,
   listBlocksInTransaction,
 } from './room-block-writes';
+import { findBusyTimes } from './busy-times';
 import { materializeSchedulesInTransaction, resolveLocalToday } from './schedule-materialization';
 import {
   ENROLLMENT_VIEW_INCLUDE,
@@ -45,6 +47,15 @@ import { repeatWeekInTransaction } from './week-repeat';
 @Injectable()
 export class PrismaScheduleRepository implements ScheduleRepository {
   constructor(private readonly tenantPrismaService: TenantPrismaService) {}
+
+  async listBusyTimes(
+    actor: ActorContext,
+    query: { roomId: string | null; staffMembershipId: string | null; now: Date },
+  ): Promise<BusyTimeView[]> {
+    return this.tenantPrismaService.runInTenantContext(actor, async (client) =>
+      findBusyTimes(client, { ...query, today: await resolveLocalToday(client, query.now) }),
+    );
+  }
 
   async listSeries(actor: ActorContext, query: { now: Date }): Promise<ScheduleSeriesView[]> {
     return this.tenantPrismaService.runInTenantContext(actor, async (client) => {

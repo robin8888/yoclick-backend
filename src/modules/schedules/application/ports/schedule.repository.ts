@@ -229,7 +229,26 @@ export interface RepeatWeekOutcome {
   readonly skipped: readonly SkippedOccurrence[];
 }
 
+/** Una franja semanal ya ocupada por una clase activa, de la sala o del profesor consultados. */
+export interface BusyTimeView {
+  /** 1 = lunes … 7 = domingo. */
+  readonly weekday: number;
+  readonly startsAtTime: string;
+  readonly endsAtTime: string;
+  /** De quién es el choque: la sala o el profesor. */
+  readonly source: 'room' | 'teacher';
+  readonly className: string;
+  /** `YYYY-MM-DD`; `null` = sin fin. */
+  readonly startsOn: string;
+  readonly endsOn: string | null;
+}
+
 export interface ScheduleRepository {
+  /** Las franjas de la semana ya ocupadas en una sala o por un profesor (clases activas). */
+  listBusyTimes(
+    actor: ActorContext,
+    query: { roomId: string | null; staffMembershipId: string | null; now: Date },
+  ): Promise<BusyTimeView[]>;
   /** Las series del centro (activas primero) con sus días; de paso crea las sesiones que falten. */
   listSeries(actor: ActorContext, query: { now: Date }): Promise<ScheduleSeriesView[]>;
   createSeries(

@@ -305,3 +305,32 @@ export class RepeatWeekResponseDto extends createZodDto(
     skipped: z.array(skippedOccurrenceShape),
   }),
 ) {}
+
+export class BusyTimesQueryDto extends createZodDto(
+  z
+    .strictObject({
+      roomId: z.uuid().optional(),
+      staffMembershipId: z.uuid().optional(),
+    })
+    .refine(
+      ({ roomId, staffMembershipId }) => roomId !== undefined || staffMembershipId !== undefined,
+      'send a room or a teacher',
+    ),
+) {}
+
+export class BusyTimesResponseDto extends createZodDto(
+  z.strictObject({
+    busy: z.array(
+      z.strictObject({
+        /** 1 = lunes … 7 = domingo. */
+        weekday: z.number().int(),
+        startsAtTime: z.string(),
+        endsAtTime: z.string(),
+        source: z.enum(['room', 'teacher']),
+        className: z.string(),
+        startsOn: z.string(),
+        endsOn: z.string().nullable(),
+      }),
+    ),
+  }),
+) {}

@@ -10,6 +10,7 @@ import {
   EnrollClientsUseCase,
   ListEnrollmentsUseCase,
   ListRoomBlocksUseCase,
+  ListBusyTimesUseCase,
   ListScheduleSeriesUseCase,
   RepeatWeekUseCase,
   UnenrollClientUseCase,
@@ -18,6 +19,7 @@ import {
 import { EnrollmentsController } from './http/enrollments.controller';
 import { RoomBlocksController } from './http/room-blocks.controller';
 import { ScheduleRepeatController } from './http/schedule-repeat.controller';
+import { BusyTimesController } from './http/busy-times.controller';
 import { SchedulesController } from './http/schedules.controller';
 import { SessionCancellationController } from './http/session-cancellation.controller';
 import { PrismaScheduleRepository } from './infrastructure/prisma-schedule.repository';
@@ -26,12 +28,14 @@ import { PrismaScheduleRepository } from './infrastructure/prisma-schedule.repos
 @Module({
   controllers: [
     ScheduleRepeatController,
+    BusyTimesController,
     SchedulesController,
     EnrollmentsController,
     SessionCancellationController,
     RoomBlocksController,
   ],
   providers: [
+    ListBusyTimesUseCase,
     ListScheduleSeriesUseCase,
     CreateScheduleSeriesUseCase,
     RepeatWeekUseCase,

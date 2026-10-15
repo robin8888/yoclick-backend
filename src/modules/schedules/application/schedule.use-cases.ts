@@ -14,6 +14,7 @@ import {
   type RepeatWeekOutcome,
   type RoomBlockCreationOutcome,
   type RoomBlockView,
+  type BusyTimeView,
   type ScheduleRepository,
   type ScheduleSeriesCreationOutcome,
   type ScheduleSeriesPatch,
@@ -228,5 +229,18 @@ export class DeleteRoomBlockUseCase {
   async execute(actor: ActorContext, request: { roomId: string; blockId: string }): Promise<void> {
     const wasDeleted = await this.schedules.deleteBlock(actor, request);
     if (!wasDeleted) throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
+  }
+}
+
+@Injectable()
+export class ListBusyTimesUseCase {
+  constructor(@Inject(SCHEDULE_REPOSITORY) private readonly schedules: ScheduleRepository) {}
+
+  /** Las franjas semanales que ya ocupan la sala y el profesor: lo que no se puede elegir al crear una clase. */
+  execute(
+    actor: ActorContext,
+    query: { roomId: string | null; staffMembershipId: string | null },
+  ): Promise<BusyTimeView[]> {
+    return this.schedules.listBusyTimes(actor, { ...query, now: new Date() });
   }
 }

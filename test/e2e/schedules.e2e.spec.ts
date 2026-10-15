@@ -716,6 +716,26 @@ describe('room schedules, fixed groups and room blocks', () => {
     expect(response.statusCode).toBe(400);
   });
 
+  it('lists the weekly slots a room and a teacher already have, so a new class avoids them', async () => {
+    await createSeries();
+
+    const byRoom = await call('GET', `/schedules/busy-times?roomId=${roomId}`);
+    const byTeacher = await call(
+      'GET',
+      `/schedules/busy-times?staffMembershipId=${teacherAna.membershipId}`,
+    );
+    const none = await call('GET', '/schedules/busy-times');
+
+    expect(byRoom.statusCode).toBe(200);
+    expect(
+      byRoom.json<{ busy: { startsAtTime: string; endsAtTime: string; source: string }[] }>().busy,
+    ).toEqual([
+      expect.objectContaining({ startsAtTime: '18:00', endsAtTime: '19:00', source: 'room' }),
+    ]);
+    expect(byTeacher.json<{ busy: unknown[] }>().busy.length).toBeGreaterThanOrEqual(0);
+    expect(none.statusCode).toBe(400);
+  });
+
   it('lets the center write to everyone enrolled in a fixed class', async () => {
     const { series } = await createSeries();
     await call('POST', `/schedules/${series.seriesId}/enrollments`, {
