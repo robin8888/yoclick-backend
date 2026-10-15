@@ -6,6 +6,7 @@ import {
 } from '../../../shared/database/tenant-prisma.service';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
 import {
+  type BroadcastTarget,
   type ChatRepository,
   type ContactList,
   type ConversationAccess,
@@ -18,7 +19,7 @@ import {
 import { isMinor, MAX_CONVERSATIONS } from '../domain/chat-rules';
 import { listContactsInTransaction } from './chat-contacts';
 import { buildPersonContext, toConversationView } from './chat-conversations';
-import { broadcastToGroupInTransaction } from './chat-broadcast';
+import { broadcastInTransaction } from './chat-broadcast';
 import { appendMessageInTransaction } from './chat-messages';
 import { markMessageNoticesRead } from './chat-notices';
 import { MESSAGE_INCLUDE, PERSON_SELECT, toMessageView } from './chat-views';
@@ -159,10 +160,10 @@ export class PrismaChatRepository implements ChatRepository {
 
   async broadcastToGroup(
     actor: ActorContext,
-    request: { groupId: string; body: string; sentAt: Date },
+    request: { target: BroadcastTarget; body: string; sentAt: Date },
   ): Promise<GroupBroadcastOutcome> {
     return this.tenantPrismaService.runInTenantContext(actor, (client) =>
-      broadcastToGroupInTransaction(client, { actor, ...request }),
+      broadcastInTransaction(client, { actor, ...request }),
     );
   }
 

@@ -716,6 +716,38 @@ describe('room schedules, fixed groups and room blocks', () => {
     expect(response.statusCode).toBe(400);
   });
 
+  it('lets the center write to everyone enrolled in a fixed class', async () => {
+    const { series } = await createSeries();
+    await call('POST', `/schedules/${series.seriesId}/enrollments`, {
+      clientMembershipIds: [clients[0]!.membershipId],
+    });
+
+    const sent = await call('POST', '/conversations/broadcast', {
+      seriesId: series.seriesId,
+      body: 'Hoy empezamos 10 minutos antes',
+    });
+    const unknown = await call('POST', '/conversations/broadcast', {
+      seriesId: '0198f4a0-0000-7000-8000-00000000ffff',
+      body: 'Hola',
+    });
+
+    expect(sent.statusCode).toBe(201);
+    expect(sent.json()).toEqual({ sentCount: 1, skippedMinorCount: 0 });
+    expect(unknown.statusCode).toBe(404);
+    const received = await world.call(
+      'GET',
+      `/v1/centers/${center.centerId}/conversations`,
+      clients[0]!.userId,
+      {
+        centerId: center.centerId,
+      },
+    );
+    expect(
+      received.json<{ conversations: { lastMessage: { body: string } }[] }>().conversations[0]
+        ?.lastMessage.body,
+    ).toBe('Hoy empezamos 10 minutos antes');
+  });
+
   it('enrolls people up to the capacity and gives them a seat in every future session', async () => {
     const { series } = await createSeries();
 

@@ -32,7 +32,7 @@ export class GroupBroadcastController {
   @ApiOperation({
     operationId: 'chat_broadcast_to_group',
     summary:
-      'La administración escribe a todas las personas de un grupo; cada una lo recibe en su conversación con el centro y las respuestas vuelven por separado. Los menores no reciben. 404 si el grupo no existe.',
+      'La administración escribe a todas las personas de un grupo de clientes (`groupId`) o de una clase fija de «Gestión» (`seriesId`); cada una lo recibe en su conversación con el centro y las respuestas vuelven por separado. Los menores no reciben. 404 si no existe.',
   })
   @ApiCreatedResponse({ type: GroupBroadcastResponseDto })
   async broadcast(
@@ -41,10 +41,11 @@ export class GroupBroadcastController {
     @Body() body: GroupBroadcastRequestDto,
   ): Promise<Record<string, unknown>> {
     assertRouteTargetsActorCenter(actor, params.centerId);
-    const outcome = await this.broadcastToGroup.execute(actor, {
-      groupId: body.groupId,
-      body: body.body,
-    });
+    const target =
+      body.groupId === undefined
+        ? ({ kind: 'series', seriesId: body.seriesId ?? '' } as const)
+        : ({ kind: 'group', groupId: body.groupId } as const);
+    const outcome = await this.broadcastToGroup.execute(actor, { target, body: body.body });
     return { sentCount: outcome.sentCount, skippedMinorCount: outcome.skippedMinorCount };
   }
 }

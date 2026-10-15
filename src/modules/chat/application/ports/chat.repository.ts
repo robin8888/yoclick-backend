@@ -78,6 +78,11 @@ export interface NewMessage {
   readonly sentAt: Date;
 }
 
+/** A quién se difunde: un grupo de clientes o la clase fija de «Gestión» (su grupo fijo). */
+export type BroadcastTarget =
+  | { readonly kind: 'group'; readonly groupId: string }
+  | { readonly kind: 'series'; readonly seriesId: string };
+
 export type GroupBroadcastOutcome =
   | { readonly kind: 'group_not_found' }
   | { readonly kind: 'sent'; readonly sentCount: number; readonly skippedMinorCount: number };
@@ -108,7 +113,7 @@ export interface ChatRepository {
   /** El mismo mensaje a cada persona de un grupo, en su conversación con el centro. */
   broadcastToGroup(
     actor: ActorContext,
-    request: { groupId: string; body: string; sentAt: Date },
+    request: { target: BroadcastTarget; body: string; sentAt: Date },
   ): Promise<GroupBroadcastOutcome>;
 }
 

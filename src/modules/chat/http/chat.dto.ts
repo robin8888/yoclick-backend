@@ -115,7 +115,18 @@ export class SendAttachmentQueryDto extends createZodDto(
 ) {}
 
 export class GroupBroadcastRequestDto extends createZodDto(
-  z.strictObject({ groupId: z.uuid(), body: z.string().trim().min(1).max(MAX_MESSAGE_LENGTH) }),
+  z
+    .strictObject({
+      /** El grupo de clientes de la ficha del alumno. */
+      groupId: z.uuid().optional(),
+      /** La clase fija de «Gestión»: las personas apuntadas a ella. */
+      seriesId: z.uuid().optional(),
+      body: z.string().trim().min(1).max(MAX_MESSAGE_LENGTH),
+    })
+    .refine(
+      ({ groupId, seriesId }) => (groupId === undefined) !== (seriesId === undefined),
+      'send either groupId or seriesId',
+    ),
 ) {}
 
 export class GroupBroadcastResponseDto extends createZodDto(

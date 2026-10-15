@@ -12,6 +12,7 @@ import {
 } from '../domain/chat-rules';
 import {
   CHAT_REPOSITORY,
+  type BroadcastTarget,
   type ChatRepository,
   type ContactList,
   type GroupBroadcastOutcome,
@@ -176,7 +177,7 @@ export class BroadcastToGroupUseCase {
   /** La administración escribe a todas las personas de un grupo, cada una en su conversación con el centro. */
   async execute(
     actor: ActorContext,
-    request: { groupId: string; body: string },
+    request: { target: BroadcastTarget; body: string },
   ): Promise<Extract<GroupBroadcastOutcome, { kind: 'sent' }>> {
     const outcome = await this.chat.broadcastToGroup(actor, { ...request, sentAt: new Date() });
     if (outcome.kind === 'group_not_found')
