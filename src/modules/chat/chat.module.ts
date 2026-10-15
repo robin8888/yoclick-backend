@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ChatPresenter } from './application/chat-presenter';
 import {
   BroadcastToGroupUseCase,
+  ListBroadcastTargetsUseCase,
   ListContactsUseCase,
   ListConversationsUseCase,
   ListMessagesUseCase,
@@ -22,6 +23,7 @@ import { PrismaChatRepository } from './infrastructure/prisma-chat.repository';
   providers: [
     BroadcastToGroupUseCase,
     ChatPresenter,
+    ListBroadcastTargetsUseCase,
     ListContactsUseCase,
     ListConversationsUseCase,
     ListMessagesUseCase,

@@ -215,9 +215,9 @@ describe('chat', () => {
       expect((await listOf(asOwner().userId)).conversations).toHaveLength(2);
     });
 
-    it('is only for the administration and needs an existing group', async () => {
+    it('is not for clients, and needs an existing group', async () => {
       const groupId = await createGroupWith([ana]);
-      const byTeacher = await world.call('POST', url('/conversations/broadcast'), teacher.userId, {
+      const byClient = await world.call('POST', url('/conversations/broadcast'), ana.userId, {
         centerId,
         body: { groupId, body: 'Hola' },
       });
@@ -226,8 +226,75 @@ describe('chat', () => {
         body: { groupId: generateUuidV7(), body: 'Hola' },
       });
 
-      expect(byTeacher.statusCode).toBe(403);
+      expect(byClient.statusCode).toBe(403);
       expect(unknown.statusCode).toBe(404);
+    });
+  });
+
+  describe('from a teacher to their groups', () => {
+    async function createGroup(name: string, instructorMembershipId?: string): Promise<string> {
+      const created = await world.call('POST', url('/groups'), ownerUserId, {
+        centerId,
+        body: { name, ...(instructorMembershipId && { instructorMembershipId }) },
+      });
+      return created.json<{ id: string }>().id;
+    }
+
+    const assign = (person: Person, groupId: string) =>
+      world.call('PATCH', url(`/clients/${person.membershipId}`), ownerUserId, {
+        centerId,
+        body: { groupId },
+      });
+
+    it('lets a teacher write to their own group, in person and out of the owner reach', async () => {
+      const groupId = await createGroup('Mis alumnos', teacher.membershipId);
+      await assign(ana, groupId);
+
+      const sent = await world.call('POST', url('/conversations/broadcast'), teacher.userId, {
+        centerId,
+        body: { groupId, body: 'Traed el kimono' },
+      });
+
+      expect(sent.statusCode).toBe(201);
+      expect(sent.json()).toEqual({ sentCount: 1, skippedMinorCount: 0 });
+      const received = await listOf(ana.userId);
+      expect(received.conversations[0]?.counterpart).toMatchObject({
+        kind: 'person',
+        role: 'staff',
+      });
+      expect((await listOf(ownerUserId)).conversations).toEqual([]);
+    });
+
+    it('does not let a teacher write to a group that is not theirs, and lists only theirs', async () => {
+      const otherTeacher = await world.addMember(centerId, 'other', 'staff');
+      const mine = await createGroup('Mis alumnos', teacher.membershipId);
+      const theirs = await createGroup('De otro', otherTeacher.membershipId);
+      await assign(ana, theirs);
+
+      const refused = await world.call('POST', url('/conversations/broadcast'), teacher.userId, {
+        centerId,
+        body: { groupId: theirs, body: 'Hola' },
+      });
+      const targets = await world.call(
+        'GET',
+        url('/conversations/broadcast/targets'),
+        teacher.userId,
+        {
+          centerId,
+        },
+      );
+      const ownerTargets = await world.call(
+        'GET',
+        url('/conversations/broadcast/targets'),
+        ownerUserId,
+        { centerId },
+      );
+
+      expect(refused.statusCode).toBe(404);
+      expect(targets.json<{ groups: { id: string }[] }>().groups.map(({ id }) => id)).toEqual([
+        mine,
+      ]);
+      expect(ownerTargets.json<{ groups: unknown[] }>().groups).toHaveLength(2);
     });
   });
 

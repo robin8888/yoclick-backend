@@ -137,3 +137,22 @@ export class GroupBroadcastResponseDto extends createZodDto(
     skippedMinorCount: z.number().int(),
   }),
 ) {}
+
+export class BroadcastTargetsResponseDto extends createZodDto(
+  z.strictObject({
+    groups: z.array(
+      z.strictObject({ id: z.uuid(), name: z.string(), memberCount: z.number().int() }),
+    ),
+    classes: z.array(
+      z.strictObject({
+        seriesId: z.uuid(),
+        name: z.string(),
+        roomName: z.string().nullable(),
+        weekdays: z.array(z.number().int()),
+        startsAtTime: z.string(),
+        endsAtTime: z.string(),
+        enrolledCount: z.number().int(),
+      }),
+    ),
+  }),
+) {}

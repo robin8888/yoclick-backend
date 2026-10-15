@@ -5154,6 +5154,40 @@ paths:
       summary: Marca la conversación como leída por quien pregunta.
       tags:
         - chat
+  /v1/centers/{centerId}/conversations/broadcast/targets:
+    get:
+      operationId: chat_list_broadcast_targets
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BroadcastTargetsResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: "A qué grupos de clientes y clases fijas puede escribir quien pregunta: todos la administración, solo los suyos un profesor."
+      tags:
+        - chat
   /v1/centers/{centerId}/conversations/broadcast:
     post:
       operationId: chat_broadcast_to_group
@@ -5191,7 +5225,7 @@ paths:
                 $ref: "#/components/schemas/ProblemDetailsDto"
       security:
         - bearer: []
-      summary: La administración escribe a todas las personas de un grupo de clientes (`groupId`) o de una clase fija de «Gestión» (`seriesId`); cada una lo recibe en su conversación con el centro y las respuestas vuelven por separado. Los menores no reciben. 404 si no existe.
+      summary: Escribe a todas las personas de un grupo de clientes (`groupId`) o de una clase fija (`seriesId`). La administración lo hace en nombre del centro; un profesor, en persona y solo a lo suyo. Cada una lo recibe en su conversación y las respuestas vuelven por separado. Los menores no reciben. 404 si no existe o no es suyo.
       tags:
         - chat
   /v1/centers/{centerId}/conversations/{conversationId}/messages:
@@ -15274,6 +15308,70 @@ components:
           pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
       required:
         - conversationId
+      additionalProperties: false
+    BroadcastTargetsResponseDto:
+      type: object
+      properties:
+        groups:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              name:
+                type: string
+              memberCount:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+            required:
+              - id
+              - name
+              - memberCount
+            additionalProperties: false
+        classes:
+          type: array
+          items:
+            type: object
+            properties:
+              seriesId:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              name:
+                type: string
+              roomName:
+                type: string
+                nullable: true
+              weekdays:
+                type: array
+                items:
+                  type: integer
+                  minimum: -9007199254740991
+                  maximum: 9007199254740991
+              startsAtTime:
+                type: string
+              endsAtTime:
+                type: string
+              enrolledCount:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+            required:
+              - seriesId
+              - name
+              - roomName
+              - weekdays
+              - startsAtTime
+              - endsAtTime
+              - enrolledCount
+            additionalProperties: false
+      required:
+        - groups
+        - classes
       additionalProperties: false
     GroupBroadcastRequestDto:
       type: object

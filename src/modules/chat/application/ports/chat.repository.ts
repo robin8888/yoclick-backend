@@ -83,6 +83,23 @@ export type BroadcastTarget =
   | { readonly kind: 'group'; readonly groupId: string }
   | { readonly kind: 'series'; readonly seriesId: string };
 
+export interface BroadcastTargetsView {
+  readonly groups: readonly {
+    readonly id: string;
+    readonly name: string;
+    readonly memberCount: number;
+  }[];
+  readonly classes: readonly {
+    readonly seriesId: string;
+    readonly name: string;
+    readonly roomName: string | null;
+    readonly weekdays: number[];
+    readonly startsAtTime: string;
+    readonly endsAtTime: string;
+    readonly enrolledCount: number;
+  }[];
+}
+
 export type GroupBroadcastOutcome =
   | { readonly kind: 'group_not_found' }
   | { readonly kind: 'sent'; readonly sentCount: number; readonly skippedMinorCount: number };
@@ -110,7 +127,9 @@ export interface ChatRepository {
   ): Promise<MessageView[]>;
   appendMessage(actor: ActorContext, message: NewMessage): Promise<MessageView>;
   markRead(actor: ActorContext, request: { conversationId: string; readAt: Date }): Promise<void>;
-  /** El mismo mensaje a cada persona de un grupo, en su conversación con el centro. */
+  /** A qué grupos y clases puede escribir quien pregunta: todos (administración) o los suyos (profesor). */
+  listBroadcastTargets(actor: ActorContext): Promise<BroadcastTargetsView>;
+  /** El mismo mensaje a cada persona de un grupo o de una clase. */
   broadcastToGroup(
     actor: ActorContext,
     request: { target: BroadcastTarget; body: string; sentAt: Date },

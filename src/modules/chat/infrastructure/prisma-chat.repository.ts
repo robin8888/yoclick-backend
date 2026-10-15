@@ -7,6 +7,7 @@ import {
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
 import {
   type BroadcastTarget,
+  type BroadcastTargetsView,
   type ChatRepository,
   type ContactList,
   type ConversationAccess,
@@ -20,6 +21,7 @@ import { isMinor, MAX_CONVERSATIONS } from '../domain/chat-rules';
 import { listContactsInTransaction } from './chat-contacts';
 import { buildPersonContext, toConversationView } from './chat-conversations';
 import { broadcastInTransaction } from './chat-broadcast';
+import { listBroadcastTargetsInTransaction } from './chat-targets';
 import { appendMessageInTransaction } from './chat-messages';
 import { markMessageNoticesRead } from './chat-notices';
 import { MESSAGE_INCLUDE, PERSON_SELECT, toMessageView } from './chat-views';
@@ -155,6 +157,12 @@ export class PrismaChatRepository implements ChatRepository {
   async appendMessage(actor: ActorContext, message: NewMessage): Promise<MessageView> {
     return this.tenantPrismaService.runInTenantContext(actor, (client) =>
       appendMessageInTransaction(client, { actor, message }),
+    );
+  }
+
+  async listBroadcastTargets(actor: ActorContext): Promise<BroadcastTargetsView> {
+    return this.tenantPrismaService.runInTenantContext(actor, (client) =>
+      listBroadcastTargetsInTransaction(client, actor),
     );
   }
 

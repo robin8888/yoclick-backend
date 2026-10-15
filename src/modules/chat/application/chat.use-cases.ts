@@ -13,6 +13,7 @@ import {
 import {
   CHAT_REPOSITORY,
   type BroadcastTarget,
+  type BroadcastTargetsView,
   type ChatRepository,
   type ContactList,
   type GroupBroadcastOutcome,
@@ -183,5 +184,14 @@ export class BroadcastToGroupUseCase {
     if (outcome.kind === 'group_not_found')
       throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
     return outcome;
+  }
+}
+
+@Injectable()
+export class ListBroadcastTargetsUseCase {
+  constructor(@Inject(CHAT_REPOSITORY) private readonly chat: ChatRepository) {}
+
+  execute(actor: ActorContext): Promise<BroadcastTargetsView> {
+    return this.chat.listBroadcastTargets(actor);
   }
 }

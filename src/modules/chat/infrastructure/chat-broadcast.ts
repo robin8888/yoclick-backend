@@ -8,11 +8,18 @@ import {
 import { isMinor } from '../domain/chat-rules';
 import { appendMessageInTransaction } from './chat-messages';
 
-async function findOrCreateCenterConversation(
+/**
+ * La administración habla en nombre del centro (la bandeja del centro, que ve la administración);
+ * un profesor habla en persona, en su propia conversación con cada alumno.
+ */
+async function findOrCreateConversation(
   client: TenantTransactionClient,
   input: { actor: ActorContext; clientMembershipId: string },
 ): Promise<string> {
-  const parties = { memberMembershipId: input.clientMembershipId, counterpartMembershipId: null };
+  const parties = {
+    memberMembershipId: input.clientMembershipId,
+    counterpartMembershipId: input.actor.role === 'staff' ? input.actor.membershipId : null,
+  };
   const existing = await client.conversation.findFirst({ where: parties, select: { id: true } });
   if (existing) return existing.id;
   const created = await client.conversation.create({
@@ -32,10 +39,16 @@ type Audience = { readonly candidates: RecipientCandidate[] } | null;
 /** Las personas activas de un grupo de clientes (el de la ficha del alumno). */
 async function findGroupAudience(
   client: TenantTransactionClient,
-  groupId: string,
+  input: { groupId: string; actor: ActorContext },
 ): Promise<Audience> {
+  const { groupId, actor } = input;
+  // Un profesor solo escribe a los grupos que él da.
   const group = await client.clientGroup.findFirst({
-    where: { id: groupId, archivedAt: null },
+    where: {
+      id: groupId,
+      archivedAt: null,
+      ...(actor.role === 'staff' && { instructorMembershipId: actor.membershipId }),
+    },
     select: { id: true },
   });
   if (!group) return null;
@@ -49,10 +62,14 @@ async function findGroupAudience(
 /** Las personas apuntadas ahora a una clase fija de «Gestión» (su grupo fijo). */
 async function findSeriesAudience(
   client: TenantTransactionClient,
-  input: { seriesId: string; today: Date },
+  input: { seriesId: string; today: Date; actor: ActorContext },
 ): Promise<Audience> {
+  // Un profesor solo escribe a las clases que él da.
   const series = await client.sessionSchedule.findFirst({
-    where: { seriesId: input.seriesId },
+    where: {
+      seriesId: input.seriesId,
+      ...(input.actor.role === 'staff' && { staffMembershipId: input.actor.membershipId }),
+    },
     select: { id: true },
   });
   if (!series) return null;
@@ -70,11 +87,11 @@ async function findSeriesAudience(
 
 function findAudience(
   client: TenantTransactionClient,
-  input: { target: BroadcastTarget; today: Date },
+  input: { target: BroadcastTarget; today: Date; actor: ActorContext },
 ): Promise<Audience> {
-  const { target, today } = input;
-  if (target.kind === 'group') return findGroupAudience(client, target.groupId);
-  return findSeriesAudience(client, { seriesId: target.seriesId, today });
+  const { target, today, actor } = input;
+  if (target.kind === 'group') return findGroupAudience(client, { groupId: target.groupId, actor });
+  return findSeriesAudience(client, { seriesId: target.seriesId, today, actor });
 }
 
 /**
@@ -87,11 +104,11 @@ export async function broadcastInTransaction(
   input: { actor: ActorContext; target: BroadcastTarget; body: string; sentAt: Date },
 ): Promise<GroupBroadcastOutcome> {
   const { actor, target, body, sentAt } = input;
-  const audience = await findAudience(client, { target, today: sentAt });
+  const audience = await findAudience(client, { target, today: sentAt, actor });
   if (audience === null) return { kind: 'group_not_found' };
   const recipients = audience.candidates.filter(({ user }) => !isMinor(user.birthDate, sentAt));
   for (const recipient of recipients) {
-    const conversationId = await findOrCreateCenterConversation(client, {
+    const conversationId = await findOrCreateConversation(client, {
       actor,
       clientMembershipId: recipient.id,
     });
