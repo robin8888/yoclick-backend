@@ -155,7 +155,25 @@ export class StripePaymentGateway implements PaymentGateway {
         metadata: { centerId: input.centerId },
       },
     });
+    await this.requestBizum(account.id);
     return { accountId: account.id };
+  }
+
+  /**
+   * Bizum no existe entre las capabilities de Accounts v2: se pide por la API v1. Es opcional: si
+   * Stripe lo rechaza, el centro cobra con tarjeta igualmente.
+   */
+  private async requestBizum(accountId: string): Promise<void> {
+    try {
+      await this.send({
+        method: 'POST',
+        path: `/accounts/${accountId}/capabilities/bizum_payments`,
+        schema: z.object({ id: z.string() }),
+        fields: { requested: 'true' },
+      });
+    } catch {
+      this.logger.warn(`Bizum could not be requested for ${accountId}; cards still work`);
+    }
   }
 
   async createOnboardingLink(accountId: string): Promise<{ url: string }> {
