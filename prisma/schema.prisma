@@ -175,6 +175,7 @@ enum NotificationKind {
   payment_received
   pass_running_low
   pass_exhausted
+  message_received
 
   @@map("notification_kind")
 }
@@ -378,6 +379,8 @@ model Center {
   sessionSchedules    SessionSchedule[]
   scheduleEnrollments ScheduleEnrollment[]
   roomBlocks          RoomBlock[]
+  conversations       Conversation[]
+  messages            Message[]
 
   @@map("centers")
 }
@@ -424,48 +427,51 @@ model Membership {
   group        ClientGroup? @relation("GroupMembers", fields: [groupId], references: [id])
   profileVideo Video?       @relation("ProfileVideo", fields: [profileVideoId], references: [id], onDelete: SetNull)
 
-  uploadedVideos          Video[]              @relation("VideoUploader")
-  createdContentItems     ContentItem[]        @relation("ContentAuthor")
-  contentAssignments      ContentAssignment[]  @relation("ContentClient")
-  assignedContent         ContentAssignment[]  @relation("ContentAssigner")
-  techniqueVideos         Video[]              @relation("TechniqueVideos")
-  staffProfile            StaffProfile?        @relation("StaffProfileOwner")
-  reviewedStaffProfiles   StaffProfile[]       @relation("StaffProfileReviewer")
-  verifiedCertifications  StaffCertification[] @relation("CertificationVerifier")
-  receivedStaffReviews    StaffReview[]        @relation("ReviewedStaff")
-  writtenStaffReviews     StaffReview[]        @relation("ReviewAuthor")
-  moderatedStaffReviews   StaffReview[]        @relation("ReviewModerator")
-  privacyRequests         PrivacyRequest[]     @relation("PrivacyRequester")
-  resolvedPrivacyRequests PrivacyRequest[]     @relation("PrivacyResolver")
-  instructedGroups        ClientGroup[]        @relation("GroupInstructor")
-  notifications           Notification[]       @relation("NotificationRecipient")
-  clientPasses            ClientPass[]         @relation("ClientPasses")
-  payments                Payment[]            @relation("ClientPayments")
-  rentedRoomBlocks        RoomBlock[]          @relation("RoomBlockRenter")
-  decidedPasses           ClientPass[]         @relation("PassDecidedBy")
-  timeEntries             StaffTimeEntry[]     @relation("TimeEntryStaff")
-  scannedTimeEntries      StaffTimeEntry[]     @relation("TimeEntryScanner")
-  editedTimeEntries       StaffTimeEntry[]     @relation("TimeEntryEditor")
-  serviceAssignments      ServiceStaff[]
-  taughtClassSessions     ClassSession[]       @relation("StaffClassSessions")
-  bookings                Booking[]            @relation("ClientBookings")
-  availability            StaffAvailability?
-  authoredRoutines        Routine[]            @relation("RoutineAuthor")
-  receivedRoutines        RoutineAssignment[]  @relation("RoutineClient")
-  routineCompletions      RoutineCompletion[]  @relation("RoutineDoneBy")
-  assignedRoutines        RoutineAssignment[]  @relation("RoutineAssigner")
-  absences                StaffAbsence[]
-  startedBookings         Booking[]            @relation("BookingStartedBy")
-  endedBookings           Booking[]            @relation("BookingEndedBy")
-  checkedInBookings       Booking[]            @relation("BookingCheckedInBy")
-  createdBookings         Booking[]            @relation("BookingCreatedBy")
-  taughtRooms             Room[]               @relation("RoomTeacher")
-  taughtSchedules         SessionSchedule[]    @relation("ScheduleTeacher")
-  createdSchedules        SessionSchedule[]    @relation("ScheduleCreator")
-  enrollments             ScheduleEnrollment[] @relation("EnrolledClient")
-  createdEnrollments      ScheduleEnrollment[] @relation("EnrollmentCreator")
-  createdRoomBlocks       RoomBlock[]          @relation("RoomBlockCreator")
-  cancelledClassSessions  ClassSession[]       @relation("ClassSessionCancelledBy")
+  uploadedVideos             Video[]              @relation("VideoUploader")
+  createdContentItems        ContentItem[]        @relation("ContentAuthor")
+  contentAssignments         ContentAssignment[]  @relation("ContentClient")
+  assignedContent            ContentAssignment[]  @relation("ContentAssigner")
+  techniqueVideos            Video[]              @relation("TechniqueVideos")
+  staffProfile               StaffProfile?        @relation("StaffProfileOwner")
+  reviewedStaffProfiles      StaffProfile[]       @relation("StaffProfileReviewer")
+  verifiedCertifications     StaffCertification[] @relation("CertificationVerifier")
+  receivedStaffReviews       StaffReview[]        @relation("ReviewedStaff")
+  writtenStaffReviews        StaffReview[]        @relation("ReviewAuthor")
+  moderatedStaffReviews      StaffReview[]        @relation("ReviewModerator")
+  privacyRequests            PrivacyRequest[]     @relation("PrivacyRequester")
+  resolvedPrivacyRequests    PrivacyRequest[]     @relation("PrivacyResolver")
+  instructedGroups           ClientGroup[]        @relation("GroupInstructor")
+  notifications              Notification[]       @relation("NotificationRecipient")
+  conversationsAsMember      Conversation[]       @relation("ConversationMember")
+  conversationsAsCounterpart Conversation[]       @relation("ConversationCounterpart")
+  sentMessages               Message[]            @relation("MessageSender")
+  clientPasses               ClientPass[]         @relation("ClientPasses")
+  payments                   Payment[]            @relation("ClientPayments")
+  rentedRoomBlocks           RoomBlock[]          @relation("RoomBlockRenter")
+  decidedPasses              ClientPass[]         @relation("PassDecidedBy")
+  timeEntries                StaffTimeEntry[]     @relation("TimeEntryStaff")
+  scannedTimeEntries         StaffTimeEntry[]     @relation("TimeEntryScanner")
+  editedTimeEntries          StaffTimeEntry[]     @relation("TimeEntryEditor")
+  serviceAssignments         ServiceStaff[]
+  taughtClassSessions        ClassSession[]       @relation("StaffClassSessions")
+  bookings                   Booking[]            @relation("ClientBookings")
+  availability               StaffAvailability?
+  authoredRoutines           Routine[]            @relation("RoutineAuthor")
+  receivedRoutines           RoutineAssignment[]  @relation("RoutineClient")
+  routineCompletions         RoutineCompletion[]  @relation("RoutineDoneBy")
+  assignedRoutines           RoutineAssignment[]  @relation("RoutineAssigner")
+  absences                   StaffAbsence[]
+  startedBookings            Booking[]            @relation("BookingStartedBy")
+  endedBookings              Booking[]            @relation("BookingEndedBy")
+  checkedInBookings          Booking[]            @relation("BookingCheckedInBy")
+  createdBookings            Booking[]            @relation("BookingCreatedBy")
+  taughtRooms                Room[]               @relation("RoomTeacher")
+  taughtSchedules            SessionSchedule[]    @relation("ScheduleTeacher")
+  createdSchedules           SessionSchedule[]    @relation("ScheduleCreator")
+  enrollments                ScheduleEnrollment[] @relation("EnrolledClient")
+  createdEnrollments         ScheduleEnrollment[] @relation("EnrollmentCreator")
+  createdRoomBlocks          RoomBlock[]          @relation("RoomBlockCreator")
+  cancelledClassSessions     ClassSession[]       @relation("ClassSessionCancelledBy")
 
   @@unique([centerId, userId])
   @@index([centerId, role])
@@ -1434,4 +1440,53 @@ model Payment {
   @@index([clientPassId])
   @@index([roomBlockId])
   @@map("payments")
+}
+
+enum MessageAttachmentKind {
+  image
+  pdf
+
+  @@map("message_attachment_kind")
+}
+
+/// Una conversación de dos partes: la persona y, o bien otra persona, o bien el centro (nulo).
+model Conversation {
+  id                      String    @id @db.Uuid
+  centerId                String    @map("center_id") @db.Uuid
+  memberMembershipId      String    @map("member_membership_id") @db.Uuid
+  /// Nulo: la bandeja del centro, que atiende la administración.
+  counterpartMembershipId String?   @map("counterpart_membership_id") @db.Uuid
+  lastMessageAt           DateTime  @default(now()) @map("last_message_at") @db.Timestamptz
+  memberLastReadAt        DateTime? @map("member_last_read_at") @db.Timestamptz
+  otherLastReadAt         DateTime? @map("other_last_read_at") @db.Timestamptz
+  createdAt               DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  center      Center      @relation(fields: [centerId], references: [id])
+  member      Membership  @relation("ConversationMember", fields: [memberMembershipId], references: [id])
+  counterpart Membership? @relation("ConversationCounterpart", fields: [counterpartMembershipId], references: [id])
+  messages    Message[]
+
+  @@index([centerId, lastMessageAt])
+  @@index([counterpartMembershipId])
+  @@map("conversations")
+}
+
+model Message {
+  id                  String                 @id @db.Uuid
+  centerId            String                 @map("center_id") @db.Uuid
+  conversationId      String                 @map("conversation_id") @db.Uuid
+  senderMembershipId  String                 @map("sender_membership_id") @db.Uuid
+  body                String?
+  attachmentKey       String?                @map("attachment_key")
+  attachmentKind      MessageAttachmentKind? @map("attachment_kind")
+  attachmentName      String?                @map("attachment_name")
+  attachmentSizeBytes Int?                   @map("attachment_size_bytes")
+  createdAt           DateTime               @default(now()) @map("created_at") @db.Timestamptz
+
+  center       Center       @relation(fields: [centerId], references: [id])
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       Membership   @relation("MessageSender", fields: [senderMembershipId], references: [id])
+
+  @@index([conversationId, createdAt])
+  @@map("messages")
 }

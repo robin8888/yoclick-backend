@@ -66,6 +66,11 @@ const PHOTO_UPLOAD_PATHS = [
   { method: 'PUT', path: /^\/v1\/me\/photo(?:\?.*)?$/ },
   { method: 'POST', path: /^\/v1\/centers\/[^/?]+\/team-profiles\/me\/photos(?:\?.*)?$/ },
   { method: 'POST', path: /^\/v1\/centers\/[^/?]+\/content\/images(?:\?.*)?$/ },
+  // Adjuntos del chat: imagen o PDF; el tipo real se lee de los bytes.
+  {
+    method: 'POST',
+    path: /^\/v1\/centers\/[^/?]+\/conversations\/[^/?]+\/attachments(?:\?.*)?$/,
+  },
 ] as const;
 
 /** Como con el PDF: el tipo que mande el móvil no decide nada, la foto se reconoce por sus primeros bytes. */

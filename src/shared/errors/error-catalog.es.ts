@@ -96,6 +96,17 @@ export const ERROR_CATALOG = {
   PAYMENTS_NOT_READY: {
     title: 'Este centro aún no puede cobrar online. Pídele que complete el alta de cobros',
   },
+  CHAT_NOT_ALLOWED: { title: 'No puedes escribir a esta persona' },
+  CHAT_NO_SHARED_CLASS: {
+    title: 'Solo puedes escribir a un profesor con quien hayas coincidido en alguna clase',
+  },
+  CHAT_MINOR_REQUIRES_GUARDIAN: {
+    title: 'A los menores solo se les escribe a través de su tutor',
+  },
+  CHAT_ATTACHMENT_UNSUPPORTED: { title: 'Solo se pueden enviar imágenes (JPEG, PNG, WebP) o PDF' },
+  CHAT_ATTACHMENT_TOO_LARGE: {
+    title: 'El archivo es demasiado grande. Máximo 5 MB en imágenes y 10 MB en PDF',
+  },
   BOOKING_NOT_CANCELLABLE: { title: 'Esta reserva ya no se puede cancelar' },
   BOOKING_NOT_RESCHEDULABLE: { title: 'Esta reserva ya no se puede cambiar de hora' },
   RESCHEDULE_TOO_LATE: {

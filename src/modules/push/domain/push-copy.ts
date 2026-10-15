@@ -41,6 +41,7 @@ const COPY_BY_KIND: Readonly<Record<string, PushCopy>> = {
   payment_received: { title: 'Has recibido un pago', body: OPEN_APP_BODY },
   pass_running_low: { title: 'Tu bono se está acabando', body: OPEN_APP_BODY },
   pass_exhausted: { title: 'Tu bono se ha agotado', body: OPEN_APP_BODY },
+  message_received: { title: 'Tienes un mensaje nuevo', body: OPEN_APP_BODY },
 };
 
 const FALLBACK_COPY: PushCopy = { title: 'Tienes un aviso nuevo', body: OPEN_APP_BODY };
