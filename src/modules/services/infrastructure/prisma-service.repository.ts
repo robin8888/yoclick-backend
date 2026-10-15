@@ -19,6 +19,7 @@ const TEAM_ROLES = ['owner', 'admin', 'staff'] as const;
 /** Solo cuenta quien sigue en el equipo: una baja no debe aparecer como profesional. */
 const WITH_ACTIVE_STAFF = {
   room: { select: { id: true, name: true } },
+  _count: { select: { schedules: { where: { status: 'active' as const } } } },
   staff: {
     where: { membership: { status: 'active', role: { in: [...TEAM_ROLES] } } },
     orderBy: [{ membership: { joinedAt: 'asc' } }, { membershipId: 'asc' }],
@@ -58,6 +59,7 @@ function toServiceView(service: ServiceWithStaff): ServiceView {
     minNoticeMinutes: service.minNoticeMinutes,
     isVisible: service.isVisible,
     room: service.room,
+    hasSchedule: service._count.schedules > 0,
     staff: service.staff.map(({ membership }) => ({
       membershipId: membership.id,
       fullName: membership.user.fullName,

@@ -96,6 +96,7 @@ describe('services', () => {
         bookingWindowDays: 30,
         minNoticeMinutes: 120,
         isVisible: true,
+        hasSchedule: false,
         room: null,
         staff: [
           { membershipId: center.ownerMembershipId, fullName: 'owner', photoUrl: null, photos: [] },

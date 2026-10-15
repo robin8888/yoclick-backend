@@ -45,6 +45,8 @@ const serviceShape = {
   isVisible: z.boolean(),
   /** Sala o recurso donde se da; `null` = sin sala fija. */
   room: z.strictObject({ id: z.uuid(), name: z.string() }).nullable(),
+  /** El centro ya le ha asignado horario; sin él la clientela no puede reservarlo. */
+  hasSchedule: z.boolean(),
   staff: z.array(z.strictObject(serviceStaffShape)),
 };
 

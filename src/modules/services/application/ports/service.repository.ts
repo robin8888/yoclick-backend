@@ -26,6 +26,8 @@ export interface ServiceView {
   readonly isVisible: boolean;
   /** Sala o recurso donde se da; `null` = sin sala fija. */
   readonly room: { readonly id: string; readonly name: string } | null;
+  /** Si el centro ya le ha puesto horario (con su sala y profesor): hasta entonces no se puede reservar. */
+  readonly hasSchedule: boolean;
   readonly staff: readonly ServiceStaffMember[];
 }
 

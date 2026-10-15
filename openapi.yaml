@@ -9913,6 +9913,8 @@ components:
                   - name
                 additionalProperties: false
                 nullable: true
+              hasSchedule:
+                type: boolean
               staff:
                 type: array
                 items:
@@ -9962,6 +9964,7 @@ components:
               - minNoticeMinutes
               - isVisible
               - room
+              - hasSchedule
               - staff
             additionalProperties: false
       required:
@@ -10083,6 +10086,8 @@ components:
             - name
           additionalProperties: false
           nullable: true
+        hasSchedule:
+          type: boolean
         staff:
           type: array
           items:
@@ -10132,6 +10137,7 @@ components:
         - minNoticeMinutes
         - isVisible
         - room
+        - hasSchedule
         - staff
       additionalProperties: false
     UpdateServiceRequestDto:
