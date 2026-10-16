@@ -7,8 +7,13 @@ import { suggestServicesForSector } from '../domain/sector-service-suggestions';
 export interface CenterDefaultsRequest {
   readonly centerId: string;
   readonly sectorId: string;
-  /** Quienes atenderán los servicios sugeridos (al crear el centro, solo su propietario). */
+  /** Quienes atenderán los servicios sugeridos. */
   readonly professionalMembershipIds: readonly string[];
+  /**
+   * Un centro real nuevo NO lleva servicios de ejemplo: solo existen los que crea su propietario.
+   * Solo la demo y el rellenado de centros antiguos los piden.
+   */
+  readonly shouldCreateSuggestedServices: boolean;
 }
 
 export interface CenterDefaultsOutcome {
@@ -17,8 +22,8 @@ export interface CenterDefaultsOutcome {
 }
 
 /**
- * Deja un centro listo para reservar: horario semanal si no tiene ninguno y los servicios sugeridos
- * de su sector si no tiene ningún servicio (archivados incluidos: quien archivó todos no quiere que
+ * Deja un centro listo para reservar: horario semanal si no tiene ninguno y, si se pide, los servicios
+ * sugeridos de su sector cuando no tiene ningún servicio (archivados incluidos: quien archivó todos no quiere que
  * reaparezcan). Idempotente, así que sirve igual al crear un centro, al sembrar la demo y al
  * rellenar los centros anteriores a esta función. Debe ejecutarse dentro de la transacción de
  * tenant del propio centro.
@@ -28,7 +33,9 @@ export async function provisionCenterDefaults(
   request: CenterDefaultsRequest,
 ): Promise<CenterDefaultsOutcome> {
   const hasAppliedOpeningHours = await applyDefaultOpeningHours(client, request.centerId);
-  const createdServiceCount = await createSuggestedServices(client, request);
+  const createdServiceCount = request.shouldCreateSuggestedServices
+    ? await createSuggestedServices(client, request)
+    : 0;
   return { hasAppliedOpeningHours, createdServiceCount };
 }
 

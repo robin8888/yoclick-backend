@@ -42,7 +42,11 @@ describe('database rules of services and bookings', () => {
     await resetTestDatabase();
     ownerUserId = await world.fixtures.createUser('owner');
     center = await world.createCenter(ownerUserId);
-    [service] = (await world.listServices(ownerUserId, center.centerId)) as [TestService];
+    service = await world.createService(ownerUserId, center.centerId, {
+      name: 'Sesión personal',
+      durationMinutes: 60,
+      staffMembershipIds: [center.ownerMembershipId],
+    });
   });
 
   afterAll(async () => {
@@ -123,6 +127,11 @@ describe('database rules of services and bookings', () => {
   it('does not see sessions or services of another center in the database', async () => {
     const otherOwner = await world.fixtures.createUser('other-owner');
     const otherCenter = await world.createCenter(otherOwner, 'Otro Centro');
+    await world.createService(otherOwner, otherCenter.centerId, {
+      name: 'Clase del otro centro',
+      durationMinutes: 60,
+      staffMembershipIds: [otherCenter.ownerMembershipId],
+    });
     const otherActor = {
       userId: otherOwner,
       centerId: otherCenter.centerId,
@@ -142,7 +151,7 @@ describe('database rules of services and bookings', () => {
     );
 
     expect(new Set(visible.serviceCenterIds)).toEqual(new Set([otherCenter.centerId]));
-    // 4 servicios de sector con un solo profesional (el propietario) cada uno.
-    expect(visible.staffLinks).toBe(4);
+    // Su único servicio, con un solo profesional (el propietario).
+    expect(visible.staffLinks).toBe(1);
   });
 });

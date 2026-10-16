@@ -129,14 +129,11 @@ describe('profile photos', () => {
     staff = await world.addMember(center.centerId, 'staff', 'staff');
     ana = await world.addMember(center.centerId, 'ana', 'client');
     bea = await world.addMember(center.centerId, 'bea', 'client');
-    await call(
-      'PATCH',
-      `/services/${(await world.listServices(owner, center.centerId))[0]?.id ?? ''}`,
-      owner,
-      {
-        staffMembershipIds: [staff.membershipId],
-      },
-    );
+    await world.createService(owner, center.centerId, {
+      name: 'Sesión personal',
+      durationMinutes: 60,
+      staffMembershipIds: [staff.membershipId],
+    });
   });
 
   afterAll(async () => {

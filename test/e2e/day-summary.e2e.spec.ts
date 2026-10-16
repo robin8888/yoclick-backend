@@ -7,8 +7,8 @@ import { createTestApplication } from './create-test-application';
 const MILLISECONDS_PER_MINUTE = 60_000;
 const SESSION_MINUTES = 60;
 const MINUTES_PER_OPEN_DAY = 24 * 60;
-// El alta del centro asigna al propietario a su primer servicio: atienden él y la profesional.
-const BOOKABLE_STAFF_COUNT = 2;
+// Un centro nuevo no trae servicios: solo atiende la profesional que el propietario asigna al suyo.
+const BOOKABLE_STAFF_COUNT = 1;
 
 interface DaySummaryBody {
   date: string;

@@ -92,6 +92,8 @@ export class CenterDefaultsBackfiller {
         centerId: owner.centerId,
         sectorId: center.sectorId,
         professionalMembershipIds: [owner.membershipId],
+        // Ningún centro real recibe servicios de ejemplo: el rellenado solo completa el horario.
+        shouldCreateSuggestedServices: false,
       });
     });
   }

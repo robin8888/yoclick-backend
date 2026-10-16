@@ -56,16 +56,16 @@ describe('default hours and services for existing centers', () => {
     await prismaService.$disconnect();
   });
 
-  it('gives a center created before services existed its hours and its sector services, run by its owner', async () => {
+  it('gives a center created before default hours existed its hours, and never sample services', async () => {
     const legacy = await createLegacyCenter('legacy-gym', 'LEGAC1');
 
     const summary = await backfiller.run();
 
     expect(summary).toMatchObject({
       centerCount: 1,
-      centersWithNewServices: 1,
+      centersWithNewServices: 0,
       centersWithNewOpeningHours: 1,
-      createdServiceCount: 4,
+      createdServiceCount: 0,
     });
     const { center, services } = await readCenter(
       legacy.centerId,
@@ -78,16 +78,7 @@ describe('default hours and services for existing centers', () => {
         { opensAt: '16:00', closesAt: '20:00' },
       ],
     });
-    expect(services.map(({ name }) => name)).toEqual([
-      'Entrenamiento personal',
-      'Clase dirigida',
-      'Valoración inicial',
-      'Grupo reducido',
-    ]);
-    for (const service of services) {
-      expect(service.kind).toBe('individual');
-      expect(service.staff.map(({ membershipId }) => membershipId)).toEqual([legacy.membershipId]);
-    }
+    expect(services).toHaveLength(0);
   });
 
   it('is idempotent: running it again changes nothing', async () => {
@@ -102,7 +93,7 @@ describe('default hours and services for existing centers', () => {
       createdServiceCount: 0,
     });
     const { services } = await readCenter(legacy.centerId, legacy.ownerUserId, legacy.membershipId);
-    expect(services).toHaveLength(4);
+    expect(services).toHaveLength(0);
   });
 
   it('respects a center that already has its own hours and services, even archived ones', async () => {

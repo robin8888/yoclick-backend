@@ -41,6 +41,7 @@ async function insertCenterWithOwnerAndDefaults(
     centerId: center.id,
     sectorId: center.sectorId,
     professionalMembershipIds: [owner.membershipId],
+    shouldCreateSuggestedServices: false,
   });
 }
 

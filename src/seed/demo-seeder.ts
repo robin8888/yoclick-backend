@@ -161,6 +161,7 @@ export class DemoSeeder {
         centerId,
         sectorId: demoCenter.sectorId,
         professionalMembershipIds,
+        shouldCreateSuggestedServices: true,
       });
       await assignProfessionalsToServices(client, centerId, professionalMembershipIds);
     });

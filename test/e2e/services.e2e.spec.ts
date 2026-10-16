@@ -30,33 +30,18 @@ describe('services', () => {
     await application.close();
   });
 
+  const createOwnService = (name = 'Clase de prueba') =>
+    world.createService(owner, center.centerId, {
+      name,
+      durationMinutes: 60,
+      staffMembershipIds: [center.ownerMembershipId],
+    });
+
   describe('a new center', () => {
-    it('starts with the suggested services of its sector, all individual, visible and run by the owner', async () => {
+    it('starts with no services: only the ones its owner creates exist', async () => {
       const services = await world.listServices(owner, center.centerId);
 
-      expect(services.map(({ name }) => name)).toEqual([
-        'Karate infantil',
-        'Karate adultos',
-        'Kickboxing',
-        'Clase particular',
-      ]);
-      expect(services.map(({ durationMinutes }) => durationMinutes)).toEqual([60, 75, 60, 60]);
-      for (const service of services) {
-        expect(service).toMatchObject({
-          kind: 'individual',
-          mode: 'private',
-          currency: 'EUR',
-          priceCents: null,
-          description: null,
-          color: null,
-          bookingWindowDays: 30,
-          minNoticeMinutes: 120,
-          isVisible: true,
-        });
-        expect(service.staff).toEqual([
-          { membershipId: center.ownerMembershipId, fullName: 'owner', photoUrl: null, photos: [] },
-        ]);
-      }
+      expect(services).toEqual([]);
     });
 
     it('starts with the default opening hours: Monday to Friday, mornings and afternoons', async () => {
@@ -247,15 +232,15 @@ describe('services', () => {
 
   describe('DELETE /services/:serviceId', () => {
     it('archives the service: it disappears from the lists but its row is kept', async () => {
-      const [service] = await world.listServices(owner, center.centerId);
+      const service = await createOwnService();
 
-      const response = await world.call('DELETE', servicesUrl(`/${service?.id ?? ''}`), owner, {
+      const response = await world.call('DELETE', servicesUrl(`/${service.id}`), owner, {
         centerId: center.centerId,
       });
 
       expect(response.statusCode).toBe(204);
       const remaining = await world.listServices(owner, center.centerId);
-      expect(remaining.map(({ id }) => id)).not.toContain(service?.id);
+      expect(remaining.map(({ id }) => id)).not.toContain(service.id);
       const kept = await world.tenantPrismaService.runInTenantContext(
         {
           userId: owner,
@@ -264,14 +249,14 @@ describe('services', () => {
           role: 'owner',
           permissions: [],
         },
-        (prisma) => prisma.service.findUnique({ where: { id: service?.id ?? '' } }),
+        (prisma) => prisma.service.findUnique({ where: { id: service.id } }),
       );
       expect(kept?.archivedAt).toBeInstanceOf(Date);
     });
 
     it('answers 404 when archiving twice, and for an archived service in PATCH', async () => {
-      const [service] = await world.listServices(owner, center.centerId);
-      const url = servicesUrl(`/${service?.id ?? ''}`);
+      const service = await createOwnService();
+      const url = servicesUrl(`/${service.id}`);
       await world.call('DELETE', url, owner, { centerId: center.centerId });
 
       const again = await world.call('DELETE', url, owner, { centerId: center.centerId });
@@ -287,8 +272,8 @@ describe('services', () => {
 
   describe('who can do what', () => {
     it('lets the team read services but not change them (403)', async () => {
-      const [service] = await world.listServices(owner, center.centerId);
-      const url = servicesUrl(`/${service?.id ?? ''}`);
+      const service = await createOwnService();
+      const url = servicesUrl(`/${service.id}`);
       const options = { centerId: center.centerId };
 
       expect((await world.call('GET', servicesUrl(), staff.userId, options)).statusCode).toBe(200);
@@ -314,8 +299,9 @@ describe('services', () => {
     });
 
     it('shows clients only visible services, while the team sees the hidden ones too', async () => {
-      const [service] = await world.listServices(owner, center.centerId);
-      await world.call('PATCH', servicesUrl(`/${service?.id ?? ''}`), owner, {
+      const service = await createOwnService('Oculta');
+      await createOwnService('Visible');
+      await world.call('PATCH', servicesUrl(`/${service.id}`), owner, {
         centerId: center.centerId,
         body: { isVisible: false },
       });
@@ -323,10 +309,10 @@ describe('services', () => {
       const forClient = await world.listServices(client.userId, center.centerId);
       const forStaff = await world.listServices(staff.userId, center.centerId);
 
-      expect(forClient.map(({ id }) => id)).not.toContain(service?.id);
-      expect(forClient).toHaveLength(3);
-      expect(forStaff.map(({ id }) => id)).toContain(service?.id);
-      expect(forStaff).toHaveLength(4);
+      expect(forClient.map(({ id }) => id)).not.toContain(service.id);
+      expect(forClient).toHaveLength(1);
+      expect(forStaff.map(({ id }) => id)).toContain(service.id);
+      expect(forStaff).toHaveLength(2);
     });
 
     it('requires a second-factor session to administer services', async () => {
@@ -371,8 +357,12 @@ describe('services', () => {
     });
 
     it('never touches a service of another center, even knowing its id (404)', async () => {
-      const [foreignService] = await world.listServices(otherOwner, otherCenter.centerId);
-      const url = `/v1/centers/${center.centerId}/services/${foreignService?.id ?? ''}`;
+      const foreignService = await world.createService(otherOwner, otherCenter.centerId, {
+        name: 'Del otro centro',
+        durationMinutes: 60,
+        staffMembershipIds: [otherCenter.ownerMembershipId],
+      });
+      const url = `/v1/centers/${center.centerId}/services/${foreignService.id}`;
 
       const patch = await world.call('PATCH', url, owner, {
         centerId: center.centerId,
@@ -384,7 +374,7 @@ describe('services', () => {
       expect(archive.statusCode).toBe(404);
       const untouched = await world.listServices(otherOwner, otherCenter.centerId);
       expect(untouched.map(({ name }) => name)).not.toContain('Robado');
-      expect(untouched).toHaveLength(4);
+      expect(untouched).toHaveLength(1);
     });
 
     it('lists only the services of the center in the header', async () => {
@@ -396,7 +386,7 @@ describe('services', () => {
       const mine = await world.listServices(owner, center.centerId);
 
       expect(mine.map(({ name }) => name)).not.toContain('Solo del otro');
-      expect(mine).toHaveLength(4);
+      expect(mine).toHaveLength(0);
     });
   });
 });
