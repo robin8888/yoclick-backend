@@ -730,6 +730,30 @@ describe('room schedules, fixed groups and room blocks', () => {
       expect(rentalRoom?.sessions[0]).toMatchObject({ teacher: null });
     });
 
+    it('lists the rental in the day agenda without a teacher instead of failing', async () => {
+      const rentalServiceId = await createRentalService();
+      const rentalRoomId = await createFreeRoom('Sala agenda alquiler');
+      await call('POST', '/schedules', {
+        serviceId: rentalServiceId,
+        roomId: rentalRoomId,
+        mode: 'group',
+        weekdays: [getScheduleWeekdayOfLocalDate(firstDate)],
+        startsAtTime: '20:00',
+        endsAtTime: '21:00',
+        startsOn: firstDate,
+      });
+
+      const response = await call('GET', `/agenda?date=${firstDate}`);
+
+      expect(response.statusCode).toBe(200);
+      const { emptySessions } = response.json<{
+        emptySessions: { service: { id: string }; staff: unknown }[];
+      }>();
+      expect(emptySessions.find(({ service }) => service.id === rentalServiceId)).toMatchObject({
+        staff: null,
+      });
+    });
+
     it('still requires a teacher when the service is not a rental', async () => {
       const rentalRoomId = await createFreeRoom('Sala sin profesor');
 

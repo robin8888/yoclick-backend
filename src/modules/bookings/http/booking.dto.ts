@@ -304,7 +304,7 @@ export class AgendaResponseDto extends createZodDto(
         capacity: z.number().int(),
         service: z.strictObject({ id: z.uuid(), name: z.string() }),
         room: z.strictObject({ id: z.uuid(), name: z.string() }).nullable(),
-        staff: z.strictObject({ membershipId: z.uuid(), fullName: z.string() }),
+        staff: z.strictObject({ membershipId: z.uuid(), fullName: z.string() }).nullable(),
       }),
     ),
   }),

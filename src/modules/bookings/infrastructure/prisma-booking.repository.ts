@@ -139,10 +139,13 @@ async function listEmptySessions(
     capacity: session.capacity,
     service: session.service,
     room: session.room,
-    staff: {
-      membershipId: requireTeacher(session.staffMembership).id,
-      fullName: requireTeacher(session.staffMembership).user.fullName,
-    },
+    staff:
+      session.staffMembership === null
+        ? null
+        : {
+            membershipId: session.staffMembership.id,
+            fullName: session.staffMembership.user.fullName,
+          },
   }));
 }
 

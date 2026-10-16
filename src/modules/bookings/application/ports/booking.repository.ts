@@ -314,7 +314,8 @@ export interface EmptySessionView {
   readonly capacity: number;
   readonly service: { readonly id: string; readonly name: string };
   readonly room: { readonly id: string; readonly name: string } | null;
-  readonly staff: { readonly membershipId: string; readonly fullName: string };
+  /** `null` en un alquiler de sala, que no tiene profesor. */
+  readonly staff: { readonly membershipId: string; readonly fullName: string } | null;
 }
 
 export interface DayAgenda {
