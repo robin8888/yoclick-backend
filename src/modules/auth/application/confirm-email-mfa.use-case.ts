@@ -8,6 +8,7 @@ import {
   type UserAccountRepository,
 } from './ports/user-account.repository';
 import { SecondFactorVerifier } from './second-factor-verifier';
+import { SessionIssuer } from './session-issuer';
 
 /** Termina de activar el segundo factor por correo con el código recibido y entrega los de recuperación. */
 @Injectable()
@@ -16,6 +17,7 @@ export class ConfirmEmailMfaUseCase {
     @Inject(USER_ACCOUNT_REPOSITORY) private readonly users: UserAccountRepository,
     private readonly secondFactorVerifier: SecondFactorVerifier,
     private readonly mfaActivator: MfaActivator,
+    private readonly sessionIssuer: SessionIssuer,
   ) {}
 
   async execute(userId: string, code: string): Promise<TotpConfirmation> {
@@ -27,6 +29,12 @@ export class ConfirmEmailMfaUseCase {
       code,
       failureStatus: HTTP_STATUS.forbidden,
     });
-    return { recoveryCodes: await this.mfaActivator.activate(account, null) };
+    const recoveryCodes = await this.mfaActivator.activate(account, null);
+    const session = await this.sessionIssuer.startSession({
+      userId,
+      deviceName: null,
+      isMfaVerified: true,
+    });
+    return { recoveryCodes, session };
   }
 }

@@ -6,6 +6,7 @@ import { readAccessPolicy } from '../access-policy';
 import { type AuthenticatedRequest } from '../authenticated-request';
 import { STAFF_PERMISSION_ROUTE_KEY } from '../decorators/staff-permission.decorator';
 import { type TeamPermission } from '../../tenancy/team-permissions';
+import { SecondFactorEnrollmentChecker } from '../second-factor-enrollment.checker';
 import { type ActorContext } from '../../tenancy/actor-context';
 
 const ADMINISTRATIVE_ROLES: ReadonlySet<string> = new Set(['owner', 'admin']);
@@ -16,9 +17,12 @@ const ADMINISTRATIVE_ROLES: ReadonlySet<string> = new Set(['owner', 'admin']);
  */
 @Injectable()
 export class AuthorizationGuard implements CanActivate {
-  constructor(private readonly reflector: Reflector) {}
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly enrollmentChecker: SecondFactorEnrollmentChecker,
+  ) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const policy = readAccessPolicy(this.reflector, context.getHandler(), context.getClass());
 
     switch (policy.kind) {
@@ -26,13 +30,14 @@ export class AuthorizationGuard implements CanActivate {
       case 'user':
         return true;
       case 'roles': {
-        const { actor, isMfaVerified } = context.switchToHttp().getRequest<AuthenticatedRequest>();
+        const { actor, isMfaVerified, authenticatedUserId } = context
+          .switchToHttp()
+          .getRequest<AuthenticatedRequest>();
         const isRoleAllowed =
           actor !== undefined &&
           (policy.roles.includes(actor.role) || this.isStaffWithGrantedPermission(actor, context));
         if (!isRoleAllowed) throw new DomainError('FORBIDDEN', HTTP_STATUS.forbidden);
-        // Quien administra un centro necesita una sesión con segundo factor (SEC-47).
-        if (ADMINISTRATIVE_ROLES.has(actor.role) && isMfaVerified !== true) {
+        if (await this.isSecondFactorMissing({ actor, isMfaVerified, authenticatedUserId })) {
           throw new DomainError('MFA_REQUIRED', HTTP_STATUS.forbidden);
         }
         return true;
@@ -40,6 +45,21 @@ export class AuthorizationGuard implements CanActivate {
       case 'undeclared':
         throw new DomainError('FORBIDDEN', HTTP_STATUS.forbidden);
     }
+  }
+
+  /**
+   * Quien administra un centro y TIENE el segundo factor activado debe entrar con él (SEC-47). Activarlo es
+   * opcional: quien no lo ha activado administra sin él, y puede activarlo cuando quiera desde su cuenta.
+   */
+  private async isSecondFactorMissing(input: {
+    actor: ActorContext;
+    isMfaVerified: boolean | undefined;
+    authenticatedUserId: string | undefined;
+  }): Promise<boolean> {
+    const { actor, isMfaVerified, authenticatedUserId } = input;
+    if (!ADMINISTRATIVE_ROLES.has(actor.role) || isMfaVerified === true) return false;
+    if (authenticatedUserId === undefined) return true;
+    return this.enrollmentChecker.hasConfirmedSecondFactor(authenticatedUserId);
   }
 
   /** Una profesional con el permiso que la ruta acepta. Solo `staff`: nadie más gana acceso por esto. */

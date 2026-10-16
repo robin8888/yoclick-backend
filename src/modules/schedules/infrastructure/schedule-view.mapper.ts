@@ -2,7 +2,6 @@ import { type Prisma } from '../../../generated/prisma/client';
 import { type TenantTransactionClient } from '../../../shared/database/tenant-prisma.service';
 import {
   type EnrollmentView,
-  type RoomBlockView,
   type ScheduleSeriesView,
 } from '../application/ports/schedule.repository';
 import { type ScheduleWeekday } from '../domain/schedule-rules';
@@ -113,31 +112,5 @@ export function toEnrollmentView(enrollment: StoredEnrollment): EnrollmentView {
     endsOn: enrollment.endsOn === null ? null : toDateOnly(enrollment.endsOn),
     status: enrollment.status,
     createdAt: enrollment.createdAt,
-  };
-}
-
-export const BLOCK_VIEW_INCLUDE = {
-  createdBy: { select: { id: true, user: { select: { fullName: true } } } },
-  renter: { select: { id: true, user: { select: { fullName: true } } } },
-  payments: { where: { status: 'succeeded' }, select: { id: true }, take: 1 },
-} satisfies Prisma.RoomBlockInclude;
-
-type StoredBlock = Prisma.RoomBlockGetPayload<{ include: typeof BLOCK_VIEW_INCLUDE }>;
-
-export function toRoomBlockView(block: StoredBlock): RoomBlockView {
-  return {
-    id: block.id,
-    roomId: block.roomId,
-    startsAt: block.startsAt,
-    endsAt: block.endsAt,
-    reason: block.reason,
-    note: block.note,
-    createdBy: { membershipId: block.createdBy.id, fullName: block.createdBy.user.fullName },
-    renter:
-      block.renter === null
-        ? null
-        : { membershipId: block.renter.id, fullName: block.renter.user.fullName },
-    priceCents: block.priceCents,
-    isPaid: block.payments.length > 0,
   };
 }

@@ -4,6 +4,7 @@ import { ActiveMembershipFinder } from '../tenancy/active-membership.finder';
 import { AccessTokenService } from './access-token.service';
 import { AuthenticationGuard } from './guards/authentication.guard';
 import { AuthorizationGuard } from './guards/authorization.guard';
+import { SecondFactorEnrollmentChecker } from './second-factor-enrollment.checker';
 import { TenantGuard } from './guards/tenant.guard';
 
 @Global()
@@ -11,6 +12,7 @@ import { TenantGuard } from './guards/tenant.guard';
   providers: [
     AccessTokenService,
     ActiveMembershipFinder,
+    SecondFactorEnrollmentChecker,
     // El ORDEN importa: primero quién eres, luego a qué centro perteneces, al final qué puedes hacer.
     { provide: APP_GUARD, useClass: AuthenticationGuard },
     { provide: APP_GUARD, useClass: TenantGuard },

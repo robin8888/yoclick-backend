@@ -112,7 +112,8 @@ describe('team and invitations', () => {
       expect((await call('GET', team(), client)).statusCode).toBe(403);
     });
 
-    it('needs a second-factor session for administrative roles', async () => {
+    it('needs a second-factor session for administrative roles who turned it on', async () => {
+      await fixtures.enrollSecondFactor(owner);
       const response = await call('GET', team(), owner, undefined, false);
 
       expect(response.statusCode).toBe(403);

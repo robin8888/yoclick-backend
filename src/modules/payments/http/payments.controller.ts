@@ -36,7 +36,6 @@ import {
   PaymentRouteParamsDto,
   PaymentSheetResponseDto,
   PaymentsStatusResponseDto,
-  RentalPaymentRouteParamsDto,
 } from './payment.dto';
 
 @ApiTags('payments')
@@ -149,23 +148,6 @@ export class PaymentsController {
     assertRouteTargetsActorCenter(actor, params.centerId);
     return {
       ...(await this.payTarget.execute(actor, { kind: 'pass', id: params.passId })),
-    };
-  }
-
-  @Post('room-rentals/:roomBlockId/pay')
-  @Roles('client')
-  @ApiOperation({
-    operationId: 'payments_pay_room_rental',
-    summary: 'Prepara el pago online del alquiler de una sala hecho a nombre de la propia persona.',
-  })
-  @ApiCreatedResponse({ type: PaymentSheetResponseDto })
-  async payRoomRental(
-    @CurrentActor() actor: ActorContext,
-    @Param() params: RentalPaymentRouteParamsDto,
-  ): Promise<Record<string, unknown>> {
-    assertRouteTargetsActorCenter(actor, params.centerId);
-    return {
-      ...(await this.payTarget.execute(actor, { kind: 'room_rental', id: params.roomBlockId })),
     };
   }
 

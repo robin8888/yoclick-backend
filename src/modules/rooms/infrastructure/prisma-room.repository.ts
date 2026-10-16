@@ -208,9 +208,6 @@ async function cancelFutureActivityOfRoom(
     where: { roomId: input.roomId, status: 'active' },
     data: { status: 'ended' },
   });
-  await client.roomBlock.deleteMany({
-    where: { roomId: input.roomId, endsAt: { gt: input.now } },
-  });
 }
 
 @Injectable()

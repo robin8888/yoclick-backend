@@ -183,7 +183,8 @@ describe('access control: authentication, tenancy and roles', () => {
       expect(response.statusCode).toBe(200);
     });
 
-    it('requires a second-factor session to act as owner or admin (SEC-47)', async () => {
+    it('requires a second-factor session from an owner who turned the second factor on (SEC-47)', async () => {
+      await fixtures.enrollSecondFactor(ownerOfCenterA);
       const { token } = await accessTokenService.issue(ownerOfCenterA, { isMfaVerified: false });
 
       const response = await application.inject({
@@ -194,6 +195,18 @@ describe('access control: authentication, tenancy and roles', () => {
 
       expect(response.statusCode).toBe(403);
       expect(response.json()).toMatchObject({ code: 'MFA_REQUIRED' });
+    });
+
+    it('lets an owner who never turned the second factor on administer without it', async () => {
+      const { token } = await accessTokenService.issue(ownerOfCenterA, { isMfaVerified: false });
+
+      const response = await application.inject({
+        method: 'GET',
+        url: '/v1/probe-guards/admin-area',
+        headers: { authorization: `Bearer ${token}`, 'x-center-id': centerAId },
+      });
+
+      expect(response.statusCode).toBe(200);
     });
 
     it('does not ask staff for a second factor', async () => {

@@ -4,7 +4,6 @@ import { listOpeningRangesOfDate, type OpeningHours } from '../../centers/domain
 import { materializeSchedulesInTransaction } from '../../schedules/infrastructure/schedule-materialization';
 import {
   type RoomAgenda,
-  type RoomBlockSummary,
   type RoomDayView,
   type RoomSessionView,
 } from '../application/ports/booking.repository';
@@ -56,19 +55,6 @@ async function listSessionsOfDay(
   });
 }
 
-async function listBlocksOfDay(
-  client: TenantTransactionClient,
-  range: { startsAt: Date; endsAt: Date },
-) {
-  return client.roomBlock.findMany({
-    where: { startsAt: { lt: range.endsAt }, endsAt: { gt: range.startsAt } },
-    select: { id: true, roomId: true, startsAt: true, endsAt: true, reason: true, note: true },
-    orderBy: [{ startsAt: 'asc' }, { id: 'asc' }],
-  });
-}
-
-type StoredBlock = Awaited<ReturnType<typeof listBlocksOfDay>>[number];
-
 function toRoomSessionView(session: StoredSession): RoomSessionView {
   return {
     id: session.id,
@@ -98,16 +84,6 @@ function toRoomSessionView(session: StoredSession): RoomSessionView {
   };
 }
 
-function toBlockSummary(block: StoredBlock): RoomBlockSummary {
-  return {
-    id: block.id,
-    startsAt: block.startsAt,
-    endsAt: block.endsAt,
-    reason: block.reason,
-    note: block.note,
-  };
-}
-
 interface StoredRoom {
   readonly id: string;
   readonly name: string;
@@ -115,10 +91,7 @@ interface StoredRoom {
   readonly staffMembership: { id: string; user: { fullName: string } } | null;
 }
 
-function toRoomDayView(
-  room: StoredRoom,
-  occupancy: { sessions: readonly StoredSession[]; blocks: readonly StoredBlock[] },
-): RoomDayView {
+function toRoomDayView(room: StoredRoom, sessions: readonly StoredSession[]): RoomDayView {
   return {
     id: room.id,
     name: room.name,
@@ -130,14 +103,11 @@ function toRoomDayView(
             membershipId: room.staffMembership.id,
             fullName: room.staffMembership.user.fullName,
           },
-    sessions: occupancy.sessions
-      .filter((session) => session.roomId === room.id)
-      .map(toRoomSessionView),
-    blocks: occupancy.blocks.filter((block) => block.roomId === room.id).map(toBlockSummary),
+    sessions: sessions.filter((session) => session.roomId === room.id).map(toRoomSessionView),
   };
 }
 
-/** Cada sala del centro con lo que la ocupa ese día (clases y bloqueos); las citas sin sala, aparte. */
+/** Cada sala del centro con lo que la ocupa ese día (sus clases); las citas sin sala, aparte. */
 export async function listRoomAgendaInTransaction(
   client: TenantTransactionClient,
   date: string,
@@ -154,7 +124,7 @@ export async function listRoomAgendaInTransaction(
     (holiday) => holiday.date,
   );
   const range = getUtcRangeOfLocalDates(date, date, center.timezone);
-  const [rooms, sessions, blocks] = await Promise.all([
+  const [rooms, sessions] = await Promise.all([
     client.room.findMany({
       where: { archivedAt: null },
       select: {
@@ -166,7 +136,6 @@ export async function listRoomAgendaInTransaction(
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     }),
     listSessionsOfDay(client, range),
-    listBlocksOfDay(client, range),
   ]);
 
   return {
@@ -174,7 +143,7 @@ export async function listRoomAgendaInTransaction(
     openingRanges: [
       ...listOpeningRangesOfDate(center.openingHours as OpeningHours | null, holidayDates, date),
     ],
-    rooms: rooms.map((room) => toRoomDayView(room, { sessions, blocks })),
+    rooms: rooms.map((room) => toRoomDayView(room, sessions)),
     sessionsWithoutRoom: sessions
       .filter((session) => session.roomId === null)
       .map(toRoomSessionView),

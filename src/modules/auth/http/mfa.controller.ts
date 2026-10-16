@@ -26,6 +26,7 @@ import {
   MfaStatusResponseDto,
   RegeneratedRecoveryCodesResponseDto,
 } from './dto/mfa-management-dtos';
+import { serializeMfaConfirmation } from './serialize-confirmation';
 
 /**
  * Gestión del segundo factor de la propia persona. Activarlo, desactivarlo y regenerar los códigos de
@@ -84,7 +85,7 @@ export class MfaController {
     @CurrentUserId() userId: string,
     @Body() body: MfaConfirmRequestDto,
   ): Promise<Record<string, unknown>> {
-    return { ...(await this.confirmTotp.execute(userId, body.code)) };
+    return serializeMfaConfirmation(await this.confirmTotp.execute(userId, body.code));
   }
 
   @Post('disable')

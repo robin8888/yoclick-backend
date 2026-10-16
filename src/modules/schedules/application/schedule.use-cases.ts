@@ -8,12 +8,7 @@ import {
   type EnrollmentView,
   type EnrollOutcome,
   type NewEnrollments,
-  type NewRoomBlock,
-  type RentalView,
   type NewScheduleSeries,
-  type RepeatWeekOutcome,
-  type RoomBlockCreationOutcome,
-  type RoomBlockView,
   type BusyTimeView,
   type ScheduleRepository,
   type ScheduleSeriesCreationOutcome,
@@ -78,15 +73,6 @@ export class CreateScheduleSeriesUseCase {
     const outcome = await this.schedules.createSeries(actor, newSeries, new Date());
     if (outcome.kind === 'created') return outcome;
     throw toSeriesError(outcome);
-  }
-}
-
-@Injectable()
-export class RepeatWeekUseCase {
-  constructor(@Inject(SCHEDULE_REPOSITORY) private readonly schedules: ScheduleRepository) {}
-
-  async execute(actor: ActorContext, weekStart: string): Promise<RepeatWeekOutcome> {
-    return this.schedules.repeatWeek(actor, { weekStart, now: new Date() });
   }
 }
 
@@ -171,64 +157,6 @@ export class CancelSessionDayUseCase {
     if (outcome.kind === 'cancelled') return outcome;
     if (outcome.kind === 'not_found') throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
     throw new DomainError('SESSION_NOT_CANCELLABLE', HTTP_STATUS.conflict);
-  }
-}
-
-@Injectable()
-export class ListRoomBlocksUseCase {
-  constructor(@Inject(SCHEDULE_REPOSITORY) private readonly schedules: ScheduleRepository) {}
-
-  async execute(
-    actor: ActorContext,
-    query: { roomId: string | null; from: Date; to: Date },
-  ): Promise<RoomBlockView[]> {
-    return this.schedules.listBlocks(actor, query);
-  }
-}
-
-@Injectable()
-export class CreateRoomBlockUseCase {
-  constructor(@Inject(SCHEDULE_REPOSITORY) private readonly schedules: ScheduleRepository) {}
-
-  async execute(
-    actor: ActorContext,
-    newBlock: NewRoomBlock,
-  ): Promise<Extract<RoomBlockCreationOutcome, { kind: 'created' }>> {
-    const outcome = await this.schedules.createBlock(actor, newBlock);
-    if (outcome.kind === 'created') return outcome;
-    if (outcome.kind === 'room_not_found') throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
-    if (outcome.kind === 'renter_not_found') {
-      throw new DomainError('VALIDATION_FAILED', HTTP_STATUS.badRequest, [
-        { path: 'renterMembershipId', code: 'not_found' },
-      ]);
-    }
-    if (outcome.kind === 'has_bookings') {
-      throw new DomainError('ROOM_HAS_BOOKINGS', HTTP_STATUS.conflict);
-    }
-    const conflictCode = outcome.kind === 'in_the_past' ? 'in_the_past' : 'overlaps_block';
-    throw new DomainError('CONFLICT', HTTP_STATUS.conflict, [
-      { path: 'startsAt', code: conflictCode },
-    ]);
-  }
-}
-
-/** Los alquileres de sala de quien pregunta, con su precio y si ya están pagados. */
-@Injectable()
-export class ListMyRentalsUseCase {
-  constructor(@Inject(SCHEDULE_REPOSITORY) private readonly schedules: ScheduleRepository) {}
-
-  async execute(actor: ActorContext): Promise<RentalView[]> {
-    return this.schedules.listRentalsOf(actor);
-  }
-}
-
-@Injectable()
-export class DeleteRoomBlockUseCase {
-  constructor(@Inject(SCHEDULE_REPOSITORY) private readonly schedules: ScheduleRepository) {}
-
-  async execute(actor: ActorContext, request: { roomId: string; blockId: string }): Promise<void> {
-    const wasDeleted = await this.schedules.deleteBlock(actor, request);
-    if (!wasDeleted) throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
   }
 }
 

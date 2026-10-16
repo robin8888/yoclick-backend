@@ -28,6 +28,13 @@ export class MfaConfirmResponseDto extends createZodDto(
   z.strictObject({
     /** Diez códigos de un solo uso. Se enseñan UNA vez: hay que guardarlos. */
     recoveryCodes: z.array(z.string()).length(RECOVERY_CODE_COUNT),
+    /** Sesión nueva ya verificada con segundo factor: la app la usa en lugar de volver a iniciar sesión. */
+    session: z.strictObject({
+      accessToken: z.string(),
+      accessTokenExpiresAt: z.iso.datetime(),
+      refreshToken: z.string(),
+      refreshTokenExpiresAt: z.iso.datetime(),
+    }),
   }),
 ) {}
 

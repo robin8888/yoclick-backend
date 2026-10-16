@@ -121,6 +121,7 @@ function buildScenario() {
       users,
       verifier,
       new MfaActivator(mfa, recoveryCodes, notifier),
+      issuer,
     ),
     verifyLogin: new VerifyMfaLoginUseCase(users, verifier, issuer),
     disable: new DisableMfaUseCase(reauth, verifier, mfa, sessions, notifier),
@@ -133,6 +134,7 @@ function buildScenario() {
       users,
       verifier,
       new MfaActivator(mfa, recoveryCodes, notifier),
+      issuer,
     ),
     sendLoginEmailCode: new SendLoginEmailCodeUseCase(users, mfa, issuer, emailCodeIssuer),
     sendAccountEmailCode: new SendAccountEmailCodeUseCase(users, mfa, emailCodeIssuer),
@@ -224,6 +226,16 @@ describe('setting up the second factor', () => {
 });
 
 describe('confirming the second factor', () => {
+  it('opens a session already verified with the second factor, so the person does not log in again', async () => {
+    const scenario = buildScenario();
+    const { secret } = await scenario.setup.execute(USER_ID, PASSWORD);
+
+    const { session } = await scenario.confirm.execute(USER_ID, codeFor(secret));
+
+    expect(session.accessToken).toBe(`access-${USER_ID}-true`);
+    expect(scenario.sessions.tokens.at(-1)?.isMfaVerified).toBe(true);
+  });
+
   it('activates it with a valid code and hands over ten recovery codes', async () => {
     const scenario = buildScenario();
     const { secret } = await scenario.setup.execute(USER_ID, PASSWORD);
@@ -381,6 +393,7 @@ describe('completing a login with the second factor', () => {
   it('locks the account after repeated wrong codes, and the right code no longer helps', async () => {
     const scenario = buildScenario();
     const { secret } = await enableSecondFactor(scenario);
+    const sessionCountAfterEnabling = scenario.sessions.tokens.length;
     const right = codeFor(secret, Date.now() + NEXT_STEP_MS);
     const wrong = right === '000000' ? '000001' : '000000';
     for (let attempt = 0; attempt < MAX_FAILED_LOGIN_ATTEMPTS; attempt += 1) {
@@ -402,7 +415,7 @@ describe('completing a login with the second factor', () => {
     );
 
     expect(error).toMatchObject({ code: 'MFA_CODE_INVALID' });
-    expect(scenario.sessions.tokens).toHaveLength(0);
+    expect(scenario.sessions.tokens).toHaveLength(sessionCountAfterEnabling);
   });
 
   it('rejects a challenge that is not valid', async () => {

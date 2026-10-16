@@ -21,15 +21,11 @@ import {
 const PAYMENT_LABEL_INCLUDE = {
   clientMembership: { select: { user: { select: { fullName: true } } } },
   clientPass: { select: { name: true } },
-  roomBlock: { select: { room: { select: { name: true } } } },
 } as const;
 
-/** El nombre del bono o de la sala que se pagó. */
-function describePaymentLabel(payment: {
-  clientPass: { name: string } | null;
-  roomBlock: { room: { name: string } } | null;
-}): string {
-  return payment.clientPass?.name ?? payment.roomBlock?.room.name ?? '';
+/** El nombre del bono que se pagó. */
+function describePaymentLabel(payment: { clientPass: { name: string } | null }): string {
+  return payment.clientPass?.name ?? '';
 }
 
 interface StoredPayment {
@@ -52,8 +48,8 @@ function toPaymentRecord(payment: StoredPayment): PaymentRecord {
   };
 }
 
-function targetWhere(target: PaymentTarget): { clientPassId: string } | { roomBlockId: string } {
-  return target.kind === 'pass' ? { clientPassId: target.id } : { roomBlockId: target.id };
+function targetWhere(target: PaymentTarget): { clientPassId: string } {
+  return { clientPassId: target.id };
 }
 
 /** El aviso de Stripe llega sin sesión: se actúa como la administración del centro que dice el cobro. */
@@ -128,13 +124,15 @@ export class PrismaPaymentRepository implements PaymentRepository {
   async listPayments(actor: ActorContext, query: { limit: number }): Promise<PaymentListItem[]> {
     return this.tenantPrismaService.runInTenantContext(actor, async (client) => {
       const payments = await client.payment.findMany({
+        // Los cobros de alquileres por bloqueo ya no se crean: los alquileres son clases y se pagan con bono.
+        where: { kind: 'pass' },
         include: PAYMENT_LABEL_INCLUDE,
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         take: query.limit,
       });
       return payments.map((payment) => ({
         id: payment.id,
-        kind: payment.kind,
+        kind: 'pass' as const,
         label: describePaymentLabel(payment),
         clientName: payment.clientMembership.user.fullName,
         amountCents: payment.amountCents,
@@ -196,33 +194,15 @@ export class PrismaPaymentRepository implements PaymentRepository {
     target: PaymentTarget,
   ): Promise<PayableTarget | null> {
     return this.tenantPrismaService.runInTenantContext(actor, async (client) => {
-      if (target.kind === 'pass') {
-        const pass = await client.clientPass.findFirst({
-          where: { id: target.id, status: 'pending', clientMembershipId: actor.membershipId },
-        });
-        if (!pass || pass.priceCents <= 0) return null;
-        return {
-          target,
-          amountCents: pass.priceCents,
-          description: pass.name,
-          clientMembershipId: pass.clientMembershipId,
-        };
-      }
-      const block = await client.roomBlock.findFirst({
-        where: {
-          id: target.id,
-          renterMembershipId: actor.membershipId,
-          priceCents: { not: null },
-          payments: { none: { status: 'succeeded' } },
-        },
-        include: { room: { select: { name: true } } },
+      const pass = await client.clientPass.findFirst({
+        where: { id: target.id, status: 'pending', clientMembershipId: actor.membershipId },
       });
-      if (!block || block.priceCents === null || block.renterMembershipId === null) return null;
+      if (!pass || pass.priceCents <= 0) return null;
       return {
         target,
-        amountCents: block.priceCents,
-        description: block.room.name,
-        clientMembershipId: block.renterMembershipId,
+        amountCents: pass.priceCents,
+        description: pass.name,
+        clientMembershipId: pass.clientMembershipId,
       };
     });
   }

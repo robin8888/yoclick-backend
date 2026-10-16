@@ -267,15 +267,6 @@ export interface RoomSessionView {
   }[];
 }
 
-/** Un tramo en que la sala no está disponible: alquiler, mantenimiento, evento. */
-export interface RoomBlockSummary {
-  readonly id: string;
-  readonly startsAt: Date;
-  readonly endsAt: Date;
-  readonly reason: 'rental' | 'maintenance' | 'event' | 'other';
-  readonly note: string | null;
-}
-
 export interface RoomDayView {
   readonly id: string;
   readonly name: string;
@@ -283,7 +274,6 @@ export interface RoomDayView {
   /** Profesor fijo de la sala; `null` si la usa cualquiera. */
   readonly staff: { readonly membershipId: string; readonly fullName: string } | null;
   readonly sessions: readonly RoomSessionView[];
-  readonly blocks: readonly RoomBlockSummary[];
 }
 
 export interface RoomAgenda {

@@ -10,11 +10,12 @@ export interface CenterPaymentsInfo {
   readonly stripeChargesEnabled: boolean;
 }
 
-export type PaymentTarget =
-  | { readonly kind: 'pass'; readonly id: string }
-  | { readonly kind: 'room_rental'; readonly id: string };
+export interface PaymentTarget {
+  readonly kind: 'pass';
+  readonly id: string;
+}
 
-/** Lo que una persona puede pagar: el bono que pidió o el alquiler de sala que le hizo el centro. */
+/** Lo que una persona puede pagar: el bono que pidió (un alquiler de sala es una clase y se paga con bono). */
 export interface PayableTarget {
   readonly target: PaymentTarget;
   readonly amountCents: number;
@@ -49,8 +50,8 @@ export type PaymentSettlementOutcome =
 /** Un cobro tal y como lo ve la administración. */
 export interface PaymentListItem {
   readonly id: string;
-  readonly kind: 'pass' | 'room_rental';
-  /** El bono o la sala que se pagó. */
+  readonly kind: 'pass';
+  /** El bono que se pagó. */
   readonly label: string;
   readonly clientName: string;
   readonly amountCents: number;

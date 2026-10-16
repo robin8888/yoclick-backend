@@ -20,6 +20,7 @@ import {
   MfaConfirmResponseDto,
   MfaSetupRequestDto,
 } from './dto/mfa-management-dtos';
+import { serializeMfaConfirmation } from './serialize-confirmation';
 
 /**
  * Segundo factor por código enviado al correo, de la propia persona. Alta con contraseña (SEC-12) y
@@ -66,7 +67,7 @@ export class MfaEmailController {
     @CurrentUserId() userId: string,
     @Body() body: MfaConfirmRequestDto,
   ): Promise<Record<string, unknown>> {
-    return { ...(await this.confirmEmail.execute(userId, body.code)) };
+    return serializeMfaConfirmation(await this.confirmEmail.execute(userId, body.code));
   }
 
   @Post('send')

@@ -67,6 +67,8 @@ export class BookingWorld {
     const headers: Record<string, string> = { ...options.headers };
     if (options.centerId) headers['x-center-id'] = options.centerId;
     if (userId) {
+      // Sin segundo factor activado se administra igual: «sin segundo factor» solo falla para quien lo tiene.
+      if (options.isMfaVerified === false) await this.fixtures.enrollSecondFactor(userId);
       const { token } = await this.accessTokenService.issue(userId, {
         isMfaVerified: options.isMfaVerified ?? true,
       });

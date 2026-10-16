@@ -1,11 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { getScheduleWeekdayOfLocalDate } from '../../src/modules/schedules/domain/schedule-rules';
-import {
-  addDaysToLocalDate,
-  toLocalDate,
-  zonedDateTimeToUtc,
-} from '../../src/shared/time/zoned-time';
+import { addDaysToLocalDate, toLocalDate } from '../../src/shared/time/zoned-time';
 import { BookingWorld, type CreatedTestCenter } from '../support/booking-world';
 import { resetTestDatabase } from '../support/test-database';
 import { createTestApplication } from './create-test-application';
@@ -46,7 +42,6 @@ interface RoomAgendaBody {
   rooms: {
     id: string;
     sessions: RoomSessionBody[];
-    blocks: { id: string; reason: string }[];
   }[];
 }
 
@@ -58,7 +53,7 @@ interface EnrollBody {
 
 const MADRID = 'Europe/Madrid';
 
-describe('room schedules, fixed groups and room blocks', () => {
+describe('room schedules and fixed groups', () => {
   let application: NestFastifyApplication;
   let world: BookingWorld;
   let owner: string;
@@ -771,36 +766,6 @@ describe('room schedules, fixed groups and room blocks', () => {
     });
   });
 
-  it('repeats a configured week into the next one with a single call, without duplicating', async () => {
-    const weekday = getScheduleWeekdayOfLocalDate(firstDate);
-    const weekStart = addDaysToLocalDate(firstDate, -(weekday - 1));
-    const weekEnd = addDaysToLocalDate(weekStart, 6);
-    const created = await createSeries({ startsOn: firstDate, endsOn: weekEnd });
-    const nextWeekDate = addDaysToLocalDate(firstDate, 7);
-    expect(await readRoomSessions(nextWeekDate)).toHaveLength(0);
-
-    const repeated = await call('POST', '/schedules/repeat-week', { weekStart });
-    const again = await call('POST', '/schedules/repeat-week', { weekStart });
-
-    expect(repeated.statusCode).toBe(200);
-    expect(repeated.json()).toMatchObject({ copiedSeriesCount: 1, alreadyCopiedSeriesCount: 0 });
-    expect(again.json()).toMatchObject({ copiedSeriesCount: 0, alreadyCopiedSeriesCount: 1 });
-    const [copiedSession] = await readRoomSessions(nextWeekDate);
-    expect(copiedSession).toMatchObject({ mode: 'group', capacity: 2, bookedCount: 0 });
-    const listed = (await call('GET', '/schedules')).json<{ series: SeriesBody[] }>().series;
-    expect(listed).toHaveLength(2);
-    expect(listed.map(({ seriesId }) => seriesId)).toContain(created.series.seriesId);
-  });
-
-  it('only accepts a Monday as the start of the week to repeat', async () => {
-    const weekday = getScheduleWeekdayOfLocalDate(firstDate);
-    const notMonday = weekday === 1 ? addDaysToLocalDate(firstDate, 1) : firstDate;
-
-    const response = await call('POST', '/schedules/repeat-week', { weekStart: notMonday });
-
-    expect(response.statusCode).toBe(400);
-  });
-
   it('lists the weekly slots a room and a teacher already have, so a new class avoids them', async () => {
     await createSeries();
 
@@ -958,89 +923,6 @@ describe('room schedules, fixed groups and room blocks', () => {
       reason: 'Otra vez',
     });
     expect(again.statusCode).toBe(404);
-  });
-
-  it('blocks a room only in a free future slot: classes are not cancelled by a block', async () => {
-    const { series } = await createSeries();
-    await call('POST', `/schedules/${series.seriesId}/enrollments`, {
-      clientMembershipIds: [clients[0]!.membershipId],
-    });
-
-    const overClass = await call('POST', `/rooms/${roomId}/blocks`, {
-      startsAt: zonedDateTimeToUtc(firstDate, '17:30', MADRID).toISOString(),
-      endsAt: zonedDateTimeToUtc(firstDate, '19:30', MADRID).toISOString(),
-      reason: 'rental',
-    });
-    expect(overClass.statusCode).toBe(409);
-    expect(overClass.json<{ code: string }>().code).toBe('ROOM_HAS_BOOKINGS');
-
-    const inThePast = await call('POST', `/rooms/${roomId}/blocks`, {
-      startsAt: zonedDateTimeToUtc(
-        addDaysToLocalDate(firstDate, -30),
-        '10:00',
-        MADRID,
-      ).toISOString(),
-      endsAt: zonedDateTimeToUtc(addDaysToLocalDate(firstDate, -30), '11:00', MADRID).toISOString(),
-      reason: 'rental',
-    });
-    expect(inThePast.statusCode).toBe(409);
-
-    const blocked = await call('POST', `/rooms/${roomId}/blocks`, {
-      startsAt: zonedDateTimeToUtc(firstDate, '19:00', MADRID).toISOString(),
-      endsAt: zonedDateTimeToUtc(firstDate, '20:00', MADRID).toISOString(),
-      reason: 'rental',
-      note: 'Alquilada a la asociación de vecinos',
-    });
-
-    expect(blocked.statusCode).toBe(201);
-    expect(blocked.json<{ cancelledSessionCount: number }>().cancelledSessionCount).toBe(0);
-    const agenda = await readRoomAgenda(firstDate);
-    const room = agenda.rooms.find(({ id }) => id === roomId);
-    expect(room?.blocks).toEqual([expect.objectContaining({ reason: 'rental' })]);
-    expect(room?.sessions[0]).toMatchObject({ cancelledReason: null, bookedCount: 1 });
-
-    const appointment = await call('POST', '/agenda/bookings', {
-      clientMembershipId: clients[1]!.membershipId,
-      serviceId: privateServiceId,
-      startsAt: zonedDateTimeToUtc(firstDate, '19:00', MADRID).toISOString(),
-      staffMembershipId: teacherAna.membershipId,
-      roomId,
-    });
-    expect(appointment.statusCode).toBe(409);
-    expect(appointment.json<{ code: string }>().code).toBe('ROOM_UNAVAILABLE');
-
-    const overlapping = await call('POST', `/rooms/${roomId}/blocks`, {
-      startsAt: zonedDateTimeToUtc(firstDate, '19:30', MADRID).toISOString(),
-      endsAt: zonedDateTimeToUtc(firstDate, '21:00', MADRID).toISOString(),
-      reason: 'event',
-    });
-    expect(overlapping.statusCode).toBe(409);
-
-    const removed = await call(
-      'DELETE',
-      `/rooms/${roomId}/blocks/${blocked.json<{ block: { id: string } }>().block.id}`,
-    );
-    expect(removed.statusCode).toBe(204);
-  });
-
-  it('refuses to block a room over a session that has single appointments', async () => {
-    const { series } = await createSeries();
-    const [firstSession] = await readRoomSessions(firstDate);
-    const joined = await call('POST', '/agenda/bookings/join-group', {
-      clientMembershipId: clients[0]!.membershipId,
-      classSessionId: firstSession!.id,
-    });
-    expect(joined.statusCode).toBe(201);
-
-    const blocked = await call('POST', `/rooms/${roomId}/blocks`, {
-      startsAt: zonedDateTimeToUtc(firstDate, '17:00', MADRID).toISOString(),
-      endsAt: zonedDateTimeToUtc(firstDate, '20:00', MADRID).toISOString(),
-      reason: 'maintenance',
-    });
-
-    expect(blocked.statusCode).toBe(409);
-    expect(blocked.json<{ code: string }>().code).toBe('ROOM_HAS_BOOKINGS');
-    expect(series.seriesId).toBeDefined();
   });
 
   it('changes the time of a series when nobody booked loose seats, and refuses when they did', async () => {

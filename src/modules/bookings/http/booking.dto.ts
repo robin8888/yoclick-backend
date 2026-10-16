@@ -106,14 +106,6 @@ const roomSessionShape = z.strictObject({
   ),
 });
 
-const roomBlockSummaryShape = z.strictObject({
-  id: z.uuid(),
-  startsAt: z.iso.datetime(),
-  endsAt: z.iso.datetime(),
-  reason: z.enum(['rental', 'maintenance', 'event', 'other']),
-  note: z.string().nullable(),
-});
-
 export class RoomAgendaQueryDto extends createZodDto(z.strictObject({ date: z.iso.date() })) {}
 
 export class RoomAgendaResponseDto extends createZodDto(
@@ -131,8 +123,6 @@ export class RoomAgendaResponseDto extends createZodDto(
         /** Profesor fijo de la sala; `null` si la usa cualquiera. */
         staff: z.strictObject({ membershipId: z.uuid(), fullName: z.string() }).nullable(),
         sessions: z.array(roomSessionShape),
-        /** Tramos en que la sala no está disponible ese día (alquiler, mantenimiento, evento). */
-        blocks: z.array(roomBlockSummaryShape),
       }),
     ),
     /** Citas de ese día que no tienen sala. */

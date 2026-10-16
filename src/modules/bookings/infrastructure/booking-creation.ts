@@ -15,7 +15,6 @@ import {
   type JoinGroupSessionOutcome,
 } from '../application/ports/booking.repository';
 import { recordBookingNotification } from '../../notifications/infrastructure/booking-notification.recorder';
-import { isRoomBlocked } from '../../schedules/infrastructure/room-block-queries';
 import { isModeAllowedByService } from '../../schedules/domain/schedule-rules';
 import { toBookingView, WITH_SESSION_DETAILS } from './booking-view.mapper';
 import { hasOverlappingBooking } from './client-overlap';
@@ -67,22 +66,12 @@ interface NewSession {
 /**
  * Inserta la sesión; si la persona del equipo o la sala ya tienen otra programada que se solapa, la
  * restricción EXCLUDE lo impide y `ON CONFLICT DO NOTHING` lo convierte en "no se insertó nada" (sin
- * abortar la transacción). Una sala bloqueada (alquiler, mantenimiento) tampoco admite la sesión.
+ * abortar la transacción).
  */
 async function tryInsertSession(
   client: TenantTransactionClient,
   session: NewSession,
 ): Promise<boolean> {
-  if (
-    session.roomId !== null &&
-    (await isRoomBlocked(client, {
-      roomId: session.roomId,
-      startsAt: session.startsAt,
-      endsAt: session.endsAt,
-    }))
-  ) {
-    return false;
-  }
   const inserted = await client.$queryRaw<{ id: string }[]>`
     insert into class_sessions
       (id, center_id, service_id, staff_membership_id, starts_at, ends_at, room_id, mode, capacity)

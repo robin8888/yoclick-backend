@@ -32,7 +32,7 @@ export interface ScheduleSeriesView {
   readonly enrolledCount: number;
 }
 
-export type OccurrenceSkipReason = 'holiday' | 'absence' | 'conflict' | 'blocked';
+export type OccurrenceSkipReason = 'holiday' | 'absence' | 'conflict';
 
 /** Una fecha en la que el horario no pudo crear su sesión y por qué. */
 export interface SkippedOccurrence {
@@ -167,69 +167,6 @@ export type CancelSessionOutcome =
   /** Ya cancelada o ya empezada. */
   | { readonly kind: 'not_cancellable' };
 
-export type RoomBlockReasonName = 'rental' | 'maintenance' | 'event' | 'other';
-
-export interface RoomBlockView {
-  readonly id: string;
-  readonly roomId: string;
-  readonly startsAt: Date;
-  readonly endsAt: Date;
-  readonly reason: RoomBlockReasonName;
-  readonly note: string | null;
-  readonly createdBy: PersonRef;
-  /** Quien alquila la sala (persona registrada); nulo en un bloqueo sin más. */
-  readonly renter: PersonRef | null;
-  readonly priceCents: number | null;
-  /** Hay un cobro online confirmado de este alquiler. */
-  readonly isPaid: boolean;
-}
-
-/** Un alquiler de sala a nombre de la persona que pregunta. */
-export interface RentalView {
-  readonly id: string;
-  readonly roomName: string;
-  readonly startsAt: Date;
-  readonly endsAt: Date;
-  readonly priceCents: number | null;
-  readonly isPaid: boolean;
-}
-
-export interface NewRoomBlock {
-  readonly roomId: string;
-  readonly startsAt: Date;
-  readonly endsAt: Date;
-  readonly reason: RoomBlockReasonName;
-  readonly note: string | null;
-  readonly renterMembershipId: string | null;
-  readonly priceCents: number | null;
-}
-
-export type RoomBlockCreationOutcome =
-  | {
-      readonly kind: 'created';
-      readonly block: RoomBlockView;
-      /** Siempre 0: bloquear ya no cancela clases (se mantiene por compatibilidad del contrato). */
-      readonly cancelledSessionCount: number;
-    }
-  | { readonly kind: 'room_not_found' }
-  /** La persona que alquila no es cliente de este centro. */
-  | { readonly kind: 'renter_not_found' }
-  | { readonly kind: 'in_the_past' }
-  /** Hay clases asignadas en ese tramo: hay que cancelarlas o moverlas antes. */
-  | { readonly kind: 'has_bookings'; readonly sessionCount: number }
-  | { readonly kind: 'overlaps_block' };
-
-export interface RepeatWeekOutcome {
-  /** Horarios (series) copiados a la semana siguiente. */
-  readonly copiedSeriesCount: number;
-  /** Los que ya estaban copiados de antes: no se duplican. */
-  readonly alreadyCopiedSeriesCount: number;
-  /** Los que no se pudieron crear (límite de horarios, sala que ya no sirve…). */
-  readonly failedSeriesCount: number;
-  /** Fechas concretas que no se pudieron crear y por qué. */
-  readonly skipped: readonly SkippedOccurrence[];
-}
-
 /** Una franja semanal ya ocupada por una clase activa, de la sala o del profesor consultados. */
 export interface BusyTimeView {
   /** 1 = lunes … 7 = domingo. */
@@ -257,11 +194,6 @@ export interface ScheduleRepository {
     newSeries: NewScheduleSeries,
     now: Date,
   ): Promise<ScheduleSeriesCreationOutcome>;
-  /** Copia los horarios de una semana (lunes `weekStart`) a la siguiente. */
-  repeatWeek(
-    actor: ActorContext,
-    request: { weekStart: string; now: Date },
-  ): Promise<RepeatWeekOutcome>;
   updateSeries(
     actor: ActorContext,
     request: { seriesId: string; patch: ScheduleSeriesPatch; now: Date },
@@ -282,15 +214,6 @@ export interface ScheduleRepository {
     actor: ActorContext,
     cancellation: SessionCancellation,
   ): Promise<CancelSessionOutcome>;
-  listBlocks(
-    actor: ActorContext,
-    query: { roomId: string | null; from: Date; to: Date },
-  ): Promise<RoomBlockView[]>;
-  createBlock(actor: ActorContext, newBlock: NewRoomBlock): Promise<RoomBlockCreationOutcome>;
-  /** Los alquileres de sala de la persona que pregunta, por fecha. */
-  listRentalsOf(actor: ActorContext): Promise<RentalView[]>;
-  /** `false` si el bloqueo no existe. */
-  deleteBlock(actor: ActorContext, request: { roomId: string; blockId: string }): Promise<boolean>;
 }
 
 export const SCHEDULE_REPOSITORY = Symbol('SCHEDULE_REPOSITORY');

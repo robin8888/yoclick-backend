@@ -7,10 +7,6 @@ export class PassPaymentRouteParamsDto extends createZodDto(
   z.strictObject({ centerId: z.uuid(), passId: z.uuid() }),
 ) {}
 
-export class RentalPaymentRouteParamsDto extends createZodDto(
-  z.strictObject({ centerId: z.uuid(), roomBlockId: z.uuid() }),
-) {}
-
 export class PaymentRouteParamsDto extends createZodDto(
   z.strictObject({ centerId: z.uuid(), paymentId: z.uuid() }),
 ) {}
@@ -27,8 +23,8 @@ export class PaymentListResponseDto extends createZodDto(
     payments: z.array(
       z.strictObject({
         id: z.uuid(),
-        kind: z.enum(['pass', 'room_rental']),
-        /** El bono o la sala que se pagó. */
+        kind: z.literal('pass'),
+        /** El bono que se pagó. */
         label: z.string(),
         clientName: z.string(),
         amountCents: z.number().int(),

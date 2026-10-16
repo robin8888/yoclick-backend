@@ -16,7 +16,6 @@ import {
   type ScheduleWeekday,
 } from '../domain/schedule-rules';
 import { type SkippedOccurrence } from '../application/ports/schedule.repository';
-import { isRoomBlocked } from './room-block-queries';
 
 const UTC_MIDNIGHT_SUFFIX = 'T00:00:00Z';
 const ISO_DATE_LENGTH = 10;
@@ -191,28 +190,6 @@ interface MaterializationContext {
   readonly absences: readonly AbsencePeriod[];
 }
 
-/** Por qué el horario no puede ocurrir ese día antes siquiera de intentarlo: cierre, ausencia o sala bloqueada. */
-async function findBlockingReason(
-  client: TenantTransactionClient,
-  session: NewScheduledSession,
-  context: MaterializationContext,
-): Promise<SkippedOccurrence['reason'] | null> {
-  const skipReason = findSkipReason({
-    date: session.date,
-    holidayDates: context.calendar.holidayDates,
-    absences: context.absences,
-  });
-  if (skipReason !== null) return skipReason;
-  const { roomId } = session.schedule;
-  if (roomId === null) return null;
-  const isBlocked = await isRoomBlocked(client, {
-    roomId,
-    startsAt: session.startsAt,
-    endsAt: session.endsAt,
-  });
-  return isBlocked ? 'blocked' : null;
-}
-
 /** La sesión del día recién creada recibe la plaza de cada persona matriculada. */
 async function attachEnrollments(
   client: TenantTransactionClient,
@@ -251,10 +228,14 @@ async function materializeDate(
     startsAtTime: schedule.startsAtTime,
     reason,
   });
-  const blockingReason = await findBlockingReason(client, session, context);
-  if (blockingReason !== null) {
-    await insertSession(client, session, blockingReason);
-    return skipped(blockingReason);
+  const skipReason = findSkipReason({
+    date,
+    holidayDates: context.calendar.holidayDates,
+    absences: context.absences,
+  });
+  if (skipReason !== null) {
+    await insertSession(client, session, skipReason);
+    return skipped(skipReason);
   }
   const outcome = await insertSession(client, session, null);
   if (outcome === 'exists') return null;

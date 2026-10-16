@@ -1,12 +1,9 @@
 import { z } from 'zod';
 import { createZodDto } from '../../../shared/http/create-zod-dto';
 import { daysBetweenLocalDates } from '../../../shared/time/zoned-time';
-import { MILLISECONDS_PER_DAY } from '../../../shared/time/time-units';
 import { isValidTimeOfDay } from '../../centers/domain/opening-hours';
 import {
   isTimeRangeOrdered,
-  MAX_BLOCK_LENGTH_DAYS,
-  MAX_BLOCK_NOTE_LENGTH,
   MAX_CANCEL_REASON_LENGTH,
   MAX_DAYS_PER_SERIES,
   MAX_ENROLLMENTS_PER_REQUEST,
@@ -68,7 +65,7 @@ const skippedOccurrenceShape = z.strictObject({
   date: z.iso.date(),
   startsAtTime: z.string(),
   /** Festivo del centro, ausencia de la persona, sala o persona ya ocupadas, o sala bloqueada. */
-  reason: z.enum(['holiday', 'absence', 'conflict', 'blocked']),
+  reason: z.enum(['holiday', 'absence', 'conflict']),
 });
 
 export class ScheduleSeriesListResponseDto extends createZodDto(
@@ -203,107 +200,6 @@ export class CancelSessionRequestDto extends createZodDto(
 
 export class CancelSessionResponseDto extends createZodDto(
   z.strictObject({ affectedBookingCount: z.number().int() }),
-) {}
-
-export class RoomBlocksQueryDto extends createZodDto(
-  z
-    .strictObject({ from: z.iso.date(), to: z.iso.date() })
-    .refine((query) => query.to >= query.from, 'to before from'),
-) {}
-
-const blockShape = {
-  id: z.uuid(),
-  roomId: z.uuid(),
-  startsAt: z.iso.datetime(),
-  endsAt: z.iso.datetime(),
-  reason: z.enum(['rental', 'maintenance', 'event', 'other']),
-  note: z.string().nullable(),
-  createdBy: personShape,
-  /** Quien alquila la sala; nulo en un bloqueo sin más. */
-  renter: personShape.nullable(),
-  /** Lo que debe pagar quien alquila, en céntimos. */
-  priceCents: z.number().int().nullable(),
-  /** Hay un cobro online confirmado. */
-  isPaid: z.boolean(),
-};
-
-export class RoomBlockResponseDto extends createZodDto(
-  z.strictObject({
-    block: z.strictObject(blockShape),
-    /** Sesiones de horario sin citas sueltas que se cancelaron para dejar la sala libre. */
-    cancelledSessionCount: z.number().int(),
-  }),
-) {}
-
-export class RoomBlockListResponseDto extends createZodDto(
-  z.strictObject({ blocks: z.array(z.strictObject(blockShape)) }),
-) {}
-
-const MAX_RENTAL_PRICE_CENTS = 1_000_000;
-
-export class MyRentalsResponseDto extends createZodDto(
-  z.strictObject({
-    rentals: z.array(
-      z.strictObject({
-        id: z.uuid(),
-        roomName: z.string(),
-        startsAt: z.iso.datetime(),
-        endsAt: z.iso.datetime(),
-        priceCents: z.number().int().nullable(),
-        isPaid: z.boolean(),
-      }),
-    ),
-  }),
-) {}
-
-export class CreateRoomBlockRequestDto extends createZodDto(
-  z
-    .strictObject({
-      /** UTC con `Z`. */
-      startsAt: z.iso.datetime(),
-      endsAt: z.iso.datetime(),
-      reason: z.enum(['rental', 'maintenance', 'event', 'other']),
-      note: z.string().trim().min(1).max(MAX_BLOCK_NOTE_LENGTH).optional(),
-      /** Alquiler a una persona registrada (solo con motivo `rental`). */
-      renterMembershipId: z.uuid().optional(),
-      /** Precio del alquiler en céntimos; exige `renterMembershipId`. */
-      priceCents: z.number().int().min(1).max(MAX_RENTAL_PRICE_CENTS).optional(),
-    })
-    .refine(
-      (body) => {
-        const isRental = body.renterMembershipId !== undefined || body.priceCents !== undefined;
-        return !isRental || (body.reason === 'rental' && body.renterMembershipId !== undefined);
-      },
-      { error: 'a rental price or renter needs the rental reason and a renter' },
-    )
-    .refine((body) => {
-      const lengthMilliseconds = Date.parse(body.endsAt) - Date.parse(body.startsAt);
-      return (
-        lengthMilliseconds > 0 && lengthMilliseconds <= MAX_BLOCK_LENGTH_DAYS * MILLISECONDS_PER_DAY
-      );
-    }, 'ends before it starts or lasts over 31 days'),
-) {}
-
-const MONDAY = 1;
-
-function isMonday(isoDate: string): boolean {
-  return new Date(`${isoDate}T00:00:00.000Z`).getUTCDay() === MONDAY;
-}
-
-export class RepeatWeekRequestDto extends createZodDto(
-  z.strictObject({
-    /** El lunes de la semana configurada que se copia a la siguiente. */
-    weekStart: z.iso.date().refine(isMonday, 'weekStart must be a Monday'),
-  }),
-) {}
-
-export class RepeatWeekResponseDto extends createZodDto(
-  z.strictObject({
-    copiedSeriesCount: z.number().int(),
-    alreadyCopiedSeriesCount: z.number().int(),
-    failedSeriesCount: z.number().int(),
-    skipped: z.array(skippedOccurrenceShape),
-  }),
 ) {}
 
 export class BusyTimesQueryDto extends createZodDto(

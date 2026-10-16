@@ -307,7 +307,7 @@ describe('second factor (TOTP) for sign-in and administrative roles', () => {
   });
 
   describe('administrative roles', () => {
-    it('blocks an owner whose session has no second factor, and lets them in with it', async () => {
+    it('blocks an owner who turned the second factor on when the session has none, and lets them in with it', async () => {
       const session = await registerAndLogin();
       const userId = (await send('GET', '/v1/me', undefined, session.accessToken)).json<{
         id: string;
@@ -316,6 +316,7 @@ describe('second factor (TOTP) for sign-in and administrative roles', () => {
       await fixtures.createMembership({ centerId, userId, role: 'owner' });
       const adminHeaders = { 'x-center-id': centerId };
 
+      const { secret } = await enrollSecondFactor(session.accessToken);
       const withoutSecondFactor = await send(
         'GET',
         '/v1/probe-guards/admin-area',
@@ -323,7 +324,6 @@ describe('second factor (TOTP) for sign-in and administrative roles', () => {
         session.accessToken,
         adminHeaders,
       );
-      const { secret } = await enrollSecondFactor(session.accessToken);
       const verified = (
         await send('POST', '/v1/auth/mfa/verify', {
           mfaToken: await loginWithChallenge(),

@@ -51,7 +51,6 @@ export class AgendaRoomsController {
       rooms: agenda.rooms.map((room) => ({
         ...room,
         sessions: room.sessions.map(serialize),
-        blocks: room.blocks.map(serialize),
       })),
       sessionsWithoutRoom: agenda.sessionsWithoutRoom.map(serialize),
     };

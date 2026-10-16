@@ -25,6 +25,17 @@ export class DatabaseFixtures {
     return userId;
   }
 
+  /** Deja el segundo factor activado: desde entonces sus rutas de administración exigen sesión con él (SEC-47). */
+  async enrollSecondFactor(userId: string): Promise<void> {
+    await this.tenantPrismaService.runInUserContext(userId, (client) =>
+      client.mfaFactor.upsert({
+        where: { userId },
+        create: { id: generateUuidV7(), userId, method: 'email', confirmedAt: new Date() },
+        update: { confirmedAt: new Date() },
+      }),
+    );
+  }
+
   async createCenter(
     slug: string,
     joinCode: string,

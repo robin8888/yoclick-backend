@@ -7,12 +7,7 @@ import {
   type EnrollmentView,
   type EnrollOutcome,
   type NewEnrollments,
-  type NewRoomBlock,
   type NewScheduleSeries,
-  type RepeatWeekOutcome,
-  type RoomBlockCreationOutcome,
-  type RentalView,
-  type RoomBlockView,
   type BusyTimeView,
   type ScheduleRepository,
   type ScheduleSeriesCreationOutcome,
@@ -23,11 +18,6 @@ import {
   type UnenrollOutcome,
 } from '../application/ports/schedule.repository';
 import { enrollInTransaction, unenrollInTransaction } from './enrollment-writes';
-import {
-  createBlockInTransaction,
-  deleteBlockInTransaction,
-  listBlocksInTransaction,
-} from './room-block-writes';
 import { findBusyTimes } from './busy-times';
 import { materializeSchedulesInTransaction, resolveLocalToday } from './schedule-materialization';
 import {
@@ -42,7 +32,6 @@ import {
   updateSeriesInTransaction,
 } from './series-writes';
 import { cancelSessionWithBookings, findCancellableSession } from './session-cancellation';
-import { repeatWeekInTransaction } from './week-repeat';
 
 @Injectable()
 export class PrismaScheduleRepository implements ScheduleRepository {
@@ -78,18 +67,6 @@ export class PrismaScheduleRepository implements ScheduleRepository {
       createSeriesInTransaction(client, actor, {
         newSeries,
         today: await resolveLocalToday(client, now),
-      }),
-    );
-  }
-
-  async repeatWeek(
-    actor: ActorContext,
-    request: { weekStart: string; now: Date },
-  ): Promise<RepeatWeekOutcome> {
-    return this.tenantPrismaService.runInTenantContext(actor, async (client) =>
-      repeatWeekInTransaction(client, actor, {
-        weekStart: request.weekStart,
-        today: await resolveLocalToday(client, request.now),
       }),
     );
   }
@@ -162,53 +139,5 @@ export class PrismaScheduleRepository implements ScheduleRepository {
       });
       return { kind: 'cancelled', affectedBookingCount };
     });
-  }
-
-  async listBlocks(
-    actor: ActorContext,
-    query: { roomId: string | null; from: Date; to: Date },
-  ): Promise<RoomBlockView[]> {
-    return this.tenantPrismaService.runInTenantContext(actor, (client) =>
-      listBlocksInTransaction(client, query),
-    );
-  }
-
-  async createBlock(
-    actor: ActorContext,
-    newBlock: NewRoomBlock,
-  ): Promise<RoomBlockCreationOutcome> {
-    return this.tenantPrismaService.runInTenantContext(actor, (client) =>
-      createBlockInTransaction(client, actor, newBlock),
-    );
-  }
-
-  async listRentalsOf(actor: ActorContext): Promise<RentalView[]> {
-    return this.tenantPrismaService.runInTenantContext(actor, async (client) => {
-      const rentals = await client.roomBlock.findMany({
-        where: { renterMembershipId: actor.membershipId },
-        include: {
-          room: { select: { name: true } },
-          payments: { where: { status: 'succeeded' }, select: { id: true }, take: 1 },
-        },
-        orderBy: [{ startsAt: 'asc' }, { id: 'asc' }],
-      });
-      return rentals.map((rental) => ({
-        id: rental.id,
-        roomName: rental.room.name,
-        startsAt: rental.startsAt,
-        endsAt: rental.endsAt,
-        priceCents: rental.priceCents,
-        isPaid: rental.payments.length > 0,
-      }));
-    });
-  }
-
-  async deleteBlock(
-    actor: ActorContext,
-    request: { roomId: string; blockId: string },
-  ): Promise<boolean> {
-    return this.tenantPrismaService.runInTenantContext(actor, (client) =>
-      deleteBlockInTransaction(client, request),
-    );
   }
 }
