@@ -169,5 +169,8 @@ export async function broadcastInTransaction(
     kind: 'sent',
     sentCount: plan.deliveries.length,
     skippedMinorCount: plan.skippedMinorCount,
+    recipientMembershipIds: plan.deliveries.map(
+      ({ recipientMembershipId }) => recipientMembershipId,
+    ),
   };
 }

@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { v7 as generateUuidV7 } from 'uuid';
+import { RealtimePublisher } from '../../realtime/application/realtime.publisher';
 import { DomainError } from '../../../shared/errors/domain-error';
 import { HTTP_STATUS } from '../../../shared/errors/http-status';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
@@ -77,6 +78,18 @@ async function loadWritableConversation(
   return access;
 }
 
+/** Avisa en directo a quienes ven la conversación; va DESPUÉS de guardar el mensaje. */
+function announceNewMessage(
+  realtime: RealtimePublisher,
+  input: { actor: ActorContext; access: ConversationAccess },
+): void {
+  realtime.publishChatUpdated({
+    centerId: input.actor.centerId,
+    membershipIds: input.access.audienceMembershipIds,
+    conversationId: input.access.conversationId,
+  });
+}
+
 @Injectable()
 export class ListMessagesUseCase {
   constructor(@Inject(CHAT_REPOSITORY) private readonly chat: ChatRepository) {}
@@ -96,20 +109,25 @@ export class ListMessagesUseCase {
 
 @Injectable()
 export class SendTextMessageUseCase {
-  constructor(@Inject(CHAT_REPOSITORY) private readonly chat: ChatRepository) {}
+  constructor(
+    @Inject(CHAT_REPOSITORY) private readonly chat: ChatRepository,
+    private readonly realtime: RealtimePublisher,
+  ) {}
 
   async execute(
     actor: ActorContext,
     request: { conversationId: string; body: string },
   ): Promise<MessageView> {
-    await loadWritableConversation(this.chat, actor, request.conversationId);
-    return this.chat.appendMessage(actor, {
+    const access = await loadWritableConversation(this.chat, actor, request.conversationId);
+    const message = await this.chat.appendMessage(actor, {
       id: generateUuidV7(),
       conversationId: request.conversationId,
       body: request.body,
       attachment: null,
       sentAt: new Date(),
     });
+    announceNewMessage(this.realtime, { actor, access });
+    return message;
   }
 }
 
@@ -118,13 +136,14 @@ export class SendAttachmentUseCase {
   constructor(
     @Inject(CHAT_REPOSITORY) private readonly chat: ChatRepository,
     private readonly files: PhotoFileKeeper,
+    private readonly realtime: RealtimePublisher,
   ) {}
 
   async execute(
     actor: ActorContext,
     request: { conversationId: string; bytes: Buffer; fileName: string | undefined },
   ): Promise<MessageView> {
-    await loadWritableConversation(this.chat, actor, request.conversationId);
+    const access = await loadWritableConversation(this.chat, actor, request.conversationId);
     const decision = decideAttachment(request.bytes);
     if (decision.kind === 'unsupported') {
       throw new DomainError('CHAT_ATTACHMENT_UNSUPPORTED', HTTP_STATUS.badRequest);
@@ -141,7 +160,7 @@ export class SendAttachmentUseCase {
     });
     await this.files.save({ key, bytes: request.bytes });
     try {
-      return await this.chat.appendMessage(actor, {
+      const message = await this.chat.appendMessage(actor, {
         id: messageId,
         conversationId: request.conversationId,
         body: null,
@@ -153,6 +172,8 @@ export class SendAttachmentUseCase {
         },
         sentAt: new Date(),
       });
+      announceNewMessage(this.realtime, { actor, access });
+      return message;
     } catch (error) {
       await this.files.discard(key);
       throw error;
@@ -173,7 +194,10 @@ export class MarkConversationReadUseCase {
 
 @Injectable()
 export class BroadcastToGroupUseCase {
-  constructor(@Inject(CHAT_REPOSITORY) private readonly chat: ChatRepository) {}
+  constructor(
+    @Inject(CHAT_REPOSITORY) private readonly chat: ChatRepository,
+    private readonly realtime: RealtimePublisher,
+  ) {}
 
   /** La administración escribe a todas las personas de un grupo, cada una en su conversación con el centro. */
   async execute(
@@ -183,6 +207,11 @@ export class BroadcastToGroupUseCase {
     const outcome = await this.chat.broadcastToGroup(actor, { ...request, sentAt: new Date() });
     if (outcome.kind === 'group_not_found')
       throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
+    this.realtime.publishChatUpdated({
+      centerId: actor.centerId,
+      membershipIds: outcome.recipientMembershipIds,
+      conversationId: null,
+    });
     return outcome;
   }
 }

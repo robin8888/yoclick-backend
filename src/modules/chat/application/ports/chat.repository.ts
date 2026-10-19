@@ -68,6 +68,8 @@ export interface ConversationAccess {
   readonly conversationId: string;
   /** Si el alumno de la conversación es menor: no se le escribe hasta que haya tutores. */
   readonly isBlockedByMinor: boolean;
+  /** Las membresías que ven la conversación: la persona y la otra parte (o la administración). */
+  readonly audienceMembershipIds: readonly string[];
 }
 
 export interface NewMessage {
@@ -102,7 +104,13 @@ export interface BroadcastTargetsView {
 
 export type GroupBroadcastOutcome =
   | { readonly kind: 'group_not_found' }
-  | { readonly kind: 'sent'; readonly sentCount: number; readonly skippedMinorCount: number };
+  | {
+      readonly kind: 'sent';
+      readonly sentCount: number;
+      readonly skippedMinorCount: number;
+      /** Quién recibió el mensaje, para avisarles en directo. */
+      readonly recipientMembershipIds: readonly string[];
+    };
 
 export interface ChatRepository {
   listConversations(actor: ActorContext): Promise<ConversationView[]>;

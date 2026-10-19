@@ -25,6 +25,7 @@ import { ClientsModule } from './modules/clients/clients.module';
 import { TimeClockModule } from './modules/time-clock/time-clock.module';
 import { PassesModule } from './modules/passes/passes.module';
 import { WaitlistModule } from './modules/waitlist/waitlist.module';
+import { RealtimeModule } from './modules/realtime/realtime.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { RoomsModule } from './modules/rooms/rooms.module';
 import { SchedulesModule } from './modules/schedules/schedules.module';
@@ -70,6 +71,7 @@ import { buildLoggerOptions } from './shared/logging/build-logger-options';
     RoomsModule,
     PassesModule,
     WaitlistModule,
+    RealtimeModule,
     PaymentsModule,
     TimeClockModule,
     SchedulesModule,

@@ -60,6 +60,21 @@ async function isActorMinor(
   return isMinor(member.user.birthDate, input.now);
 }
 
+/** Quién ve una conversación: la persona y la otra parte, o la administración si va al centro. */
+async function findAudience(
+  client: TenantTransactionClient,
+  parties: { memberMembershipId: string; counterpartMembershipId: string | null },
+): Promise<string[]> {
+  if (parties.counterpartMembershipId !== null) {
+    return [parties.memberMembershipId, parties.counterpartMembershipId];
+  }
+  const administrators = await client.membership.findMany({
+    where: { role: { in: ['owner', 'admin'] }, status: 'active' },
+    select: { id: true },
+  });
+  return [parties.memberMembershipId, ...administrators.map(({ id }) => id)];
+}
+
 @Injectable()
 export class PrismaChatRepository implements ChatRepository {
   constructor(private readonly tenantPrismaService: TenantPrismaService) {}
@@ -125,13 +140,21 @@ export class PrismaChatRepository implements ChatRepository {
     return this.tenantPrismaService.runInTenantContext(actor, async (client) => {
       const conversation = await client.conversation.findUnique({
         where: { id: request.conversationId },
-        select: { id: true, member: { select: PERSON_SELECT } },
+        select: {
+          id: true,
+          counterpartMembershipId: true,
+          member: { select: PERSON_SELECT },
+        },
       });
       if (!conversation) return null;
       const { member } = conversation;
       return {
         conversationId: conversation.id,
         isBlockedByMinor: member.role === 'client' && isMinor(member.user.birthDate, request.now),
+        audienceMembershipIds: await findAudience(client, {
+          memberMembershipId: member.id,
+          counterpartMembershipId: conversation.counterpartMembershipId,
+        }),
       };
     });
   }
