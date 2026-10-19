@@ -28,6 +28,8 @@ export class PaymentListResponseDto extends createZodDto(
         label: z.string(),
         clientName: z.string(),
         amountCents: z.number().int(),
+        /** Lo devuelto desde el panel de Stripe del centro; igual a `amountCents` si fue total. */
+        refundedCents: z.number().int(),
         status: z.enum(['pending', 'succeeded', 'failed']),
         createdAt: z.iso.datetime(),
         paidAt: z.iso.datetime().nullable(),

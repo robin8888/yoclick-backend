@@ -292,19 +292,33 @@ export class HandleStripeWebhookUseCase {
   constructor(
     @Inject(PAYMENT_GATEWAY) private readonly gateway: PaymentGateway,
     private readonly settlement: SettlePaymentService,
+    @Inject(PAYMENT_REPOSITORY) private readonly payments: PaymentRepository,
   ) {}
 
-  /** Firma válida o error; solo `payment_intent.succeeded` hace algo, y tras releer el cobro en Stripe. */
+  /**
+   * Firma válida o error. Solo importan `payment_intent.succeeded` (liquida) y `charge.refunded`
+   * (anota la devolución); en ambos casos se relee el cobro en Stripe antes de actuar.
+   */
   async execute(input: { rawBody: Buffer; signatureHeader: string | undefined }): Promise<void> {
     const event = this.gateway.verifyWebhook({ ...input, now: new Date() });
     if (event === null) throw new DomainError('BAD_REQUEST', HTTP_STATUS.badRequest);
     const { paymentIntentId, accountId } = event;
-    const isSettleable =
-      event.type === 'payment_intent.succeeded' && paymentIntentId !== null && accountId !== null;
-    if (!isSettleable) return;
+    if (paymentIntentId === null || accountId === null) return;
+    const isRelevant =
+      event.type === 'charge.refunded' || event.type === 'payment_intent.succeeded';
+    if (!isRelevant) return;
     const payment = await this.gateway.readPayment({ paymentIntentId, accountId });
     const centerId = payment.metadata['centerId'];
     if (centerId === undefined) return;
+    if (event.type === 'charge.refunded') {
+      await this.payments.recordRefund({
+        centerId,
+        stripePaymentIntentId: paymentIntentId,
+        refundedCents: payment.refundedCents,
+        now: new Date(),
+      });
+      return;
+    }
     await this.settlement.settleFromGateway({
       centerId,
       accountId,

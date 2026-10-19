@@ -136,6 +136,7 @@ export class PrismaPaymentRepository implements PaymentRepository {
         label: describePaymentLabel(payment),
         clientName: payment.clientMembership.user.fullName,
         amountCents: payment.amountCents,
+        refundedCents: payment.refundedCents,
         status: payment.status,
         createdAt: payment.createdAt,
         paidAt: payment.paidAt,
@@ -243,6 +244,32 @@ export class PrismaPaymentRepository implements PaymentRepository {
         where: { id: paymentId, clientMembershipId: actor.membershipId },
       });
       return payment ? toPaymentRecord(payment) : null;
+    });
+  }
+
+  async recordRefund(command: {
+    centerId: string;
+    stripePaymentIntentId: string;
+    refundedCents: number;
+    now: Date;
+  }): Promise<void> {
+    const systemActor = buildSystemActor(command.centerId);
+    await this.tenantPrismaService.runInTenantContext(systemActor, async (client) => {
+      const payment = await client.payment.findUnique({
+        where: { stripePaymentIntentId: command.stripePaymentIntentId },
+      });
+      if (payment?.centerId !== command.centerId || payment.status !== 'succeeded') return;
+      const refundedCents = Math.min(
+        Math.max(command.refundedCents, payment.refundedCents),
+        payment.amountCents,
+      );
+      await client.payment.update({ where: { id: payment.id }, data: { refundedCents } });
+      if (refundedCents < payment.amountCents || payment.clientPassId === null) return;
+      // Devolución total: el bono ya no vale (mismo efecto que «quitar bono» en la administración).
+      await client.clientPass.updateMany({
+        where: { id: payment.clientPassId, status: { not: 'cancelled' } },
+        data: { status: 'cancelled', decidedAt: command.now },
+      });
     });
   }
 

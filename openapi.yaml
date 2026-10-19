@@ -13618,6 +13618,10 @@ components:
                 type: integer
                 minimum: -9007199254740991
                 maximum: 9007199254740991
+              refundedCents:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
               status:
                 type: string
                 enum:
@@ -13639,6 +13643,7 @@ components:
               - label
               - clientName
               - amountCents
+              - refundedCents
               - status
               - createdAt
               - paidAt

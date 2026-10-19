@@ -44,6 +44,8 @@ const paymentIntentSchema = z.object({
   status: z.string(),
   amount: z.number().int(),
   client_secret: z.string(),
+  /** Solo viene como objeto cuando se pide con `expand[]=latest_charge`. */
+  latest_charge: z.union([z.string(), z.object({ amount_refunded: z.number().int() })]).nullish(),
   metadata: z.record(z.string(), z.string()).default({}),
 });
 
@@ -51,8 +53,24 @@ const webhookEventSchema = z.object({
   type: z.string(),
   /** Presente en los eventos Connect: la cuenta del centro en la que ocurrió. */
   account: z.string().optional(),
-  data: z.object({ object: z.object({ id: z.string().optional() }) }),
+  data: z.object({
+    object: z.object({ id: z.string().optional(), payment_intent: z.string().nullish() }),
+  }),
 });
+
+/** Un aviso de cobro trae el cobro en `id`; uno de devolución (`charge.refunded`), en `payment_intent`. */
+function extractPaymentIntentId(event: z.infer<typeof webhookEventSchema>): string | null {
+  const { object } = event.data;
+  if (event.type.startsWith('payment_intent.')) return object.id ?? null;
+  return event.type === 'charge.refunded' ? (object.payment_intent ?? null) : null;
+}
+
+function readRefundedCents(intent: z.infer<typeof paymentIntentSchema>): number {
+  const { latest_charge: latestCharge } = intent;
+  return typeof latestCharge === 'object' && latestCharge !== null
+    ? latestCharge.amount_refunded
+    : 0;
+}
 
 function toGatewayStatus(stripeStatus: string): GatewayPaymentStatus {
   if (stripeStatus === 'succeeded') return 'succeeded';
@@ -260,7 +278,7 @@ export class StripePaymentGateway implements PaymentGateway {
   }): Promise<GatewayPayment> {
     const intent = await this.send({
       method: 'GET',
-      path: `/payment_intents/${input.paymentIntentId}`,
+      path: `/payment_intents/${input.paymentIntentId}?expand[]=latest_charge`,
       schema: paymentIntentSchema,
       stripeAccountId: input.accountId,
     });
@@ -283,10 +301,9 @@ export class StripePaymentGateway implements PaymentGateway {
     if (!isValid) return null;
     const parsed = webhookEventSchema.safeParse(JSON.parse(input.rawBody.toString('utf8')));
     if (!parsed.success) return null;
-    const isPaymentEvent = parsed.data.type.startsWith('payment_intent.');
     return {
       type: parsed.data.type,
-      paymentIntentId: isPaymentEvent ? (parsed.data.data.object.id ?? null) : null,
+      paymentIntentId: extractPaymentIntentId(parsed.data),
       accountId: parsed.data.account ?? null,
     };
   }
@@ -296,6 +313,7 @@ export class StripePaymentGateway implements PaymentGateway {
       paymentIntentId: intent.id,
       status: toGatewayStatus(intent.status),
       amountCents: intent.amount,
+      refundedCents: readRefundedCents(intent),
       clientSecret: intent.client_secret,
       metadata: intent.metadata,
     };

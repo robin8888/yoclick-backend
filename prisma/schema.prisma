@@ -1437,6 +1437,8 @@ model Payment {
   clientPassId          String?       @map("client_pass_id") @db.Uuid
   roomBlockId           String?       @map("room_block_id") @db.Uuid
   amountCents           Int           @map("amount_cents")
+  /// Lo ya devuelto desde el panel de Stripe del centro (el aviso `charge.refunded` lo trae).
+  refundedCents         Int           @default(0) @map("refunded_cents")
   currency              String        @default("eur")
   status                PaymentStatus @default(pending)
   stripePaymentIntentId String        @unique @map("stripe_payment_intent_id")

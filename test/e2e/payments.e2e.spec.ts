@@ -276,4 +276,77 @@ describe('payments (Stripe Connect, plan Premium)', () => {
     expect(delivered.statusCode).toBe(204);
     expect(await readPassStatus(ana, pass.id)).toBe('active');
   });
+
+  describe('refunds made from the Stripe dashboard', () => {
+    interface PaidPass {
+      passId: string;
+      paymentId: string;
+      sheet: SheetBody;
+      paymentIntentId: string;
+    }
+
+    async function deliverWebhook(event: {
+      type: string;
+      paymentIntentId: string;
+      sheet: SheetBody;
+    }): Promise<void> {
+      const delivered = await world.call('POST', '/v1/webhooks/stripe', undefined, {
+        headers: { 'stripe-signature': WEBHOOK_SIGNATURE },
+        body: {
+          type: event.type,
+          paymentIntentId: event.paymentIntentId,
+          accountId: event.sheet.connectedAccountId,
+        },
+      });
+      expect(delivered.statusCode).toBe(204);
+    }
+
+    async function payAndSettle(): Promise<PaidPass> {
+      await makeCenterReadyToCharge();
+      const pass = await requestPass(ana);
+      const sheet = (await payPass(ana, pass.id)).json<SheetBody>();
+      const paymentIntentId = await readPaymentIntentId(sheet.paymentId);
+      gateway.succeed(paymentIntentId);
+      await deliverWebhook({ type: 'payment_intent.succeeded', paymentIntentId, sheet });
+      return { passId: pass.id, paymentId: sheet.paymentId, sheet, paymentIntentId };
+    }
+
+    async function readListedRefund(paymentId: string): Promise<number | undefined> {
+      const response = await world.call('GET', url('/payments'), ownerUserId, { centerId });
+      return response
+        .json<{ payments: { id: string; refundedCents: number }[] }>()
+        .payments.find(({ id }) => id === paymentId)?.refundedCents;
+    }
+
+    it('shows a partial refund and keeps the pass', async () => {
+      const paid = await payAndSettle();
+      gateway.refund({ paymentIntentId: paid.paymentIntentId, refundedCents: 2000 });
+
+      await deliverWebhook({
+        type: 'charge.refunded',
+        paymentIntentId: paid.paymentIntentId,
+        sheet: paid.sheet,
+      });
+
+      expect(await readListedRefund(paid.paymentId)).toBe(2000);
+      expect(await readPassStatus(ana, paid.passId)).toBe('active');
+    });
+
+    it('voids the pass on a full refund and never lowers the refunded amount', async () => {
+      const paid = await payAndSettle();
+      const refundEvent = {
+        type: 'charge.refunded',
+        paymentIntentId: paid.paymentIntentId,
+        sheet: paid.sheet,
+      };
+      gateway.refund({ paymentIntentId: paid.paymentIntentId, refundedCents: PASS_PRICE_CENTS });
+      await deliverWebhook(refundEvent);
+      // Un aviso antiguo que llega tarde no puede deshacer la devolución.
+      gateway.refund({ paymentIntentId: paid.paymentIntentId, refundedCents: 1000 });
+      await deliverWebhook(refundEvent);
+
+      expect(await readListedRefund(paid.paymentId)).toBe(PASS_PRICE_CENTS);
+      expect(await readPassStatus(ana, paid.passId)).toBeUndefined();
+    });
+  });
 });

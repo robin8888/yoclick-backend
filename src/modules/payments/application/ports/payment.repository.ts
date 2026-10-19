@@ -55,6 +55,7 @@ export interface PaymentListItem {
   readonly label: string;
   readonly clientName: string;
   readonly amountCents: number;
+  readonly refundedCents: number;
   readonly status: 'pending' | 'succeeded' | 'failed';
   readonly createdAt: Date;
   readonly paidAt: Date | null;
@@ -77,6 +78,16 @@ export interface PaymentRepository {
    * Da el cobro por pagado y activa lo comprado. Idempotente: un cobro ya liquidado no cambia nada.
    * Lo llaman la confirmación de la app y el aviso de Stripe, que pueden llegar en cualquier orden.
    */
+  /**
+   * Anota lo devuelto desde el panel de Stripe. Nunca baja la cifra (los avisos pueden llegar
+   * desordenados) y, si la devolución es total, anula el bono que se pagó. Idempotente.
+   */
+  recordRefund(command: {
+    centerId: string;
+    stripePaymentIntentId: string;
+    refundedCents: number;
+    now: Date;
+  }): Promise<void>;
   settlePayment(command: {
     centerId: string;
     stripePaymentIntentId: string;

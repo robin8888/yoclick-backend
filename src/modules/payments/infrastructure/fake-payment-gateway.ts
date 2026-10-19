@@ -47,6 +47,7 @@ export class FakePaymentGateway implements PaymentGateway {
       paymentIntentId: `pi_fake_${generateUuidV4().slice(0, ID_SUFFIX_LENGTH)}`,
       status: 'pending',
       amountCents: input.amountCents,
+      refundedCents: 0,
       clientSecret: `pi_secret_${generateUuidV4().slice(0, ID_SUFFIX_LENGTH)}`,
       metadata: input.metadata,
     };
@@ -81,6 +82,14 @@ export class FakePaymentGateway implements PaymentGateway {
 
   completeOnboarding(accountId: string): void {
     this.chargeableAccounts.add(accountId);
+  }
+
+  /** Lo que haría el centro al devolver dinero desde su panel de Stripe. */
+  refund(input: { paymentIntentId: string; refundedCents: number }): void {
+    const payment = this.payments.get(input.paymentIntentId);
+    if (payment !== undefined) {
+      this.payments.set(input.paymentIntentId, { ...payment, refundedCents: input.refundedCents });
+    }
   }
 
   succeed(paymentIntentId: string): void {

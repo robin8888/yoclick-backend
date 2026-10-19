@@ -13,6 +13,8 @@ export interface GatewayPayment {
   readonly paymentIntentId: string;
   readonly status: GatewayPaymentStatus;
   readonly amountCents: number;
+  /** Lo que el centro ya ha devuelto de este cobro (desde el panel de Stripe). */
+  readonly refundedCents: number;
   /** Secreto con el que la app confirma el pago; solo se entrega a quien paga. */
   readonly clientSecret: string;
   readonly metadata: Readonly<Record<string, string>>;
