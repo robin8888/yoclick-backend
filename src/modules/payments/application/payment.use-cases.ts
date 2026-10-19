@@ -3,6 +3,7 @@ import { v7 as generateUuidV7 } from 'uuid';
 import { DomainError } from '../../../shared/errors/domain-error';
 import { HTTP_STATUS } from '../../../shared/errors/http-status';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
+import { isFiscalDataComplete } from '../domain/receipt-rules';
 import { PAYMENT_GATEWAY, type PaymentGateway } from './ports/payment-gateway';
 import {
   PAYMENT_REPOSITORY,
@@ -12,6 +13,7 @@ import {
   type PaymentRecord,
   type PaymentRepository,
   type PaymentTarget,
+  type ReceiptView,
 } from './ports/payment.repository';
 
 /** `not_included`: el plan no cobra online. El resto es el avance del alta de cobros en Stripe. */
@@ -65,6 +67,13 @@ export class PaymentsStatusReader {
   }
 }
 
+/** Sin razón social, NIF y dirección fiscal los recibos no serían válidos: no se cobra online. */
+function assertFiscalDataIsComplete(centerPayments: CenterPaymentsInfo): void {
+  if (!isFiscalDataComplete(centerPayments)) {
+    throw new DomainError('FISCAL_DATA_REQUIRED', HTTP_STATUS.unprocessableEntity);
+  }
+}
+
 const PAYMENTS_LIST_LIMIT = 50;
 
 /** Los últimos cobros online del centro, para la administración. */
@@ -77,12 +86,43 @@ export class ListPaymentsUseCase {
   }
 }
 
+/** Los cobros ya pagados de la propia persona (la RLS acota a los suyos), con su recibo. */
+@Injectable()
+export class ListMyPaymentsUseCase {
+  constructor(@Inject(PAYMENT_REPOSITORY) private readonly payments: PaymentRepository) {}
+
+  async execute(actor: ActorContext): Promise<PaymentListItem[]> {
+    return this.payments.listPayments(actor, {
+      limit: PAYMENTS_LIST_LIMIT,
+      isOnlySucceeded: true,
+    });
+  }
+}
+
+/** El recibo de un cobro pagado, con su base imponible y su IVA. */
+@Injectable()
+export class GetReceiptUseCase {
+  constructor(@Inject(PAYMENT_REPOSITORY) private readonly payments: PaymentRepository) {}
+
+  async execute(actor: ActorContext, paymentId: string): Promise<ReceiptView> {
+    const receipt = await this.payments.findReceipt(actor, paymentId);
+    if (!receipt) throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
+    return receipt;
+  }
+}
+
 @Injectable()
 export class GetPaymentsStatusUseCase {
   constructor(private readonly statusReader: PaymentsStatusReader) {}
 
-  async execute(actor: ActorContext): Promise<{ status: PaymentsStatus }> {
-    return { status: resolveStatus(await this.statusReader.readInfo(actor)) };
+  async execute(
+    actor: ActorContext,
+  ): Promise<{ status: PaymentsStatus; isFiscalDataComplete: boolean }> {
+    const centerPayments = await this.statusReader.readInfo(actor);
+    return {
+      status: resolveStatus(centerPayments),
+      isFiscalDataComplete: isFiscalDataComplete(centerPayments),
+    };
   }
 }
 
@@ -99,6 +139,7 @@ export class StartPaymentsOnboardingUseCase {
     if (!centerPayments) throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
     if (!centerPayments.isPremium)
       throw new DomainError('PAYMENTS_NOT_INCLUDED', HTTP_STATUS.forbidden);
+    assertFiscalDataIsComplete(centerPayments);
     const accountId =
       centerPayments.stripeAccountId ?? (await this.createAccount(actor, centerPayments));
     return this.gateway.createOnboardingLink(accountId);
@@ -156,6 +197,7 @@ export class PayTargetUseCase {
     if (centerPayments.stripeAccountId === null || !centerPayments.stripeChargesEnabled) {
       throw new DomainError('PAYMENTS_NOT_READY', HTTP_STATUS.conflict);
     }
+    assertFiscalDataIsComplete(centerPayments);
     const payable = await this.payments.findPayableTarget(actor, target);
     if (!payable) throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
     const merchant = { accountId: centerPayments.stripeAccountId, name: centerPayments.name };

@@ -57,6 +57,10 @@ export const ERROR_CATALOG = {
     title: 'Esa sala no está libre a esa hora o no la da esa persona. Elige otra',
   },
   SESSION_FULL: { title: 'Esta clase ya no tiene plazas' },
+  FISCAL_DATA_REQUIRED: {
+    title:
+      'Para cobrar online completa los datos fiscales del centro: razón social, NIF y dirección',
+  },
   WAITLIST_SESSION_HAS_SEATS: { title: 'Esta clase aún tiene plazas: reserva directamente' },
   WAITLIST_ALREADY_JOINED: { title: 'Ya estás en la lista de espera de esta clase' },
   WAITLIST_OFFER_EXPIRED: {

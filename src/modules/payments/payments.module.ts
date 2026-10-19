@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { type Environment } from '../../shared/config/environment.schema';
 import {
   ConfirmPaymentUseCase,
+  GetReceiptUseCase,
+  ListMyPaymentsUseCase,
   GetPaymentsStatusUseCase,
   HandleStripeWebhookUseCase,
   ListPaymentsUseCase,
@@ -19,6 +21,7 @@ import {
   PaymentsController,
   PaymentWebhooksController,
 } from './http/payments.controller';
+import { PaymentReceiptsController } from './http/payment-receipts.controller';
 import { FakePaymentGateway } from './infrastructure/fake-payment-gateway';
 import { PrismaPaymentRepository } from './infrastructure/prisma-payment.repository';
 import { StripePaymentGateway } from './infrastructure/stripe-payment-gateway';
@@ -43,7 +46,12 @@ function createPaymentGateway(configService: ConfigService<Environment, true>): 
 }
 
 @Module({
-  controllers: [PaymentsController, PaymentsConnectController, PaymentWebhooksController],
+  controllers: [
+    PaymentsController,
+    PaymentsConnectController,
+    PaymentWebhooksController,
+    PaymentReceiptsController,
+  ],
   providers: [
     { provide: PAYMENT_GATEWAY, inject: [ConfigService], useFactory: createPaymentGateway },
     { provide: PAYMENT_REPOSITORY, useClass: PrismaPaymentRepository },
@@ -55,6 +63,8 @@ function createPaymentGateway(configService: ConfigService<Environment, true>): 
     StartPaymentsOnboardingUseCase,
     PayTargetUseCase,
     ConfirmPaymentUseCase,
+    GetReceiptUseCase,
+    ListMyPaymentsUseCase,
     HandleStripeWebhookUseCase,
   ],
 })

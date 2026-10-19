@@ -60,8 +60,22 @@ describe('payments (Stripe Connect, plan Premium)', () => {
   }
 
   /** Deja el centro cobrando: Premium y con el alta de Stripe terminada. */
+  async function fillFiscalData(): Promise<void> {
+    await world.tenantPrismaService.runInTenantContext(ownerActor(), async (prisma) => {
+      await prisma.center.update({
+        where: { id: centerId },
+        data: {
+          legalName: 'Academia Ninja SL',
+          taxId: 'B12345678',
+          taxAddress: 'Calle Mayor 1, 28013 Madrid',
+        },
+      });
+    });
+  }
+
   async function makeCenterReadyToCharge(): Promise<void> {
     await setClientLimit(null);
+    await fillFiscalData();
     const link = await world.call('POST', url('/payments/connect/onboarding-link'), ownerUserId, {
       centerId,
     });
@@ -151,6 +165,7 @@ describe('payments (Stripe Connect, plan Premium)', () => {
 
   it('walks a Premium center through the Stripe sign-up until it can charge', async () => {
     await setClientLimit(null);
+    await fillFiscalData();
     expect(await readStatus(ownerUserId)).toBe('not_started');
 
     const link = await world.call('POST', url('/payments/connect/onboarding-link'), ownerUserId, {
@@ -168,6 +183,7 @@ describe('payments (Stripe Connect, plan Premium)', () => {
 
   it('asks for a contact email before opening the Stripe account', async () => {
     await setClientLimit(null);
+    await fillFiscalData();
     await world.tenantPrismaService.runInTenantContext(ownerActor(), async (prisma) => {
       await prisma.center.update({ where: { id: centerId }, data: { contactEmail: null } });
     });
@@ -437,6 +453,115 @@ describe('payments (Stripe Connect, plan Premium)', () => {
 
       expect(await readListedRefund(paid.paymentId)).toBe(PASS_PRICE_CENTS);
       expect(await readPassStatus(ana, paid.passId)).toBeUndefined();
+    });
+  });
+
+  describe('fiscal data and receipts (prices include VAT)', () => {
+    interface ReceiptBody {
+      receiptNumber: string;
+      baseCents: number;
+      vatRatePercent: number;
+      vatCents: number;
+      totalCents: number;
+      buyerName: string;
+      seller: { legalName: string; taxId: string | null; taxAddress: string | null };
+    }
+
+    async function payAndSettle(client: Person): Promise<string> {
+      const pass = await requestPass(client);
+      const sheet = (await payPass(client, pass.id)).json<SheetBody>();
+      const paymentIntentId = await readPaymentIntentId(sheet.paymentId);
+      gateway.succeed(paymentIntentId);
+      const settled = await world.call('POST', '/v1/webhooks/stripe', undefined, {
+        headers: { 'stripe-signature': WEBHOOK_SIGNATURE },
+        body: {
+          type: 'payment_intent.succeeded',
+          paymentIntentId,
+          accountId: sheet.connectedAccountId,
+        },
+      });
+      expect(settled.statusCode).toBe(204);
+      return sheet.paymentId;
+    }
+
+    it('asks for the fiscal data before opening online payments', async () => {
+      await setClientLimit(null);
+
+      const refused = await world.call(
+        'POST',
+        url('/payments/connect/onboarding-link'),
+        ownerUserId,
+        { centerId },
+      );
+      const status = await world.call('GET', url('/payments/status'), ownerUserId, { centerId });
+
+      expect(refused.statusCode).toBe(422);
+      expect(refused.json<{ code: string }>().code).toBe('FISCAL_DATA_REQUIRED');
+      expect(status.json<{ isFiscalDataComplete: boolean }>().isFiscalDataComplete).toBe(false);
+    });
+
+    it('numbers receipts one after another and splits the VAT that the price includes', async () => {
+      await makeCenterReadyToCharge();
+      const firstPaymentId = await payAndSettle(ana);
+      const secondPaymentId = await payAndSettle(luis);
+
+      const first = await world.call(
+        'GET',
+        url(`/payments/${firstPaymentId}/receipt`),
+        ana.userId,
+        {
+          centerId,
+        },
+      );
+      const second = await world.call(
+        'GET',
+        url(`/payments/${secondPaymentId}/receipt`),
+        ownerUserId,
+        { centerId },
+      );
+
+      expect(first.statusCode).toBe(200);
+      expect(first.json<ReceiptBody>()).toMatchObject({
+        receiptNumber: expect.stringMatching(/^\d{4}-000001$/) as string,
+        totalCents: PASS_PRICE_CENTS,
+        baseCents: 4132,
+        vatRatePercent: 21,
+        vatCents: 868,
+        buyerName: expect.any(String) as string,
+        seller: { legalName: 'Academia Ninja SL', taxId: 'B12345678' },
+      });
+      expect(second.json<ReceiptBody>().receiptNumber).toMatch(/^\d{4}-000002$/);
+    });
+
+    it('shows a person only their own receipts, and none for an unpaid payment', async () => {
+      await makeCenterReadyToCharge();
+      const anaPaymentId = await payAndSettle(ana);
+      const pendingPass = await requestPass(luis);
+      const pendingSheet = (await payPass(luis, pendingPass.id)).json<SheetBody>();
+
+      const others = await world.call(
+        'GET',
+        url(`/payments/${anaPaymentId}/receipt`),
+        luis.userId,
+        {
+          centerId,
+        },
+      );
+      const unpaid = await world.call(
+        'GET',
+        url(`/payments/${pendingSheet.paymentId}/receipt`),
+        ownerUserId,
+        { centerId },
+      );
+      const mine = await world.call('GET', url('/payments/mine'), ana.userId, { centerId });
+
+      expect(others.statusCode).toBe(404);
+      expect(unpaid.statusCode).toBe(404);
+      expect(
+        mine.json<{ payments: { id: string; receiptNumber: string | null }[] }>().payments,
+      ).toEqual([
+        expect.objectContaining({ id: anaPaymentId, receiptNumber: expect.any(String) as string }),
+      ]);
     });
   });
 });

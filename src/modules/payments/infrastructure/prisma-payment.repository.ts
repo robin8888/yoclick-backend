@@ -7,6 +7,7 @@ import {
 import { isPremiumPlan } from '../../../shared/centers/center-appearance';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
 import { computePassExpiry } from '../../passes/domain/pass-rules';
+import { buildReceiptNumber } from '../domain/receipt-rules';
 import {
   type CenterPaymentsInfo,
   type NewPaymentRecord,
@@ -16,7 +17,10 @@ import {
   type PaymentRepository,
   type PaymentSettlementOutcome,
   type PaymentTarget,
+  type ReceiptView,
 } from '../application/ports/payment.repository';
+
+const SELLER_SELECT = { name: true, legalName: true, taxId: true, taxAddress: true } as const;
 
 const PAYMENT_LABEL_INCLUDE = {
   clientMembership: { select: { user: { select: { fullName: true } } } },
@@ -55,6 +59,25 @@ function targetWhere(target: PaymentTarget): { clientPassId: string } {
 /** El aviso de Stripe llega sin sesión: se actúa como la administración del centro que dice el cobro. */
 function buildSystemActor(centerId: string): ActorContext {
   return { userId: '', centerId, membershipId: '', role: 'owner', permissions: [] };
+}
+
+/**
+ * El siguiente número de recibo del centro en ese año. Va con un cerrojo por centro: dos cobros que se
+ * liquidan a la vez nunca reciben el mismo número ni dejan huecos.
+ */
+async function assignReceiptNumber(
+  client: TenantTransactionClient,
+  input: { paymentId: string; centerId: string; paidAt: Date },
+): Promise<void> {
+  await client.$executeRaw`select pg_advisory_xact_lock(hashtextextended(${input.centerId}, 2))`;
+  const year = input.paidAt.getUTCFullYear();
+  const issuedThisYear = await client.payment.count({
+    where: { centerId: input.centerId, receiptNumber: { startsWith: `${String(year)}-` } },
+  });
+  await client.payment.update({
+    where: { id: input.paymentId },
+    data: { receiptNumber: buildReceiptNumber({ year, sequence: issuedThisYear + 1 }) },
+  });
 }
 
 async function activatePassOfPayment(
@@ -121,11 +144,14 @@ async function notifyPaymentReceived(
 export class PrismaPaymentRepository implements PaymentRepository {
   constructor(private readonly tenantPrismaService: TenantPrismaService) {}
 
-  async listPayments(actor: ActorContext, query: { limit: number }): Promise<PaymentListItem[]> {
+  async listPayments(
+    actor: ActorContext,
+    query: { limit: number; isOnlySucceeded?: boolean },
+  ): Promise<PaymentListItem[]> {
     return this.tenantPrismaService.runInTenantContext(actor, async (client) => {
       const payments = await client.payment.findMany({
         // Los cobros de alquileres por bloqueo ya no se crean: los alquileres son clases y se pagan con bono.
-        where: { kind: 'pass' },
+        where: { kind: 'pass', ...(query.isOnlySucceeded === true && { status: 'succeeded' }) },
         include: PAYMENT_LABEL_INCLUDE,
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         take: query.limit,
@@ -137,10 +163,35 @@ export class PrismaPaymentRepository implements PaymentRepository {
         clientName: payment.clientMembership.user.fullName,
         amountCents: payment.amountCents,
         refundedCents: payment.refundedCents,
+        receiptNumber: payment.receiptNumber,
         status: payment.status,
         createdAt: payment.createdAt,
         paidAt: payment.paidAt,
       }));
+    });
+  }
+
+  async findReceipt(actor: ActorContext, paymentId: string): Promise<ReceiptView | null> {
+    return this.tenantPrismaService.runInTenantContext(actor, async (client) => {
+      // La RLS deja a una persona cliente ver solo sus cobros; la administración, los del centro.
+      const payment = await client.payment.findFirst({
+        where: { id: paymentId, status: 'succeeded', receiptNumber: { not: null } },
+        include: { ...PAYMENT_LABEL_INCLUDE, center: { select: SELLER_SELECT } },
+      });
+      if (payment?.receiptNumber == null || payment.paidAt === null) return null;
+      return {
+        receiptNumber: payment.receiptNumber,
+        issuedAt: payment.paidAt,
+        seller: {
+          legalName: payment.center.legalName ?? payment.center.name,
+          taxId: payment.center.taxId,
+          taxAddress: payment.center.taxAddress,
+        },
+        buyerName: payment.clientMembership.user.fullName,
+        concept: describePaymentLabel(payment),
+        totalCents: payment.amountCents,
+        refundedCents: payment.refundedCents,
+      };
     });
   }
 
@@ -154,6 +205,9 @@ export class PrismaPaymentRepository implements PaymentRepository {
           maxClients: true,
           stripeAccountId: true,
           stripeChargesEnabled: true,
+          legalName: true,
+          taxId: true,
+          taxAddress: true,
         },
       });
       if (!center) return null;
@@ -163,6 +217,9 @@ export class PrismaPaymentRepository implements PaymentRepository {
         isPremium: isPremiumPlan(center.maxClients),
         stripeAccountId: center.stripeAccountId,
         stripeChargesEnabled: center.stripeChargesEnabled,
+        legalName: center.legalName,
+        taxId: center.taxId,
+        taxAddress: center.taxAddress,
       };
     });
   }
@@ -300,6 +357,11 @@ export class PrismaPaymentRepository implements PaymentRepository {
         data: { status: 'succeeded', paidAt: command.now },
       });
       if (marked.count === 0) return { kind: 'already_settled', payment: toPaymentRecord(payment) };
+      await assignReceiptNumber(client, {
+        paymentId: payment.id,
+        centerId: payment.centerId,
+        paidAt: command.now,
+      });
       if (payment.clientPassId !== null) {
         await activatePassOfPayment(client, { passId: payment.clientPassId, now: command.now });
       }

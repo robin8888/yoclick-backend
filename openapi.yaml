@@ -4026,6 +4026,81 @@ paths:
       summary: Avisos de Stripe. Verifica la firma `Stripe-Signature` (SEC-66) y relee el cobro antes de dar nada por pagado.
       tags:
         - payments
+  /v1/centers/{centerId}/payments/mine:
+    get:
+      operationId: payments_list_mine
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentListResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Los cobros ya pagados de la propia persona, con el número de su recibo.
+      tags:
+        - payments
+  /v1/centers/{centerId}/payments/{paymentId}/receipt:
+    get:
+      operationId: payments_get_receipt
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: paymentId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReceiptResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: El recibo de un cobro pagado, con la base imponible y el IVA (los precios lo llevan incluido). La persona cliente solo ve los suyos; 404 si no existe o aún no está pagado.
+      tags:
+        - payments
   /v1/centers/{centerId}/schedules/busy-times:
     get:
       operationId: schedules_busy_times
@@ -13914,8 +13989,11 @@ components:
             - not_started
             - pending
             - ready
+        isFiscalDataComplete:
+          type: boolean
       required:
         - status
+        - isFiscalDataComplete
       additionalProperties: false
     PaymentListResponseDto:
       type: object
@@ -13945,6 +14023,9 @@ components:
                 type: integer
                 minimum: -9007199254740991
                 maximum: 9007199254740991
+              receiptNumber:
+                type: string
+                nullable: true
               status:
                 type: string
                 enum:
@@ -13967,6 +14048,7 @@ components:
               - clientName
               - amountCents
               - refundedCents
+              - receiptNumber
               - status
               - createdAt
               - paidAt
@@ -14026,6 +14108,67 @@ components:
           format: uri
       required:
         - url
+      additionalProperties: false
+    ReceiptResponseDto:
+      type: object
+      properties:
+        receiptNumber:
+          type: string
+        issuedAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+        seller:
+          type: object
+          properties:
+            legalName:
+              type: string
+            taxId:
+              type: string
+              nullable: true
+            taxAddress:
+              type: string
+              nullable: true
+          required:
+            - legalName
+            - taxId
+            - taxAddress
+          additionalProperties: false
+        buyerName:
+          type: string
+        concept:
+          type: string
+        baseCents:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        vatRatePercent:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        vatCents:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        totalCents:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        refundedCents:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+      required:
+        - receiptNumber
+        - issuedAt
+        - seller
+        - buyerName
+        - concept
+        - baseCents
+        - vatRatePercent
+        - vatCents
+        - totalCents
+        - refundedCents
       additionalProperties: false
     BusyTimesResponseDto:
       type: object

@@ -1446,6 +1446,8 @@ model Payment {
   amountCents           Int           @map("amount_cents")
   /// Lo ya devuelto desde el panel de Stripe del centro (el aviso `charge.refunded` lo trae).
   refundedCents         Int           @default(0) @map("refunded_cents")
+  /// Número correlativo del recibo (`2026-000001`), único por centro. Se asigna al cobrarse.
+  receiptNumber         String?       @map("receipt_number")
   currency              String        @default("eur")
   status                PaymentStatus @default(pending)
   stripePaymentIntentId String        @unique @map("stripe_payment_intent_id")
@@ -1460,6 +1462,7 @@ model Payment {
   @@index([centerId, status])
   @@index([clientPassId])
   @@index([roomBlockId])
+  @@unique([centerId, receiptNumber])
   @@map("payments")
 }
 

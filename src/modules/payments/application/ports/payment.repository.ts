@@ -8,6 +8,9 @@ export interface CenterPaymentsInfo {
   readonly isPremium: boolean;
   readonly stripeAccountId: string | null;
   readonly stripeChargesEnabled: boolean;
+  readonly legalName: string | null;
+  readonly taxId: string | null;
+  readonly taxAddress: string | null;
 }
 
 export interface PaymentTarget {
@@ -56,14 +59,36 @@ export interface PaymentListItem {
   readonly clientName: string;
   readonly amountCents: number;
   readonly refundedCents: number;
+  /** `2026-000001`; nulo mientras no esté pagado. */
+  readonly receiptNumber: string | null;
   readonly status: 'pending' | 'succeeded' | 'failed';
   readonly createdAt: Date;
   readonly paidAt: Date | null;
 }
 
+/** El recibo de un cobro pagado: quién cobra, a quién y cuánto (IVA incluido en el total). */
+export interface ReceiptView {
+  readonly receiptNumber: string;
+  readonly issuedAt: Date;
+  readonly seller: {
+    readonly legalName: string;
+    readonly taxId: string | null;
+    readonly taxAddress: string | null;
+  };
+  readonly buyerName: string;
+  readonly concept: string;
+  readonly totalCents: number;
+  readonly refundedCents: number;
+}
+
 export interface PaymentRepository {
   /** Los últimos cobros del centro, de más reciente a más antiguo. */
-  listPayments(actor: ActorContext, query: { limit: number }): Promise<PaymentListItem[]>;
+  listPayments(
+    actor: ActorContext,
+    query: { limit: number; isOnlySucceeded?: boolean },
+  ): Promise<PaymentListItem[]>;
+  /** El recibo de un cobro pagado; `null` si no existe, no es de quien lo pide o aún no está pagado. */
+  findReceipt(actor: ActorContext, paymentId: string): Promise<ReceiptView | null>;
   getCenterPaymentsInfo(actor: ActorContext): Promise<CenterPaymentsInfo | null>;
   /** Guarda la cuenta solo si el centro aún no tenía una; devuelve la que queda vigente. */
   saveStripeAccount(actor: ActorContext, accountId: string): Promise<string>;

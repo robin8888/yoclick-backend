@@ -37,6 +37,7 @@ import {
   PaymentSheetResponseDto,
   PaymentsStatusResponseDto,
 } from './payment.dto';
+import { serializePaymentItem } from './serialize-payments';
 
 @ApiTags('payments')
 @ApiBearerAuth('bearer')
@@ -124,13 +125,7 @@ export class PaymentsController {
   ): Promise<Record<string, unknown>> {
     assertRouteTargetsActorCenter(actor, params.centerId);
     const payments = await this.listPayments.execute(actor);
-    return {
-      payments: payments.map((payment) => ({
-        ...payment,
-        createdAt: payment.createdAt.toISOString(),
-        paidAt: payment.paidAt?.toISOString() ?? null,
-      })),
-    };
+    return { payments: payments.map(serializePaymentItem) };
   }
 
   @Post('passes/:passId/pay')
