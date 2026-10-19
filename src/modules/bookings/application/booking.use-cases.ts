@@ -319,7 +319,11 @@ export class GetDayAgendaUseCase {
     const { actor, date, requestedStaffMembershipId } = request;
     const staffMembershipId =
       actor.role === 'staff' ? actor.membershipId : requestedStaffMembershipId;
-    const agenda = await this.bookings.listDayAgenda(actor, { date, staffMembershipId });
+    const agenda = await this.bookings.listDayAgenda(actor, {
+      date,
+      staffMembershipId,
+      now: new Date(),
+    });
     return {
       ...agenda,
       entries: agenda.entries.map(({ booking, client }) => ({

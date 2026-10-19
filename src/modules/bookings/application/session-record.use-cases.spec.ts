@@ -38,6 +38,7 @@ function buildBooking(overrides: Partial<BookingView> = {}): BookingView {
     checkedInAt: null,
     source: 'single',
     createdAt: NOW,
+    needsNewPass: false,
     createdBy: null,
     ...overrides,
   };

@@ -51,6 +51,7 @@ import {
   rescheduleByTeamInTransaction,
 } from './booking-rescheduling';
 import {
+  markBlockedBookings,
   toBookingView,
   WITH_SESSION_DETAILS,
   type BookingWithSessionDetails,
@@ -149,15 +150,28 @@ async function listEmptySessions(
   }));
 }
 
-function toAgendaEntry(booking: StoredAgendaBooking): AgendaEntryView {
+function toAgendaEntry(booking: StoredAgendaBooking, view: BookingView): AgendaEntryView {
   return {
-    booking: toBookingView(booking),
+    booking: view,
     client: {
       membershipId: booking.clientMembership.id,
       fullName: booking.clientMembership.user.fullName,
       photoKey: booking.clientMembership.user.photoKey,
     },
   };
+}
+
+/** Las citas del día con su cliente y, en cada una, si está bloqueada por un reembolso total. */
+async function buildAgendaEntries(
+  client: TenantTransactionClient,
+  input: { bookings: readonly StoredAgendaBooking[]; now: Date },
+): Promise<AgendaEntryView[]> {
+  const views = await markBlockedBookings(client, input);
+  const storedById = new Map(input.bookings.map((booking) => [booking.id, booking]));
+  return views.flatMap((view) => {
+    const stored = storedById.get(view.id);
+    return stored === undefined ? [] : [toAgendaEntry(stored, view)];
+  });
 }
 
 @Injectable()
@@ -252,8 +266,8 @@ export class PrismaBookingRepository implements BookingRepository {
     query: { scope: BookingListScope; limit: number; now: Date },
   ): Promise<BookingView[]> {
     const sortDirection = query.scope === 'upcoming' ? 'asc' : 'desc';
-    const bookings = await this.tenantPrismaService.runInTenantContext(actor, (client) =>
-      client.booking.findMany({
+    return this.tenantPrismaService.runInTenantContext(actor, async (client) => {
+      const bookings = await client.booking.findMany({
         where: {
           clientMembershipId: actor.membershipId,
           ...buildScopeFilter(query.scope, query.now),
@@ -261,9 +275,9 @@ export class PrismaBookingRepository implements BookingRepository {
         include: WITH_SESSION_DETAILS,
         orderBy: [{ classSession: { startsAt: sortDirection } }, { id: sortDirection }],
         take: query.limit,
-      }),
-    );
-    return bookings.map(toBookingView);
+      });
+      return markBlockedBookings(client, { bookings, now: query.now });
+    });
   }
 
   async findCancellationFacts(
@@ -361,7 +375,7 @@ export class PrismaBookingRepository implements BookingRepository {
 
   async listDayAgenda(
     actor: ActorContext,
-    query: { date: string; staffMembershipId: string | null },
+    query: { date: string; staffMembershipId: string | null; now: Date },
   ): Promise<DayAgenda> {
     return this.tenantPrismaService.runInTenantContext(actor, async (client) => {
       const center = await client.center.findFirstOrThrow({
@@ -385,7 +399,7 @@ export class PrismaBookingRepository implements BookingRepository {
         },
         orderBy: [{ classSession: { startsAt: 'asc' } }, { id: 'asc' }],
       });
-      const entries = bookings.map(toAgendaEntry);
+      const entries = await buildAgendaEntries(client, { bookings, now: query.now });
       const emptySessions = await listEmptySessions(client, {
         range,
         staffMembershipId: query.staffMembershipId,

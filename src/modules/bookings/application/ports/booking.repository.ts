@@ -32,6 +32,8 @@ export interface BookingView {
   /** Cita suelta o plaza de un grupo fijo (matrícula, no gasta bono). */
   readonly source: 'single' | 'enrollment';
   readonly createdAt: Date;
+  /** Bloqueada: su bono se reembolsó por completo y hace falta uno nuevo para atenderla. */
+  readonly needsNewPass: boolean;
   /** Quién asignó la cita; `null` en las anteriores a este dato. */
   readonly createdBy: {
     readonly membershipId: string;
@@ -385,7 +387,7 @@ export interface BookingRepository {
   ): Promise<TeamCancellationOutcome>;
   listDayAgenda(
     actor: ActorContext,
-    query: { date: string; staffMembershipId: string | null },
+    query: { date: string; staffMembershipId: string | null; now: Date },
   ): Promise<DayAgenda>;
   /** La agenda del día por sala: cuándo está ocupada cada una, con su aforo, profesor y alumnos. */
   listRoomAgenda(actor: ActorContext, query: { date: string }): Promise<RoomAgenda>;

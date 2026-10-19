@@ -1,3 +1,4 @@
+import { v7 as generateUuidV7 } from 'uuid';
 import { type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { PAYMENT_GATEWAY } from '../../src/modules/payments/application/ports/payment-gateway';
 import { FakePaymentGateway } from '../../src/modules/payments/infrastructure/fake-payment-gateway';
@@ -330,6 +331,95 @@ describe('payments (Stripe Connect, plan Premium)', () => {
 
       expect(await readListedRefund(paid.paymentId)).toBe(2000);
       expect(await readPassStatus(ana, paid.passId)).toBe('active');
+    });
+
+    describe('bookings of a fully refunded pass', () => {
+      let teacher: Person;
+
+      async function insertUpcomingBooking(client: Person): Promise<string> {
+        const service = await world.createService(ownerUserId, centerId, {
+          name: 'Karate',
+          durationMinutes: 60,
+        });
+        const startsAt = new Date(Date.now() + 5 * 60_000);
+        const sessionId = generateUuidV7();
+        const bookingId = generateUuidV7();
+        await world.tenantPrismaService.runInTenantContext(ownerActor(), async (prisma) => {
+          await prisma.classSession.create({
+            data: {
+              id: sessionId,
+              centerId,
+              serviceId: service.id,
+              staffMembershipId: teacher.membershipId,
+              startsAt,
+              endsAt: new Date(startsAt.getTime() + 60 * 60_000),
+            },
+          });
+          await prisma.booking.create({
+            data: {
+              id: bookingId,
+              centerId,
+              classSessionId: sessionId,
+              clientMembershipId: client.membershipId,
+            },
+          });
+        });
+        return bookingId;
+      }
+
+      async function refundEverything(paid: PaidPass): Promise<void> {
+        gateway.refund({ paymentIntentId: paid.paymentIntentId, refundedCents: PASS_PRICE_CENTS });
+        await deliverWebhook({
+          type: 'charge.refunded',
+          paymentIntentId: paid.paymentIntentId,
+          sheet: paid.sheet,
+        });
+      }
+
+      const confirmAttendance = async (bookingId: string) =>
+        world.call('POST', url(`/bookings/${bookingId}/attendance`), teacher.userId, {
+          centerId,
+        });
+
+      beforeEach(async () => {
+        teacher = await world.addMember(centerId, 'teacher', 'staff');
+      });
+
+      it('keeps the booking but flags it and refuses attendance until a new pass is used', async () => {
+        const paid = await payAndSettle();
+        const bookingId = await insertUpcomingBooking(ana);
+        await refundEverything(paid);
+
+        const mine = await world.call('GET', url('/bookings/mine'), ana.userId, { centerId });
+        const [booking] = mine.json<{ bookings: { id: string; needsNewPass: boolean }[] }>()
+          .bookings;
+        expect(booking).toMatchObject({ id: bookingId, needsNewPass: true });
+        const blocked = await confirmAttendance(bookingId);
+        expect(blocked.statusCode).toBe(409);
+        expect(blocked.json<{ code: string }>().code).toBe('PASS_REQUIRED');
+
+        await world.call('POST', url('/passes/assign'), ownerUserId, {
+          centerId,
+          body: { rateId, clientMembershipId: ana.membershipId },
+        });
+        const again = await world.call('GET', url('/bookings/mine'), ana.userId, { centerId });
+        expect(again.json<{ bookings: { needsNewPass: boolean }[] }>().bookings[0]).toMatchObject({
+          needsNewPass: false,
+        });
+        expect((await confirmAttendance(bookingId)).statusCode).toBe(200);
+      });
+
+      it('does not block bookings made after the refund', async () => {
+        const paid = await payAndSettle();
+        await refundEverything(paid);
+
+        const laterBookingId = await insertUpcomingBooking(ana);
+
+        const mine = await world.call('GET', url('/bookings/mine'), ana.userId, { centerId });
+        expect(mine.json<{ bookings: { id: string; needsNewPass: boolean }[] }>().bookings).toEqual(
+          [expect.objectContaining({ id: laterBookingId, needsNewPass: false })],
+        );
+      });
     });
 
     it('voids the pass on a full refund and never lowers the refunded amount', async () => {

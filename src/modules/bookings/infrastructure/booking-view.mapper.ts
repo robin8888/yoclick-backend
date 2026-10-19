@@ -1,3 +1,5 @@
+import { type TenantTransactionClient } from '../../../shared/database/tenant-prisma.service';
+import { findBookingsBlockedByRefund } from '../../passes/infrastructure/refund-block';
 import { requireTeacher } from './require-teacher';
 import { type Prisma } from '../../../generated/prisma/client';
 import { type BookingView } from '../application/ports/booking.repository';
@@ -37,6 +39,27 @@ function toCreatedByView(booking: BookingWithSessionDetails): BookingView['creat
   };
 }
 
+/** Marca como bloqueadas las citas que lo estén por un reembolso total (ver `isBookingBlockedByRefund`). */
+export async function markBlockedBookings(
+  client: TenantTransactionClient,
+  input: { bookings: readonly BookingWithSessionDetails[]; now: Date },
+): Promise<BookingView[]> {
+  const blockedIds = await findBookingsBlockedByRefund(client, {
+    bookings: input.bookings.map((booking) => ({
+      id: booking.id,
+      clientMembershipId: booking.clientMembershipId,
+      createdAt: booking.createdAt,
+      status: booking.status,
+      source: booking.source,
+    })),
+    now: input.now,
+  });
+  return input.bookings.map((booking) => ({
+    ...toBookingView(booking),
+    needsNewPass: blockedIds.has(booking.id),
+  }));
+}
+
 export function toBookingView(booking: BookingWithSessionDetails): BookingView {
   const { classSession } = booking;
   return {
@@ -68,6 +91,8 @@ export function toBookingView(booking: BookingWithSessionDetails): BookingView {
     checkedInAt: booking.checkedInAt,
     source: booking.source,
     createdAt: booking.createdAt,
+    // Solo las listas lo calculan (ver `markBlockedBookings`): el resto de respuestas no lo necesita.
+    needsNewPass: false,
     createdBy: toCreatedByView(booking),
   };
 }

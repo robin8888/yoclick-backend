@@ -8,6 +8,8 @@ export type StartSessionOutcome =
   /** No existe, es de otro centro o no es de quien lo pide (se responde 404). */
   | { readonly kind: 'not_found' }
   | { readonly kind: 'not_startable' }
+  /** Su bono se reembolsó por completo: hace falta uno nuevo para atenderla. */
+  | { readonly kind: 'pass_required' }
   | { readonly kind: 'session_already_open' };
 
 export type EndSessionOutcome =
@@ -22,7 +24,9 @@ export type ConfirmAttendanceOutcome =
   | { readonly kind: 'already_confirmed'; readonly booking: BookingView }
   | { readonly kind: 'not_found' }
   /** Está cancelada o falta más de una hora para que empiece. */
-  | { readonly kind: 'not_confirmable' };
+  | { readonly kind: 'not_confirmable' }
+  /** Su bono se reembolsó por completo: hace falta uno nuevo para atenderla. */
+  | { readonly kind: 'pass_required' };
 
 export interface SessionRecordEntry {
   readonly booking: BookingView;

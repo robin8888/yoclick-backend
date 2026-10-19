@@ -1339,6 +1339,8 @@ model ClientPass {
   expiresAt             DateTime?  @map("expires_at") @db.Timestamptz
   decidedByMembershipId String?    @map("decided_by_membership_id") @db.Uuid
   decidedAt             DateTime?  @map("decided_at") @db.Timestamptz
+  /// Cuándo se le reembolsó por completo lo que pagó: las citas anteriores quedan bloqueadas hasta tener un bono nuevo.
+  refundedAt            DateTime?  @map("refunded_at") @db.Timestamptz
   createdAt             DateTime   @default(now()) @map("created_at") @db.Timestamptz
 
   center           Center            @relation(fields: [centerId], references: [id])

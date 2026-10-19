@@ -243,6 +243,8 @@ export const bookingShape = {
   /** Cita suelta o plaza de un grupo fijo (matrícula, no gasta bono). */
   source: z.enum(['single', 'enrollment']),
   createdAt: z.iso.datetime(),
+  /** Bloqueada: su bono se reembolsó por completo; no se puede atender hasta tener uno nuevo. */
+  needsNewPass: z.boolean(),
   /** Quién asignó la cita y con qué papel; `null` en las anteriores a este dato. */
   createdBy: z
     .strictObject({

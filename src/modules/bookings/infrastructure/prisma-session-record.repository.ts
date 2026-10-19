@@ -24,6 +24,7 @@ import {
   type BookingWithSessionDetails,
 } from './booking-view.mapper';
 import { consumePassForBooking } from '../../passes/infrastructure/pass-consumption';
+import { findBookingsBlockedByRefund } from '../../passes/infrastructure/refund-block';
 
 /**
  * La reserva que esta persona puede mover: el personal solo las suyas, administración todas las del
@@ -53,6 +54,18 @@ function reloadBooking(
   });
 }
 
+/** Si la cita está bloqueada por un reembolso total: no se inicia ni se confirma hasta tener bono nuevo. */
+async function isBlockedUntilNewPass(
+  client: TenantTransactionClient,
+  input: { booking: BookingWithSessionDetails; now: Date },
+): Promise<boolean> {
+  const blockedIds = await findBookingsBlockedByRefund(client, {
+    bookings: [input.booking],
+    now: input.now,
+  });
+  return blockedIds.has(input.booking.id);
+}
+
 /** Un cerrojo por persona del equipo y transacción: dos «iniciar» suyos a la vez se atienden de uno en uno. */
 async function lockStaffSessions(
   client: TenantTransactionClient,
@@ -76,7 +89,11 @@ export class PrismaSessionRecordRepository implements SessionRecordRepository {
       await lockStaffSessions(client, requireTeacher(staffMembershipId));
 
       // Se vuelve a leer ya con el cerrojo: otra petición pudo iniciarla mientras esperábamos.
-      const booking = toBookingView(await reloadBooking(client, command.bookingId));
+      const reloaded = await reloadBooking(client, command.bookingId);
+      const booking = toBookingView(reloaded);
+      if (await isBlockedUntilNewPass(client, { booking: reloaded, now: command.now })) {
+        return { kind: 'pass_required' };
+      }
       const verdict = decideSessionStart({ ...booking, now: command.now });
       if (verdict === 'already_started') return { kind: 'already_started', booking };
       if (verdict === 'not_startable') return { kind: 'not_startable' };
@@ -141,6 +158,9 @@ export class PrismaSessionRecordRepository implements SessionRecordRepository {
         visible.classSession.startsAt.getTime() - CHECKIN_EARLY_MINUTES * MILLISECONDS_PER_MINUTE;
       const isConfirmable = visible.status !== 'cancelled' && command.now.getTime() >= opensAt;
       if (!isConfirmable) return { kind: 'not_confirmable' };
+      if (await isBlockedUntilNewPass(client, { booking: visible, now: command.now })) {
+        return { kind: 'pass_required' };
+      }
 
       // UPDATE condicionado a «aún sin confirmar»: dos checks a la vez no descuentan dos veces.
       const confirmed = await client.booking.updateMany({

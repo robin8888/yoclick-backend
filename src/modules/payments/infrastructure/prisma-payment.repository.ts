@@ -265,10 +265,15 @@ export class PrismaPaymentRepository implements PaymentRepository {
       );
       await client.payment.update({ where: { id: payment.id }, data: { refundedCents } });
       if (refundedCents < payment.amountCents || payment.clientPassId === null) return;
-      // Devolución total: el bono ya no vale (mismo efecto que «quitar bono» en la administración).
+      // Devolución total: el bono ya no vale (mismo efecto que «quitar bono» en la administración)
+      // y queda anotado el momento, para bloquear las citas anteriores hasta tener un bono nuevo.
       await client.clientPass.updateMany({
         where: { id: payment.clientPassId, status: { not: 'cancelled' } },
         data: { status: 'cancelled', decidedAt: command.now },
+      });
+      await client.clientPass.updateMany({
+        where: { id: payment.clientPassId, refundedAt: null },
+        data: { refundedAt: command.now },
       });
     });
   }

@@ -34,6 +34,9 @@ export class StartSessionUseCase {
     });
     if (outcome.kind === 'started' || outcome.kind === 'already_started') return outcome.booking;
     if (outcome.kind === 'not_found') throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
+    if (outcome.kind === 'pass_required') {
+      throw new DomainError('PASS_REQUIRED', HTTP_STATUS.conflict);
+    }
     if (outcome.kind === 'not_startable') {
       throw new DomainError('BOOKING_NOT_STARTABLE', HTTP_STATUS.conflict);
     }
@@ -83,6 +86,9 @@ export class ConfirmAttendanceUseCase {
     if (outcome.kind === 'confirmed' || outcome.kind === 'already_confirmed')
       return outcome.booking;
     if (outcome.kind === 'not_found') throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
+    if (outcome.kind === 'pass_required') {
+      throw new DomainError('PASS_REQUIRED', HTTP_STATUS.conflict);
+    }
     throw new DomainError('CHECKIN_NO_BOOKING', HTTP_STATUS.conflict);
   }
 }
