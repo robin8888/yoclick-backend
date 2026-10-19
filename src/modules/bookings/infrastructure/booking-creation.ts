@@ -36,7 +36,10 @@ async function lockClientBookings(
 }
 
 /** Serializa el recuento de plazas de una clase grupal: nadie se pasa del aforo por llegar a la vez. */
-async function lockSessionSeats(client: TenantTransactionClient, sessionId: string): Promise<void> {
+export async function lockSessionSeats(
+  client: TenantTransactionClient,
+  sessionId: string,
+): Promise<void> {
   await client.$executeRaw`select pg_advisory_xact_lock(hashtextextended(${sessionId}, 1))`;
 }
 
@@ -391,14 +394,31 @@ async function findJoinableSession(
   });
 }
 
+/**
+ * Llena si las reservas más las plazas ofrecidas a quien espera suman el aforo. La plaza que se le
+ * ofreció a la propia persona no cuenta: es la suya.
+ */
 async function isSessionFull(
   client: TenantTransactionClient,
-  session: { id: string; capacity: number },
+  input: {
+    session: { id: string; capacity: number };
+    clientMembershipId: string;
+    now: Date;
+  },
 ): Promise<boolean> {
-  const seatsTaken = await client.booking.count({
-    where: { classSessionId: session.id, status: { not: 'cancelled' } },
-  });
-  return seatsTaken >= session.capacity;
+  const { session } = input;
+  const [seatsTaken, seatsHeldForOthers] = await Promise.all([
+    client.booking.count({ where: { classSessionId: session.id, status: { not: 'cancelled' } } }),
+    client.waitlistEntry.count({
+      where: {
+        classSessionId: session.id,
+        status: 'offered',
+        offerExpiresAt: { gt: input.now },
+        clientMembershipId: { not: input.clientMembershipId },
+      },
+    }),
+  ]);
+  return seatsTaken + seatsHeldForOthers >= session.capacity;
 }
 
 /**
@@ -472,7 +492,12 @@ export async function joinGroupSessionInTransaction(
   const passCheck = await checkPassForJoin(client, command, session);
   if (passCheck !== 'ok') return { kind: passCheck };
 
-  if (await isSessionFull(client, session)) return { kind: 'session_full' };
+  const isFull = await isSessionFull(client, {
+    session,
+    clientMembershipId: command.clientMembershipId,
+    now: command.now,
+  });
+  if (isFull) return { kind: 'session_full' };
   const isClientBusy = await hasOverlappingBooking(client, {
     clientMembershipId: command.clientMembershipId,
     startsAt: session.startsAt,

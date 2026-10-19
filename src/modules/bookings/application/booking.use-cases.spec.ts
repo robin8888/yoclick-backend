@@ -1,6 +1,7 @@
 import { type PhotoUrlSigner } from '../../photos/application/photo-url-signer';
 import { DomainError } from '../../../shared/errors/domain-error';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
+import { type WaitlistAdvancer } from '../../waitlist/application/waitlist.use-cases';
 import {
   CancelBookingUseCase,
   CreateBookingUseCase,
@@ -17,6 +18,8 @@ import {
 } from './ports/booking.repository';
 
 const NOW = new Date('2026-10-05T10:00:00Z');
+/** Estos tests no miran la lista de espera: su aviso no hace nada. */
+const noWaitlist = { advanceCenter: jest.fn() } as unknown as WaitlistAdvancer;
 const HOUR_MS = 3_600_000;
 const CLIENT: ActorContext = {
   userId: 'user-client',
@@ -141,7 +144,10 @@ describe('RescheduleBookingUseCase', () => {
         .mockResolvedValue({ kind: 'rescheduled', booking, hasChangedTime: true }),
     });
 
-    const outcome = await new RescheduleBookingUseCase(repository).execute(CLIENT, command);
+    const outcome = await new RescheduleBookingUseCase(repository, noWaitlist).execute(
+      CLIENT,
+      command,
+    );
 
     expect(outcome.booking).toBe(booking);
   });
@@ -158,7 +164,9 @@ describe('RescheduleBookingUseCase', () => {
     const outcome: RescheduleOutcome = { kind };
     const repository = buildRepository({ rescheduleBooking: jest.fn().mockResolvedValue(outcome) });
 
-    const error = await errorOf(new RescheduleBookingUseCase(repository).execute(CLIENT, command));
+    const error = await errorOf(
+      new RescheduleBookingUseCase(repository, noWaitlist).execute(CLIENT, command),
+    );
 
     expect(error).toMatchObject({ code, httpStatus: status });
   });
@@ -177,7 +185,7 @@ describe('CancelBookingUseCase', () => {
       markCancelled,
     });
 
-    const result = await new CancelBookingUseCase(repository).execute(request);
+    const result = await new CancelBookingUseCase(repository, noWaitlist).execute(request);
 
     expect(markCancelled).toHaveBeenCalledWith(CLIENT, {
       bookingId: 'booking-1',
@@ -201,7 +209,7 @@ describe('CancelBookingUseCase', () => {
       markCancelled,
     });
 
-    const result = await new CancelBookingUseCase(repository).execute(request);
+    const result = await new CancelBookingUseCase(repository, noWaitlist).execute(request);
 
     expect(markCancelled).toHaveBeenCalledWith(
       CLIENT,
@@ -218,7 +226,7 @@ describe('CancelBookingUseCase', () => {
       markCancelled,
     });
 
-    const result = await new CancelBookingUseCase(repository).execute(request);
+    const result = await new CancelBookingUseCase(repository, noWaitlist).execute(request);
 
     expect(result).toEqual({ booking: cancelled, withinPolicy: false });
     expect(markCancelled).not.toHaveBeenCalled();
@@ -230,7 +238,7 @@ describe('CancelBookingUseCase', () => {
       findCancellationFacts: jest.fn().mockResolvedValue(facts(started)),
     });
 
-    const error = await errorOf(new CancelBookingUseCase(repository).execute(request));
+    const error = await errorOf(new CancelBookingUseCase(repository, noWaitlist).execute(request));
 
     expect(error).toMatchObject({ code: 'BOOKING_NOT_CANCELLABLE', httpStatus: 409 });
   });
@@ -240,7 +248,7 @@ describe('CancelBookingUseCase', () => {
       findCancellationFacts: jest.fn().mockResolvedValue(null),
     });
 
-    const error = await errorOf(new CancelBookingUseCase(repository).execute(request));
+    const error = await errorOf(new CancelBookingUseCase(repository, noWaitlist).execute(request));
 
     expect(error).toMatchObject({ code: 'NOT_FOUND', httpStatus: 404 });
   });
@@ -264,8 +272,10 @@ describe('CancelBookingUseCase', () => {
       markCancelled: jest.fn().mockResolvedValue(null),
     });
 
-    const first = await new CancelBookingUseCase(lostToCancellation).execute(request);
-    const error = await errorOf(new CancelBookingUseCase(lostToAttendance).execute(request));
+    const first = await new CancelBookingUseCase(lostToCancellation, noWaitlist).execute(request);
+    const error = await errorOf(
+      new CancelBookingUseCase(lostToAttendance, noWaitlist).execute(request),
+    );
 
     expect(first.booking.status).toBe('cancelled');
     expect(error).toMatchObject({ code: 'BOOKING_NOT_CANCELLABLE' });
@@ -312,7 +322,10 @@ describe('RescheduleBookingByTeamUseCase', () => {
         .mockResolvedValue({ kind: 'rescheduled', booking, hasChangedTime: true }),
     });
 
-    const outcome = await new RescheduleBookingByTeamUseCase(repository).execute(staff, command);
+    const outcome = await new RescheduleBookingByTeamUseCase(repository, noWaitlist).execute(
+      staff,
+      command,
+    );
 
     expect(outcome.booking).toBe(booking);
   });
@@ -328,7 +341,7 @@ describe('RescheduleBookingByTeamUseCase', () => {
     const repository = buildRepository({ rescheduleByTeam: jest.fn().mockResolvedValue(outcome) });
 
     const error = await errorOf(
-      new RescheduleBookingByTeamUseCase(repository).execute(staff, command),
+      new RescheduleBookingByTeamUseCase(repository, noWaitlist).execute(staff, command),
     );
 
     expect(error).toMatchObject({ code, httpStatus: status });

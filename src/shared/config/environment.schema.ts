@@ -3,6 +3,7 @@ import { z } from 'zod';
 const MIN_TCP_PORT = 1;
 const MAX_TCP_PORT = 65_535;
 const DEFAULT_PORT = 3000;
+const DEFAULT_WAITLIST_SWEEP_INTERVAL_SECONDS = 60;
 const DEVELOPMENT_KEY_ID = 'dev-1';
 const MIN_PEPPER_BYTES = 32;
 const MFA_KEY_BYTES = 32;
@@ -89,6 +90,12 @@ const baseEnvironmentSchema = z.object({
   // `enabled` firma los enlaces de descarga (hay que activar Token Authentication en el pull zone y usar su
   // clave); `disabled` los deja sin firmar, que es lo único que acepta un CDN sin esa protección.
   BUNNY_STORAGE_TOKEN_AUTH: z.enum(['enabled', 'disabled']).default('disabled'),
+  // Cada cuántos segundos se pasa la plaza a la siguiente persona de la lista de espera cuando vence una oferta; 0 lo apaga.
+  WAITLIST_SWEEP_INTERVAL_SECONDS: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .default(DEFAULT_WAITLIST_SWEEP_INTERVAL_SECONDS),
   // Cobros de bonos y alquileres (plan Premium): `stripe` usa Stripe Connect; `fake` no llama a nadie.
   PAYMENT_PROVIDER: z.enum(['fake', 'stripe']).default('fake'),
   // Solo hacen falta con PAYMENT_PROVIDER=stripe (se exigen en ese caso, ver más abajo).

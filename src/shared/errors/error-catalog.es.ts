@@ -57,6 +57,11 @@ export const ERROR_CATALOG = {
     title: 'Esa sala no está libre a esa hora o no la da esa persona. Elige otra',
   },
   SESSION_FULL: { title: 'Esta clase ya no tiene plazas' },
+  WAITLIST_SESSION_HAS_SEATS: { title: 'Esta clase aún tiene plazas: reserva directamente' },
+  WAITLIST_ALREADY_JOINED: { title: 'Ya estás en la lista de espera de esta clase' },
+  WAITLIST_OFFER_EXPIRED: {
+    title: 'Han pasado las 12 horas para confirmar: la plaza ha pasado a otra persona',
+  },
   STAFF_NOT_FOR_SERVICE: {
     title: 'Esa persona no da este servicio. Elige a una de las que lo dan',
   },

@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { WaitlistAdvancer } from '../../waitlist/application/waitlist.use-cases';
 import { DomainError } from '../../../shared/errors/domain-error';
 import { HTTP_STATUS } from '../../../shared/errors/http-status';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
@@ -174,30 +175,44 @@ const REFUSALS_BY_RESCHEDULE_OUTCOME: Readonly<
  */
 @Injectable()
 export class RescheduleBookingUseCase {
-  constructor(@Inject(BOOKING_REPOSITORY) private readonly bookings: BookingRepository) {}
+  constructor(
+    @Inject(BOOKING_REPOSITORY) private readonly bookings: BookingRepository,
+    private readonly waitlist: WaitlistAdvancer,
+  ) {}
 
   async execute(
     actor: ActorContext,
     command: RescheduleBookingCommand,
   ): Promise<Extract<RescheduleOutcome, { kind: 'rescheduled' }>> {
     const outcome = await this.bookings.rescheduleBooking(actor, command);
-    if (outcome.kind === 'rescheduled') return outcome;
-    throw new DomainError(...REFUSALS_BY_RESCHEDULE_OUTCOME[outcome.kind]);
+    if (outcome.kind !== 'rescheduled') {
+      throw new DomainError(...REFUSALS_BY_RESCHEDULE_OUTCOME[outcome.kind]);
+    }
+    // La plaza que deja la cita se ofrece a quien espera en la clase de antes.
+    await this.waitlist.advanceCenter(actor);
+    return outcome;
   }
 }
 
 /** El cliente pasa su reserva a otra clase con plazas del mismo servicio. */
 @Injectable()
 export class MoveBookingToSessionUseCase {
-  constructor(@Inject(BOOKING_REPOSITORY) private readonly bookings: BookingRepository) {}
+  constructor(
+    @Inject(BOOKING_REPOSITORY) private readonly bookings: BookingRepository,
+    private readonly waitlist: WaitlistAdvancer,
+  ) {}
 
   async execute(
     actor: ActorContext,
     command: MoveToSessionCommand,
   ): Promise<Extract<RescheduleOutcome, { kind: 'rescheduled' }>> {
     const outcome = await this.bookings.moveToSession(actor, command);
-    if (outcome.kind === 'rescheduled') return outcome;
-    throw new DomainError(...REFUSALS_BY_RESCHEDULE_OUTCOME[outcome.kind]);
+    if (outcome.kind !== 'rescheduled') {
+      throw new DomainError(...REFUSALS_BY_RESCHEDULE_OUTCOME[outcome.kind]);
+    }
+    // La plaza que deja la cita se ofrece a quien espera en la clase de antes.
+    await this.waitlist.advanceCenter(actor);
+    return outcome;
   }
 }
 
@@ -207,15 +222,22 @@ export class MoveBookingToSessionUseCase {
  */
 @Injectable()
 export class RescheduleBookingByTeamUseCase {
-  constructor(@Inject(BOOKING_REPOSITORY) private readonly bookings: BookingRepository) {}
+  constructor(
+    @Inject(BOOKING_REPOSITORY) private readonly bookings: BookingRepository,
+    private readonly waitlist: WaitlistAdvancer,
+  ) {}
 
   async execute(
     actor: ActorContext,
     command: RescheduleBookingCommand,
   ): Promise<Extract<RescheduleOutcome, { kind: 'rescheduled' }>> {
     const outcome = await this.bookings.rescheduleByTeam(actor, command);
-    if (outcome.kind === 'rescheduled') return outcome;
-    throw new DomainError(...REFUSALS_BY_RESCHEDULE_OUTCOME[outcome.kind]);
+    if (outcome.kind !== 'rescheduled') {
+      throw new DomainError(...REFUSALS_BY_RESCHEDULE_OUTCOME[outcome.kind]);
+    }
+    // La plaza que deja la cita se ofrece a quien espera en la clase de antes.
+    await this.waitlist.advanceCenter(actor);
+    return outcome;
   }
 }
 
@@ -246,7 +268,10 @@ export interface CancellationResult {
  */
 @Injectable()
 export class CancelBookingUseCase {
-  constructor(@Inject(BOOKING_REPOSITORY) private readonly bookings: BookingRepository) {}
+  constructor(
+    @Inject(BOOKING_REPOSITORY) private readonly bookings: BookingRepository,
+    private readonly waitlist: WaitlistAdvancer,
+  ) {}
 
   async execute(input: {
     actor: ActorContext;
@@ -275,7 +300,10 @@ export class CancelBookingUseCase {
       cancelledAt: now,
       isWithinPolicy,
     });
-    return cancelled ? toResult(cancelled) : this.resolveRace(actor, bookingId);
+    if (!cancelled) return this.resolveRace(actor, bookingId);
+    // La plaza que queda libre se ofrece a quien espera en la lista.
+    await this.waitlist.advanceCenter(actor);
+    return toResult(cancelled);
   }
 
   /** Otra petición cancelló primero: si quedó cancelada es éxito; si no (p. ej. se pasó lista), no se puede. */
@@ -337,7 +365,10 @@ export class GetDayAgendaUseCase {
 /** El equipo cancela una cita desde la agenda: avisa al cliente por push. */
 @Injectable()
 export class CancelBookingByTeamUseCase {
-  constructor(@Inject(BOOKING_REPOSITORY) private readonly bookings: BookingRepository) {}
+  constructor(
+    @Inject(BOOKING_REPOSITORY) private readonly bookings: BookingRepository,
+    private readonly waitlist: WaitlistAdvancer,
+  ) {}
 
   async execute(input: {
     actor: ActorContext;
@@ -350,6 +381,7 @@ export class CancelBookingByTeamUseCase {
     });
     if (outcome.kind === 'not_found') throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
     if (outcome.kind === 'not_cancellable') throw notCancellable();
+    await this.waitlist.advanceCenter(input.actor);
     return outcome.booking;
   }
 }

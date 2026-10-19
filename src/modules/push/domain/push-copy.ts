@@ -42,6 +42,8 @@ const COPY_BY_KIND: Readonly<Record<string, PushCopy>> = {
   pass_running_low: { title: 'Tu bono se está acabando', body: OPEN_APP_BODY },
   pass_exhausted: { title: 'Tu bono se ha agotado', body: OPEN_APP_BODY },
   message_received: { title: 'Tienes un mensaje nuevo', body: OPEN_APP_BODY },
+  waitlist_offer: { title: 'Se ha liberado una plaza para ti', body: OPEN_APP_BODY },
+  waitlist_offer_expired: { title: 'Tu plaza ofrecida ha caducado', body: OPEN_APP_BODY },
 };
 
 const FALLBACK_COPY: PushCopy = { title: 'Tienes un aviso nuevo', body: OPEN_APP_BODY };

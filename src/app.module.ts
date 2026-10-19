@@ -24,6 +24,7 @@ import { PrivacyModule } from './modules/privacy/privacy.module';
 import { ClientsModule } from './modules/clients/clients.module';
 import { TimeClockModule } from './modules/time-clock/time-clock.module';
 import { PassesModule } from './modules/passes/passes.module';
+import { WaitlistModule } from './modules/waitlist/waitlist.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { RoomsModule } from './modules/rooms/rooms.module';
 import { SchedulesModule } from './modules/schedules/schedules.module';
@@ -68,6 +69,7 @@ import { buildLoggerOptions } from './shared/logging/build-logger-options';
     ReportsModule,
     RoomsModule,
     PassesModule,
+    WaitlistModule,
     PaymentsModule,
     TimeClockModule,
     SchedulesModule,

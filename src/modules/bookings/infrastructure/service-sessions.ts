@@ -32,8 +32,9 @@ async function findSessions(
   });
 }
 
-function toView(session: StoredSession): ServiceSessionView {
-  const bookedCount = session._count.bookings;
+function toView(session: StoredSession, heldSeatCount: number): ServiceSessionView {
+  // Las plazas ofrecidas a quien espera no se pueden reservar mientras dure su oferta.
+  const bookedCount = session._count.bookings + heldSeatCount;
   return {
     id: session.id,
     startsAt: session.startsAt,
@@ -49,6 +50,65 @@ function toView(session: StoredSession): ServiceSessionView {
     },
     label: session.schedule?.label ?? null,
   };
+}
+
+/** Cuántas plazas de cada clase están ofrecidas ahora mismo a alguien de la lista de espera. */
+async function countHeldSeats(
+  client: TenantTransactionClient,
+  input: { sessionIds: readonly string[]; now: Date },
+): Promise<Map<string, number>> {
+  if (input.sessionIds.length === 0) return new Map();
+  const groups = await client.waitlistEntry.groupBy({
+    by: ['classSessionId'],
+    where: {
+      classSessionId: { in: [...input.sessionIds] },
+      status: 'offered',
+      offerExpiresAt: { gt: input.now },
+    },
+    _count: { _all: true },
+  });
+  return new Map(groups.map((group) => [group.classSessionId, group._count._all]));
+}
+
+async function toViews(
+  client: TenantTransactionClient,
+  input: { sessions: readonly StoredSession[]; now: Date },
+): Promise<ServiceSessionView[]> {
+  const held = await countHeldSeats(client, {
+    sessionIds: input.sessions.map(({ id }) => id),
+    now: input.now,
+  });
+  return input.sessions.map((session) => toView(session, held.get(session.id) ?? 0));
+}
+
+/** Las clases del rango pedido (las llenas solo si se piden) y la próxima con plazas, esté donde esté. */
+async function findOpenSessions(
+  client: TenantTransactionClient,
+  input: { query: ServiceSessionsQuery; range: { startsAt: Date; endsAt: Date } },
+): Promise<{ inRange: ServiceSessionView[]; upcoming: ServiceSessionView | undefined }> {
+  const { query, range } = input;
+  const inRangeSessions = await toViews(client, {
+    sessions: await findSessions(client, {
+      serviceId: query.serviceId,
+      startsAt: { gte: range.startsAt, lt: range.endsAt },
+    }),
+    now: query.now,
+  });
+  // Con `shouldIncludeFull` también salen las llenas: es lo que permite apuntarse a su lista de espera.
+  const inRange = inRangeSessions.filter(
+    (session) => query.shouldIncludeFull || session.remainingSeats > 0,
+  );
+  const upcoming = (
+    await toViews(client, {
+      sessions: await findSessions(
+        client,
+        { serviceId: query.serviceId, startsAt: { gte: query.now } },
+        NEXT_OPEN_LOOKUP_LIMIT,
+      ),
+      now: query.now,
+    })
+  ).find((session) => session.remainingSeats > 0);
+  return { inRange, upcoming };
 }
 
 /**
@@ -73,23 +133,10 @@ export async function listServiceSessionsInTransaction(
       where: { serviceId: query.serviceId, status: 'active' },
     })) > 0;
 
-  const inRange = (
-    await findSessions(client, {
-      serviceId: query.serviceId,
-      startsAt: { gte: from, lt: range.endsAt },
-    })
-  )
-    .map(toView)
-    .filter((session) => session.remainingSeats > 0);
-  const upcoming = (
-    await findSessions(
-      client,
-      { serviceId: query.serviceId, startsAt: { gte: query.now } },
-      NEXT_OPEN_LOOKUP_LIMIT,
-    )
-  )
-    .map(toView)
-    .find((session) => session.remainingSeats > 0);
+  const { inRange, upcoming } = await findOpenSessions(client, {
+    query,
+    range: { startsAt: from, endsAt: range.endsAt },
+  });
 
   return {
     timeZone: center.timezone,

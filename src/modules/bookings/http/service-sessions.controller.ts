@@ -47,6 +47,7 @@ export class ServiceSessionsController {
       fromDate: query.from,
       toDate: query.to,
       now: new Date(),
+      shouldIncludeFull: query.includeFull === 'true',
     });
     return {
       timezone: view.timeZone,

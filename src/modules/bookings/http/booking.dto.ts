@@ -310,7 +310,12 @@ export class ServiceSessionsRouteParamsDto extends createZodDto(
 
 export class ServiceSessionsQueryDto extends createZodDto(
   z
-    .strictObject({ from: z.iso.date(), to: z.iso.date() })
+    .strictObject({
+      from: z.iso.date(),
+      to: z.iso.date(),
+      /** `true` incluye las clases llenas, para ofrecer su lista de espera. */
+      includeFull: z.enum(['true', 'false']).optional(),
+    })
     .refine(
       ({ from, to }) =>
         to >= from &&

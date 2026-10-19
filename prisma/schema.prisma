@@ -176,6 +176,8 @@ enum NotificationKind {
   pass_running_low
   pass_exhausted
   message_received
+  waitlist_offer
+  waitlist_offer_expired
 
   @@map("notification_kind")
 }
@@ -366,6 +368,7 @@ model Center {
   rates               Rate[]
   clientPasses        ClientPass[]
   payments            Payment[]
+  waitlistEntries     WaitlistEntry[]
   staffTimeEntries    StaffTimeEntry[]
   balanceMovements    BalanceMovement[]
   staffAvailabilities StaffAvailability[]
@@ -461,6 +464,7 @@ model Membership {
   serviceAssignments         ServiceStaff[]
   taughtClassSessions        ClassSession[]       @relation("StaffClassSessions")
   bookings                   Booking[]            @relation("ClientBookings")
+  waitlistEntries            WaitlistEntry[]      @relation("ClientWaitlistEntries")
   availability               StaffAvailability?
   authoredRoutines           Routine[]            @relation("RoutineAuthor")
   receivedRoutines           RoutineAssignment[]  @relation("RoutineClient")
@@ -929,6 +933,7 @@ model ClassSession {
   schedule        SessionSchedule? @relation(fields: [scheduleId], references: [id])
   cancelledBy     Membership?      @relation("ClassSessionCancelledBy", fields: [cancelledByMembershipId], references: [id])
   bookings        Booking[]
+  waitlistEntries WaitlistEntry[]
 
   @@index([centerId, startsAt])
   @@index([centerId, staffMembershipId, startsAt])
@@ -1524,4 +1529,36 @@ model GuardianLink {
   @@unique([guardianMembershipId, childMembershipId])
   @@index([centerId, childMembershipId])
   @@map("guardian_links")
+}
+
+enum WaitlistStatus {
+  waiting
+  /// Se liberó una plaza para esta persona: tiene hasta `offerExpiresAt` para confirmarla.
+  offered
+  confirmed
+  /// No confirmó a tiempo: la plaza pasó a la siguiente persona.
+  expired
+  cancelled
+
+  @@map("waitlist_status")
+}
+
+/// Una persona en la lista de espera de una clase llena. Se atiende por orden de llegada.
+model WaitlistEntry {
+  id                 String         @id @db.Uuid
+  centerId           String         @map("center_id") @db.Uuid
+  classSessionId     String         @map("class_session_id") @db.Uuid
+  clientMembershipId String         @map("client_membership_id") @db.Uuid
+  status             WaitlistStatus @default(waiting)
+  offeredAt          DateTime?      @map("offered_at") @db.Timestamptz
+  offerExpiresAt     DateTime?      @map("offer_expires_at") @db.Timestamptz
+  createdAt          DateTime       @default(now()) @map("created_at") @db.Timestamptz
+
+  center           Center       @relation(fields: [centerId], references: [id])
+  classSession     ClassSession @relation(fields: [classSessionId], references: [id])
+  clientMembership Membership   @relation("ClientWaitlistEntries", fields: [clientMembershipId], references: [id])
+
+  @@index([centerId, classSessionId, status])
+  @@index([centerId, clientMembershipId, status])
+  @@map("waitlist_entries")
 }

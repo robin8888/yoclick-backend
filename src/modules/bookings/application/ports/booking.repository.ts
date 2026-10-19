@@ -192,6 +192,8 @@ export interface ServiceSessionsQuery {
   readonly fromDate: string;
   readonly toDate: string;
   readonly now: Date;
+  /** Incluir también las clases llenas (para apuntarse a su lista de espera). */
+  readonly shouldIncludeFull: boolean;
 }
 
 /** Una clase de un servicio a la que aún se puede apuntar a alguien. */

@@ -21,6 +21,8 @@ interface RequestContextSettings {
   readonly lookupCenterId?: string;
   readonly isDirectoryLookup?: boolean;
   readonly lookupInvitationHash?: string;
+  /** El barrido de ofertas de la lista de espera caducadas: solo ve esas filas. */
+  readonly isWaitlistSweep?: boolean;
 }
 
 /** Qué centro(s) puede ver quien aún no pertenece a ninguno: uno por código, uno por id, o los listados. */
@@ -84,6 +86,13 @@ export class TenantPrismaService {
     return this.runWithSettings({ ...NO_CENTER_SETTINGS, userId: '' }, work);
   }
 
+  /** Para el barrido de la lista de espera: qué centros tienen ofertas caducadas, sin sesión ni centro. */
+  async runInWaitlistSweepContext<TResult>(
+    work: (transactionClient: TenantTransactionClient) => Promise<TResult>,
+  ): Promise<TResult> {
+    return this.runWithSettings({ ...NO_CENTER_SETTINGS, userId: '', isWaitlistSweep: true }, work);
+  }
+
   /** Para unirse: lee centros concretos (por código o id) o los listados, sin sesión ni centro. */
   async runInCenterLookupContext<TResult>(
     lookup: CenterLookup,
@@ -127,6 +136,7 @@ export class TenantPrismaService {
         set_config('app.lookup_center_id', ${settings.lookupCenterId ?? ''}, true),
         set_config('app.lookup_invitation_hash', ${settings.lookupInvitationHash ?? ''}, true),
         set_config('app.lookup_directory', ${settings.isDirectoryLookup ? 'on' : ''}, true),
+        set_config('app.lookup_waitlist_sweep', ${settings.isWaitlistSweep ? 'on' : ''}, true),
         set_config('statement_timeout', ${String(STATEMENT_TIMEOUT_MS)}, true)`;
   }
 }

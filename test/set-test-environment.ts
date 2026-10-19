@@ -32,3 +32,5 @@ process.env['ALLOW_DISPOSABLE_EMAILS'] = 'true';
 process.env['RATE_LIMITING'] = 'disabled';
 // Sin red en los tests: los cobros usan la pasarela falsa aunque el .env apunte a Stripe.
 process.env['PAYMENT_PROVIDER'] = 'fake';
+// Los tests llaman al barrido de la lista de espera a mano.
+process.env['WAITLIST_SWEEP_INTERVAL_SECONDS'] = '0';

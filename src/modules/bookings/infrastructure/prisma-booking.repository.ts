@@ -306,35 +306,41 @@ export class PrismaBookingRepository implements BookingRepository {
     actor: ActorContext,
     cancellation: { bookingId: string; cancelledAt: Date; isWithinPolicy: boolean },
   ): Promise<BookingView | null> {
-    return this.tenantPrismaService.runInTenantContext(actor, async (client) => {
-      // Un solo UPDATE condicionado a "sigue confirmada": dos cancelaciones a la vez no se pisan.
-      const result = await client.booking.updateMany({
-        where: {
-          id: cancellation.bookingId,
-          clientMembershipId: actor.membershipId,
-          status: 'confirmed',
-          // Una clase ya iniciada (se puede abrir 15 min antes) deja de poder cancelarse.
-          startedAt: null,
-        },
-        data: {
-          status: 'cancelled',
-          cancelledAt: cancellation.cancelledAt,
-          cancelledBy: 'client',
-          cancelWithinPolicy: cancellation.isWithinPolicy,
-        },
-      });
-      if (result.count !== 1) return null;
-      const booking = await client.booking.findUniqueOrThrow({
-        where: { id: cancellation.bookingId },
-        include: WITH_SESSION_DETAILS,
-      });
-      // Libera el hueco de la persona y de la sala (la restricción EXCLUDE solo mira sesiones
-      // programadas), salvo que en una clase grupal quede alguien más apuntado.
-      await releaseSessionIfEmpty(client, booking.classSessionId);
-      await restorePassForBooking(client, { bookingId: booking.id });
-      await recordCancellationNotice(client, actor, booking);
-      return toBookingView(booking);
-    });
+    // Con la visibilidad del equipo para ver si en la clase grupal queda alguien más apuntado: con la
+    // del cliente solo vería su propia reserva y daría la clase por vacía. La reserva que se cancela
+    // se sigue buscando por dueño, así que nunca se toca una ajena.
+    return this.tenantPrismaService.runInTenantContext(
+      withTeamVisibility(actor),
+      async (client) => {
+        // Un solo UPDATE condicionado a "sigue confirmada": dos cancelaciones a la vez no se pisan.
+        const result = await client.booking.updateMany({
+          where: {
+            id: cancellation.bookingId,
+            clientMembershipId: actor.membershipId,
+            status: 'confirmed',
+            // Una clase ya iniciada (se puede abrir 15 min antes) deja de poder cancelarse.
+            startedAt: null,
+          },
+          data: {
+            status: 'cancelled',
+            cancelledAt: cancellation.cancelledAt,
+            cancelledBy: 'client',
+            cancelWithinPolicy: cancellation.isWithinPolicy,
+          },
+        });
+        if (result.count !== 1) return null;
+        const booking = await client.booking.findUniqueOrThrow({
+          where: { id: cancellation.bookingId },
+          include: WITH_SESSION_DETAILS,
+        });
+        // Libera el hueco de la persona y de la sala (la restricción EXCLUDE solo mira sesiones
+        // programadas), salvo que en una clase grupal quede alguien más apuntado.
+        await releaseSessionIfEmpty(client, booking.classSessionId);
+        await restorePassForBooking(client, { bookingId: booking.id });
+        await recordCancellationNotice(client, actor, booking);
+        return toBookingView(booking);
+      },
+    );
   }
 
   async cancelByTeam(
