@@ -6,6 +6,7 @@ import { PushDispatcher } from '../../push/application/push-dispatcher';
 import { type BookingView } from '../../bookings/application/ports/booking.repository';
 import {
   type ConfirmOfferOutcome,
+  type SessionWaitlistPersonView,
   WAITLIST_REPOSITORY,
   type WaitlistEntryView,
   type WaitlistRepository,
@@ -88,12 +89,42 @@ export class LeaveWaitlistUseCase {
   }
 }
 
+/** El personal quita a alguien de la espera; si tenía la plaza ofrecida, pasa a la siguiente persona. */
+@Injectable()
+export class RemoveFromSessionWaitlistUseCase {
+  constructor(
+    @Inject(WAITLIST_REPOSITORY) private readonly waitlist: WaitlistRepository,
+    private readonly advancer: WaitlistAdvancer,
+  ) {}
+
+  async execute(
+    actor: ActorContext,
+    command: { entryId: string; classSessionId: string },
+  ): Promise<void> {
+    const result = await this.waitlist.removeFromSession(actor, command);
+    if (!result.wasFound) throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
+    if (result.hadOffer) await this.advancer.advanceCenter(actor);
+  }
+}
+
 @Injectable()
 export class ListMyWaitlistUseCase {
   constructor(@Inject(WAITLIST_REPOSITORY) private readonly waitlist: WaitlistRepository) {}
 
   execute(actor: ActorContext, query: { now: Date }): Promise<WaitlistEntryView[]> {
     return this.waitlist.listMine(actor, query);
+  }
+}
+
+@Injectable()
+export class ListSessionWaitlistUseCase {
+  constructor(@Inject(WAITLIST_REPOSITORY) private readonly waitlist: WaitlistRepository) {}
+
+  execute(
+    actor: ActorContext,
+    query: { classSessionId: string; now: Date },
+  ): Promise<SessionWaitlistPersonView[]> {
+    return this.waitlist.listForSession(actor, query);
   }
 }
 

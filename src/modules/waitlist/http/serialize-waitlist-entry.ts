@@ -1,4 +1,7 @@
-import { type WaitlistEntryView } from '../application/ports/waitlist.repository';
+import {
+  type SessionWaitlistPersonView,
+  type WaitlistEntryView,
+} from '../application/ports/waitlist.repository';
 
 export function serializeWaitlistEntry(entry: WaitlistEntryView): Record<string, unknown> {
   return {
@@ -13,5 +16,18 @@ export function serializeWaitlistEntry(entry: WaitlistEntryView): Record<string,
       endsAt: entry.session.endsAt.toISOString(),
       service: entry.session.service,
     },
+  };
+}
+
+export function serializeSessionWaitlistPerson(
+  person: SessionWaitlistPersonView,
+): Record<string, unknown> {
+  return {
+    id: person.id,
+    status: person.status,
+    createdAt: person.createdAt.toISOString(),
+    position: person.position,
+    offerExpiresAt: person.offerExpiresAt?.toISOString() ?? null,
+    client: person.client,
   };
 }

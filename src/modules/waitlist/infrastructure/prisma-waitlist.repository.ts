@@ -13,6 +13,7 @@ import {
 import {
   type ConfirmOfferOutcome,
   type JoinWaitlistOutcome,
+  type SessionWaitlistPersonView,
   type WaitlistEntryView,
   type WaitlistRepository,
 } from '../application/ports/waitlist.repository';
@@ -175,6 +176,58 @@ export class PrismaWaitlistRepository implements WaitlistRepository {
         data: { status: 'cancelled' },
       });
       return { wasFound: left.count === 1, hadOffer: entry.status === 'offered' };
+    });
+  }
+
+  async removeFromSession(
+    actor: ActorContext,
+    command: { entryId: string; classSessionId: string },
+  ): Promise<{ wasFound: boolean; hadOffer: boolean }> {
+    return this.tenantPrismaService.runInTenantContext(actor, async (client) => {
+      const entry = await client.waitlistEntry.findFirst({
+        where: {
+          id: command.entryId,
+          classSessionId: command.classSessionId,
+          status: { in: ['waiting', 'offered'] },
+        },
+      });
+      if (!entry) return { wasFound: false, hadOffer: false };
+      const removed = await client.waitlistEntry.updateMany({
+        where: { id: entry.id, status: { in: ['waiting', 'offered'] } },
+        data: { status: 'cancelled' },
+      });
+      return { wasFound: removed.count === 1, hadOffer: entry.status === 'offered' };
+    });
+  }
+
+  async listForSession(
+    actor: ActorContext,
+    query: { classSessionId: string; now: Date },
+  ): Promise<SessionWaitlistPersonView[]> {
+    return this.tenantPrismaService.runInTenantContext(actor, async (client) => {
+      const entries = await client.waitlistEntry.findMany({
+        where: { classSessionId: query.classSessionId, status: { in: ['waiting', 'offered'] } },
+        include: {
+          clientMembership: { select: { id: true, user: { select: { fullName: true } } } },
+        },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      });
+      const live = entries.filter(
+        (entry) => entry.status === 'waiting' || isOfferActive(entry, query.now),
+      );
+      const offered = live.filter((entry) => entry.status === 'offered');
+      const waiting = live.filter((entry) => entry.status === 'waiting');
+      return [...offered, ...waiting].map((entry) => ({
+        id: entry.id,
+        status: entry.status === 'waiting' ? 'waiting' : 'offered',
+        createdAt: entry.createdAt,
+        position: entry.status === 'waiting' ? waiting.indexOf(entry) + 1 : null,
+        offerExpiresAt: entry.offerExpiresAt,
+        client: {
+          membershipId: entry.clientMembership.id,
+          fullName: entry.clientMembership.user.fullName,
+        },
+      }));
     });
   }
 

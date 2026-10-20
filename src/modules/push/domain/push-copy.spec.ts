@@ -17,4 +17,8 @@ describe('getPushCopy', () => {
 
     expect(`${title} ${body}`).not.toMatch(/\d{1,2}:\d{2}|@|€/);
   });
+
+  it('tells the person offered a waitlist seat how long they have to confirm it', () => {
+    expect(getPushCopy('waitlist_offer').body).toContain('12 horas');
+  });
 });

@@ -7,6 +7,10 @@ export class SessionWaitlistRouteParamsDto extends createZodDto(
   z.strictObject({ centerId: z.uuid(), classSessionId: z.uuid() }),
 ) {}
 
+export class SessionWaitlistEntryRouteParamsDto extends createZodDto(
+  z.strictObject({ centerId: z.uuid(), classSessionId: z.uuid(), entryId: z.uuid() }),
+) {}
+
 export class WaitlistEntryRouteParamsDto extends createZodDto(
   z.strictObject({ centerId: z.uuid(), entryId: z.uuid() }),
 ) {}
@@ -31,4 +35,20 @@ export class WaitlistEntryResponseDto extends createZodDto(z.strictObject(waitli
 
 export class MyWaitlistResponseDto extends createZodDto(
   z.strictObject({ entries: z.array(z.strictObject(waitlistEntryShape)) }),
+) {}
+
+export class SessionWaitlistResponseDto extends createZodDto(
+  z.strictObject({
+    entries: z.array(
+      z.strictObject({
+        id: z.uuid(),
+        status: z.enum(['waiting', 'offered']),
+        createdAt: z.iso.datetime(),
+        /** Lugar en la cola (1 = la primera); `null` cuando ya tiene una plaza ofrecida. */
+        position: z.number().int().nullable(),
+        offerExpiresAt: z.iso.datetime().nullable(),
+        client: z.strictObject({ membershipId: z.uuid(), fullName: z.string() }),
+      }),
+    ),
+  }),
 ) {}

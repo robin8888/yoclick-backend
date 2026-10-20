@@ -21,6 +21,17 @@ export interface WaitlistEntryView {
   };
 }
 
+/** Quién espera una clase, tal como lo ve el personal del centro. */
+export interface SessionWaitlistPersonView {
+  readonly id: string;
+  readonly status: 'waiting' | 'offered';
+  readonly createdAt: Date;
+  /** Lugar en la cola (1 = la primera); `null` cuando ya se le ofreció la plaza. */
+  readonly position: number | null;
+  readonly offerExpiresAt: Date | null;
+  readonly client: { readonly membershipId: string; readonly fullName: string };
+}
+
 export type JoinWaitlistOutcome =
   | { readonly kind: 'joined'; readonly entry: WaitlistEntryView }
   /** No existe, no es grupal, está cancelada o ya empezó. */
@@ -50,7 +61,17 @@ export interface WaitlistRepository {
     actor: ActorContext,
     command: { entryId: string },
   ): Promise<{ readonly wasFound: boolean; readonly hadOffer: boolean }>;
+  /** El personal quita a alguien de la espera de una clase. Mismo resultado que `leave`. */
+  removeFromSession(
+    actor: ActorContext,
+    command: { entryId: string; classSessionId: string },
+  ): Promise<{ readonly wasFound: boolean; readonly hadOffer: boolean }>;
   listMine(actor: ActorContext, query: { now: Date }): Promise<WaitlistEntryView[]>;
+  /** Quien espera una clase: primero las plazas ofrecidas y luego la cola por orden de llegada. */
+  listForSession(
+    actor: ActorContext,
+    query: { classSessionId: string; now: Date },
+  ): Promise<SessionWaitlistPersonView[]>;
   confirm(
     actor: ActorContext,
     command: { entryId: string; now: Date },

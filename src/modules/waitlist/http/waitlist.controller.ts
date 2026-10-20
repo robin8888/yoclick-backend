@@ -1,3 +1,4 @@
+import { RequiresModule } from '../../../shared/auth/decorators/requires-module.decorator';
 import { Controller, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -67,6 +68,7 @@ export class WaitlistController {
     return { entries: entries.map(serializeWaitlistEntry) };
   }
 
+  @RequiresModule('waitlist')
   @Post('class-sessions/:classSessionId/waitlist')
   @Roles('client')
   @HttpCode(HttpStatus.CREATED)
@@ -106,6 +108,7 @@ export class WaitlistController {
     await this.push.flushCenter(actor);
   }
 
+  @RequiresModule('waitlist')
   @Post('waitlist/:entryId/confirm')
   @Roles('client')
   @HttpCode(HttpStatus.CREATED)

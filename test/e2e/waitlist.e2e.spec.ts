@@ -14,6 +14,14 @@ interface Person {
   membershipId: string;
 }
 
+interface SessionWaitlistBody {
+  entries: {
+    status: 'waiting' | 'offered';
+    position: number | null;
+    client: { fullName: string };
+  }[];
+}
+
 interface EntryBody {
   id: string;
   status: 'waiting' | 'offered';
@@ -29,6 +37,7 @@ describe('waitlist (lista de espera de las clases llenas)', () => {
   let center: CreatedTestCenter;
   let centerId: string;
   let sessionId: string;
+  let teacher: Person;
   let ana: Person;
   let luis: Person;
   let marco: Person;
@@ -95,7 +104,7 @@ describe('waitlist (lista de espera de las clases llenas)', () => {
     ownerUserId = await world.fixtures.createUser('owner');
     center = await world.createCenter(ownerUserId);
     centerId = center.centerId;
-    const teacher = await world.addMember(centerId, 'teacher', 'staff');
+    teacher = await world.addMember(centerId, 'teacher', 'staff');
     ana = await world.addMember(centerId, 'ana', 'client');
     luis = await world.addMember(centerId, 'luis', 'client');
     marco = await world.addMember(centerId, 'marco', 'client');
@@ -162,6 +171,28 @@ describe('waitlist (lista de espera de las clases llenas)', () => {
     );
 
     expect(response.statusCode).toBe(404);
+  });
+
+  it('refuses the waitlist with 409 MODULE_DISABLED when the center turned it off', async () => {
+    await insertBooking(luis);
+    await world.tenantPrismaService.runInTenantContext(ownerActor(), async (prisma) => {
+      await prisma.center.update({
+        where: { id: centerId },
+        data: { disabledModules: ['waitlist'] },
+      });
+    });
+
+    const join = await joinWaitlist(marco);
+    const staffList = await world.call(
+      'GET',
+      url(`/class-sessions/${sessionId}/waitlist`),
+      teacher.userId,
+      { centerId },
+    );
+
+    expect(join.statusCode).toBe(409);
+    expect(join.json<{ code: string }>().code).toBe('MODULE_DISABLED');
+    expect(staffList.statusCode).toBe(409);
   });
 
   describe('with a full class', () => {
@@ -281,6 +312,76 @@ describe('waitlist (lista de espera de las clases llenas)', () => {
 
       expect(leave.statusCode).toBe(404);
       expect(confirm.statusCode).toBe(404);
+      expect(await myEntry(marco)).toMatchObject({ status: 'waiting' });
+    });
+
+    it('shows the team who waits for the class: offered seats first, then the queue in order', async () => {
+      await joinWaitlist(marco);
+      await joinWaitlist(eva);
+      await world.call('POST', url(`/bookings/${anaBookingId}/cancel`), ana.userId, { centerId });
+
+      const response = await world.call(
+        'GET',
+        url(`/class-sessions/${sessionId}/waitlist`),
+        teacher.userId,
+        { centerId },
+      );
+
+      expect(response.statusCode).toBe(200);
+      expect(
+        response
+          .json<SessionWaitlistBody>()
+          .entries.map(({ status, position }) => ({ status, position })),
+      ).toEqual([
+        { status: 'offered', position: null },
+        { status: 'waiting', position: 1 },
+      ]);
+    });
+
+    it('does not show the waitlist of a class to a client', async () => {
+      await joinWaitlist(marco);
+
+      const response = await world.call(
+        'GET',
+        url(`/class-sessions/${sessionId}/waitlist`),
+        marco.userId,
+        { centerId },
+      );
+
+      expect(response.statusCode).toBe(403);
+    });
+
+    it('lets the team remove an offered person so the seat goes to the next one', async () => {
+      await joinWaitlist(marco);
+      await joinWaitlist(eva);
+      await world.call('POST', url(`/bookings/${anaBookingId}/cancel`), ana.userId, { centerId });
+      const offered = await myEntry(marco);
+
+      const removal = await world.call(
+        'DELETE',
+        url(`/class-sessions/${sessionId}/waitlist/${offered?.id ?? ''}`),
+        teacher.userId,
+        { centerId },
+      );
+
+      expect(removal.statusCode).toBe(204);
+      expect(await myEntry(marco)).toBeUndefined();
+      expect(await myEntry(eva)).toMatchObject({ status: 'offered', position: null });
+      expect(await kindsOfNotices(eva)).toContain('waitlist_offer');
+    });
+
+    it('does not let a client remove someone from the waitlist', async () => {
+      await joinWaitlist(marco);
+      const entry = await myEntry(marco);
+
+      const removal = await world.call(
+        'DELETE',
+        url(`/class-sessions/${sessionId}/waitlist/${entry?.id ?? ''}`),
+        eva.userId,
+        { centerId },
+      );
+
+      expect(removal.statusCode).toBe(403);
       expect(await myEntry(marco)).toMatchObject({ status: 'waiting' });
     });
   });
