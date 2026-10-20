@@ -2989,6 +2989,46 @@ paths:
       summary: La persona se apunta a la lista de espera de una clase grupal llena. 409 WAITLIST_SESSION_HAS_SEATS si aún quedan plazas, WAITLIST_ALREADY_JOINED si ya espera, ALREADY_BOOKED si ya tiene plaza.
       tags:
         - waitlist
+    get:
+      operationId: waitlist_list_for_session
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: classSessionId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionWaitlistResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: "Quién espera una clase llena: las plazas ofrecidas pendientes de confirmar y la cola por orden de llegada."
+      tags:
+        - waitlist
   /v1/centers/{centerId}/waitlist/{entryId}/leave:
     post:
       operationId: waitlist_leave
@@ -3065,6 +3105,50 @@ paths:
       security:
         - bearer: []
       summary: Confirma la plaza ofrecida y crea la reserva. 409 WAITLIST_OFFER_EXPIRED si pasaron las 12 horas; el resto de errores son los de apuntarse a una clase (bono sin clases, otra cita a esa hora…).
+      tags:
+        - waitlist
+  /v1/centers/{centerId}/class-sessions/{classSessionId}/waitlist/{entryId}:
+    delete:
+      operationId: waitlist_remove_from_session
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: classSessionId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: entryId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "204":
+          description: ""
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: El personal quita a una persona de la espera de la clase. Si tenía una plaza ofrecida, esa plaza se ofrece a la siguiente persona.
       tags:
         - waitlist
   /v1/centers/{centerId}/agenda/summary:
@@ -8274,6 +8358,26 @@ components:
                   logoUrl:
                     type: string
                     nullable: true
+                  modules:
+                    type: object
+                    properties:
+                      content:
+                        type: boolean
+                      attendance:
+                        type: boolean
+                      passes:
+                        type: boolean
+                      waitlist:
+                        type: boolean
+                      rooms:
+                        type: boolean
+                    required:
+                      - content
+                      - attendance
+                      - passes
+                      - waitlist
+                      - rooms
+                    additionalProperties: false
                   appearance:
                     type: object
                     properties:
@@ -8297,6 +8401,7 @@ components:
                   - sectorId
                   - brandColor
                   - logoUrl
+                  - modules
                   - appearance
                 additionalProperties: false
             required:
@@ -8484,6 +8589,26 @@ components:
                   logoUrl:
                     type: string
                     nullable: true
+                  modules:
+                    type: object
+                    properties:
+                      content:
+                        type: boolean
+                      attendance:
+                        type: boolean
+                      passes:
+                        type: boolean
+                      waitlist:
+                        type: boolean
+                      rooms:
+                        type: boolean
+                    required:
+                      - content
+                      - attendance
+                      - passes
+                      - waitlist
+                      - rooms
+                    additionalProperties: false
                   appearance:
                     type: object
                     properties:
@@ -8507,6 +8632,7 @@ components:
                   - sectorId
                   - brandColor
                   - logoUrl
+                  - modules
                   - appearance
                 additionalProperties: false
             required:
@@ -8719,6 +8845,13 @@ components:
         isListed:
           default: false
           type: boolean
+        workMode:
+          default: both
+          type: string
+          enum:
+            - classes
+            - appointments
+            - both
       required:
         - name
         - sectorId
@@ -8756,6 +8889,26 @@ components:
           type: string
         isListed:
           type: boolean
+        modules:
+          type: object
+          properties:
+            content:
+              type: boolean
+            attendance:
+              type: boolean
+            passes:
+              type: boolean
+            waitlist:
+              type: boolean
+            rooms:
+              type: boolean
+          required:
+            - content
+            - attendance
+            - passes
+            - waitlist
+            - rooms
+          additionalProperties: false
         joinCode:
           type: string
         trialEndsAt:
@@ -8773,6 +8926,7 @@ components:
         - sectorId
         - brandColor
         - isListed
+        - modules
         - joinCode
         - trialEndsAt
         - logoUrl
@@ -9511,6 +9665,26 @@ components:
         logoUrl:
           type: string
           nullable: true
+        modules:
+          type: object
+          properties:
+            content:
+              type: boolean
+            attendance:
+              type: boolean
+            passes:
+              type: boolean
+            waitlist:
+              type: boolean
+            rooms:
+              type: boolean
+          required:
+            - content
+            - attendance
+            - passes
+            - waitlist
+            - rooms
+          additionalProperties: false
         appearance:
           type: object
           properties:
@@ -9534,6 +9708,7 @@ components:
         - sectorId
         - brandColor
         - logoUrl
+        - modules
         - appearance
       additionalProperties: false
     CenterSettingsResponseDto:
@@ -9727,6 +9902,26 @@ components:
             - lateCancellationConsumesCredit
           additionalProperties: false
           nullable: true
+        modules:
+          type: object
+          properties:
+            content:
+              type: boolean
+            attendance:
+              type: boolean
+            passes:
+              type: boolean
+            waitlist:
+              type: boolean
+            rooms:
+              type: boolean
+          required:
+            - content
+            - attendance
+            - passes
+            - waitlist
+            - rooms
+          additionalProperties: false
         trialEndsAt:
           type: string
           format: date-time
@@ -9767,6 +9962,7 @@ components:
         - openingHours
         - holidays
         - cancelPolicy
+        - modules
         - trialEndsAt
         - backgroundColor
         - backgroundColorEnd
@@ -9980,6 +10176,20 @@ components:
             - freeCancellationHours
             - lateCancellationConsumesCredit
           additionalProperties: false
+        modules:
+          type: object
+          properties:
+            content:
+              type: boolean
+            attendance:
+              type: boolean
+            passes:
+              type: boolean
+            waitlist:
+              type: boolean
+            rooms:
+              type: boolean
+          additionalProperties: false
         backgroundColor:
           type: string
           pattern: ^#[0-9A-Fa-f]{6}$
@@ -10142,6 +10352,10 @@ components:
                 type: integer
                 minimum: -9007199254740991
                 maximum: 9007199254740991
+              bufferMinutes:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
               isVisible:
                 type: boolean
               isRental:
@@ -10251,6 +10465,7 @@ components:
               - color
               - bookingWindowDays
               - minNoticeMinutes
+              - bufferMinutes
               - isVisible
               - isRental
               - room
@@ -10297,6 +10512,10 @@ components:
           type: integer
           minimum: 0
           maximum: 86400
+        bufferMinutes:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
         isVisible:
           type: boolean
         isRental:
@@ -10359,6 +10578,10 @@ components:
           minimum: -9007199254740991
           maximum: 9007199254740991
         minNoticeMinutes:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        bufferMinutes:
           type: integer
           minimum: -9007199254740991
           maximum: 9007199254740991
@@ -10471,6 +10694,7 @@ components:
         - color
         - bookingWindowDays
         - minNoticeMinutes
+        - bufferMinutes
         - isVisible
         - isRental
         - room
@@ -10517,6 +10741,10 @@ components:
           type: integer
           minimum: 0
           maximum: 86400
+        bufferMinutes:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
         isVisible:
           type: boolean
         isRental:
@@ -13212,6 +13440,61 @@ components:
         - position
         - offerExpiresAt
         - session
+      additionalProperties: false
+    SessionWaitlistResponseDto:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              status:
+                type: string
+                enum:
+                  - waiting
+                  - offered
+              createdAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+              position:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+                nullable: true
+              offerExpiresAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                nullable: true
+              client:
+                type: object
+                properties:
+                  membershipId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  fullName:
+                    type: string
+                required:
+                  - membershipId
+                  - fullName
+                additionalProperties: false
+            required:
+              - id
+              - status
+              - createdAt
+              - position
+              - offerExpiresAt
+              - client
+            additionalProperties: false
+      required:
+        - entries
       additionalProperties: false
     DaySummaryResponseDto:
       type: object
