@@ -9,6 +9,8 @@ export interface SchedulableService {
   readonly color: string | null;
   readonly durationMinutes: number;
   readonly minNoticeMinutes: number;
+  /** Minutos que quedan libres tras cada cita de este servicio. */
+  readonly bufferMinutes: number;
   readonly bookingWindowDays: number;
   /** Sala donde se da el servicio; `null` = en cualquiera libre de quien lo da. */
   readonly roomId: string | null;

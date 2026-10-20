@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { createZodDto } from '../../../shared/http/create-zod-dto';
 import {
+  isValidServiceBuffer,
   isValidServiceDuration,
   MAX_BOOKING_WINDOW_DAYS,
   MAX_MIN_NOTICE_MINUTES,
@@ -46,6 +47,8 @@ const serviceShape = {
   color: z.string().nullable(),
   bookingWindowDays: z.number().int(),
   minNoticeMinutes: z.number().int(),
+  /** Minutos libres tras cada cita de este servicio (preparar, limpiar); 0 = sin margen. */
+  bufferMinutes: z.number().int(),
   isVisible: z.boolean(),
   /** Alquiler de sala: sus clases se crean sin profesor. */
   isRental: z.boolean(),
@@ -89,6 +92,10 @@ const bookingWindowSchema = z
   .min(MIN_BOOKING_WINDOW_DAYS)
   .max(MAX_BOOKING_WINDOW_DAYS);
 const minNoticeSchema = z.number().int().min(0).max(MAX_MIN_NOTICE_MINUTES);
+const bufferSchema = z
+  .number()
+  .int()
+  .refine(isValidServiceBuffer, 'between 0 and 240 minutes, in steps of 5');
 const staffIdsSchema = z
   .array(z.uuid())
   .max(MAX_STAFF_PER_SERVICE)
@@ -105,6 +112,7 @@ export class CreateServiceRequestDto extends createZodDto(
     color: colorSchema.optional(),
     bookingWindowDays: bookingWindowSchema.optional(),
     minNoticeMinutes: minNoticeSchema.optional(),
+    bufferMinutes: bufferSchema.optional(),
     isVisible: z.boolean().optional(),
     isRental: z.boolean().optional(),
     roomId: z.uuid().optional(),
@@ -124,6 +132,7 @@ export class UpdateServiceRequestDto extends createZodDto(
       color: colorSchema.nullable().optional(),
       bookingWindowDays: bookingWindowSchema.optional(),
       minNoticeMinutes: minNoticeSchema.optional(),
+      bufferMinutes: bufferSchema.optional(),
       isVisible: z.boolean().optional(),
       isRental: z.boolean().optional(),
       roomId: z.uuid().nullable().optional(),

@@ -144,6 +144,55 @@ describe('calculateAvailableSlots', () => {
     expect(slots[0]).toBe('2026-10-05T08:00:00.000Z');
   });
 
+  describe('margin between appointments', () => {
+    it('starts a slot every duration plus margin, and the last one may end at closing', () => {
+      // Turno 09:00-14:00 (07:00-12:00 UTC): citas de 60 min con 15 de margen -> cada 75 min.
+      expect(
+        startsOf(buildInput({ bufferMinutes: 15, openingHours: { mon: [TWO_SPLIT_SHIFTS[0]!] } })),
+      ).toEqual([
+        '2026-10-05T07:00:00.000Z',
+        '2026-10-05T08:15:00.000Z',
+        '2026-10-05T09:30:00.000Z',
+        '2026-10-05T10:45:00.000Z',
+      ]);
+    });
+
+    it('blocks the start that would leave less than the margin before the next appointment', () => {
+      const input = buildInput({
+        bufferMinutes: 15,
+        stepMinutes: 15,
+        openingHours: { mon: [TWO_SPLIT_SHIFTS[0]!] },
+        busyIntervals: [busy(ANA, '2026-10-05T09:00:00Z', '2026-10-05T10:00:00Z')],
+      });
+
+      const starts = startsOf(input);
+
+      // La cita de las 09:00 UTC pide margen por delante: 07:45 acabaría a las 08:45 y 08:00 chocaría.
+      expect(starts).toContain('2026-10-05T07:45:00.000Z');
+      expect(starts).not.toContain('2026-10-05T08:00:00.000Z');
+      expect(starts).not.toContain('2026-10-05T08:15:00.000Z');
+    });
+
+    it('keeps free the margin the busy appointment asks after it ends', () => {
+      const input = buildInput({
+        stepMinutes: 15,
+        openingHours: { mon: [TWO_SPLIT_SHIFTS[0]!] },
+        busyIntervals: [
+          { ...busy(ANA, '2026-10-05T09:00:00Z', '2026-10-05T10:00:00Z'), bufferMinutes: 30 },
+        ],
+      });
+
+      const starts = startsOf(input);
+
+      expect(starts).not.toContain('2026-10-05T10:15:00.000Z');
+      expect(starts).toContain('2026-10-05T10:30:00.000Z');
+    });
+
+    it('changes nothing when the margin is zero', () => {
+      expect(startsOf(buildInput({ bufferMinutes: 0 }))).toEqual(startsOf(buildInput()));
+    });
+  });
+
   describe('notice and booking window', () => {
     it.each([
       {

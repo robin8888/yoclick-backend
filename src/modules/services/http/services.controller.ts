@@ -102,6 +102,7 @@ export class ServicesController {
         color: body.color ?? null,
         bookingWindowDays: body.bookingWindowDays,
         minNoticeMinutes: body.minNoticeMinutes,
+        bufferMinutes: body.bufferMinutes,
         isVisible: body.isVisible,
         isRental: body.isRental,
         roomId: body.roomId ?? null,

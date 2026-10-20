@@ -20,6 +20,8 @@ export interface BusyInterval {
   readonly staffMembershipId: string;
   readonly startsAt: Date;
   readonly endsAt: Date;
+  /** Minutos que esa sesión deja libres al terminar (preparar, limpiar); sin él, ninguno. */
+  readonly bufferMinutes?: number | undefined;
 }
 
 export interface SlotCalculationInput {
@@ -30,8 +32,10 @@ export interface SlotCalculationInput {
   readonly fromDate: string;
   readonly toDate: string;
   readonly durationMinutes: number;
+  /** Minutos que deja libres cada cita de este servicio al terminar; sin él, ninguno. */
+  readonly bufferMinutes?: number | undefined;
   /**
-   * Cada cuántos minutos puede empezar un hueco. Sin él, cada `durationMinutes` desde la apertura
+   * Cada cuántos minutos puede empezar un hueco. Sin él, cada duración más margen desde la apertura
    * (lo que ve la clientela); el equipo lo baja (p. ej. a 15) para elegir horas como las 10:30.
    */
   readonly stepMinutes?: number | undefined;
@@ -69,8 +73,14 @@ export function isStartWithinBookingWindow(startsAt: Date, rules: BookingWindowR
   return startsAt >= earliestStart && startsAt <= latestStart;
 }
 
-function overlaps(first: { startsAt: Date; endsAt: Date }, second: BusyInterval): boolean {
-  return first.startsAt < second.endsAt && second.startsAt < first.endsAt;
+/** Dos citas chocan si se pisan, o si no queda entre ellas el margen que pide la primera. */
+function overlaps(
+  candidate: { startsAt: Date; endsAt: Date; bufferMinutes: number },
+  busy: BusyInterval,
+): boolean {
+  const candidateEnd = addMinutes(candidate.endsAt, candidate.bufferMinutes);
+  const busyEnd = addMinutes(busy.endsAt, busy.bufferMinutes ?? 0);
+  return candidate.startsAt < busyEnd && busy.startsAt < candidateEnd;
 }
 
 /**
@@ -83,6 +93,7 @@ function buildGridOfInterval(
     date: string;
     timeZone: string;
     durationMinutes: number;
+    bufferMinutes?: number | undefined;
     stepMinutes?: number | undefined;
   },
   interval: OpeningInterval,
@@ -90,7 +101,7 @@ function buildGridOfInterval(
   const intervalStart = zonedDateTimeToUtc(input.date, interval.opensAt, input.timeZone);
   const intervalEnd = zonedDateTimeToUtc(input.date, interval.closesAt, input.timeZone);
   const grid: { startsAt: Date; endsAt: Date }[] = [];
-  const stepMinutes = input.stepMinutes ?? input.durationMinutes;
+  const stepMinutes = input.stepMinutes ?? input.durationMinutes + (input.bufferMinutes ?? 0);
   let startsAt = intervalStart;
   while (addMinutes(startsAt, input.durationMinutes) <= intervalEnd) {
     grid.push({ startsAt, endsAt: addMinutes(startsAt, input.durationMinutes) });
@@ -136,7 +147,9 @@ function calculateSlotsOfDate(input: SlotCalculationInput, date: string): Calcul
         (member) =>
           isStaffAvailableForSlot(member, candidate, input.timeZone) &&
           !input.busyIntervals.some(
-            (busy) => busy.staffMembershipId === member.membershipId && overlaps(candidate, busy),
+            (busy) =>
+              busy.staffMembershipId === member.membershipId &&
+              overlaps({ ...candidate, bufferMinutes: input.bufferMinutes ?? 0 }, busy),
           ),
       );
       return freeStaff.length === 0

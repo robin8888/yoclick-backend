@@ -72,6 +72,7 @@ function toServiceView(service: ServiceWithStaff): ServiceView {
     color: service.color,
     bookingWindowDays: service.bookingWindowDays,
     minNoticeMinutes: service.minNoticeMinutes,
+    bufferMinutes: service.bufferMinutes,
     isVisible: service.isVisible,
     isRental: service.isRental,
     room: service.room,
@@ -141,6 +142,23 @@ async function replaceStaff(
   });
 }
 
+/** Lo no enviado toma el valor por defecto de la tabla. */
+function pickSentOptionalFields(
+  newService: NewService,
+): Partial<Prisma.ServiceUncheckedCreateInput> {
+  const optionalFields = {
+    mode: newService.mode,
+    bookingWindowDays: newService.bookingWindowDays,
+    minNoticeMinutes: newService.minNoticeMinutes,
+    bufferMinutes: newService.bufferMinutes,
+    isVisible: newService.isVisible,
+    isRental: newService.isRental,
+  };
+  return Object.fromEntries(
+    Object.entries(optionalFields).filter(([, value]) => value !== undefined),
+  );
+}
+
 @Injectable()
 export class PrismaServiceRepository implements ServiceRepository {
   constructor(private readonly tenantPrismaService: TenantPrismaService) {}
@@ -180,16 +198,7 @@ export class PrismaServiceRepository implements ServiceRepository {
           priceCents: newService.priceCents,
           color: newService.color,
           roomId: newService.roomId,
-          // Lo no enviado toma el valor por defecto de la tabla.
-          ...(newService.mode !== undefined && { mode: newService.mode }),
-          ...(newService.bookingWindowDays !== undefined && {
-            bookingWindowDays: newService.bookingWindowDays,
-          }),
-          ...(newService.minNoticeMinutes !== undefined && {
-            minNoticeMinutes: newService.minNoticeMinutes,
-          }),
-          ...(newService.isVisible !== undefined && { isVisible: newService.isVisible }),
-          ...(newService.isRental !== undefined && { isRental: newService.isRental }),
+          ...pickSentOptionalFields(newService),
         },
       });
       await replaceStaff(client, serviceId, newService.staffMembershipIds);

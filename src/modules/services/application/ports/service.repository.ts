@@ -35,6 +35,8 @@ export interface ServiceView {
   readonly color: string | null;
   readonly bookingWindowDays: number;
   readonly minNoticeMinutes: number;
+  /** Minutos libres tras cada cita de este servicio; 0 = sin margen. */
+  readonly bufferMinutes: number;
   readonly isVisible: boolean;
   /** Alquiler de sala: sus clases se crean sin profesor. */
   readonly isRental: boolean;
@@ -56,6 +58,7 @@ export interface NewService {
   readonly color: string | null;
   readonly bookingWindowDays: number | undefined;
   readonly minNoticeMinutes: number | undefined;
+  readonly bufferMinutes: number | undefined;
   readonly isVisible: boolean | undefined;
   readonly isRental: boolean | undefined;
   readonly roomId: string | null;
@@ -72,6 +75,7 @@ export interface ServicePatch {
   readonly color?: string | null | undefined;
   readonly bookingWindowDays?: number | undefined;
   readonly minNoticeMinutes?: number | undefined;
+  readonly bufferMinutes?: number | undefined;
   readonly isVisible?: boolean | undefined;
   readonly isRental?: boolean | undefined;
   readonly roomId?: string | null | undefined;

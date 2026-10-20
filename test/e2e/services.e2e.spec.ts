@@ -80,6 +80,7 @@ describe('services', () => {
         color: '#E4572E',
         bookingWindowDays: 30,
         minNoticeMinutes: 120,
+        bufferMinutes: 0,
         isVisible: true,
         isRental: false,
         hasSchedule: false,
@@ -89,6 +90,29 @@ describe('services', () => {
           { membershipId: center.ownerMembershipId, fullName: 'owner', photoUrl: null, photos: [] },
         ],
       });
+    });
+
+    it('keeps a margin after each appointment when the center asks for one', async () => {
+      const response = await world.call('POST', servicesUrl(), owner, {
+        centerId: center.centerId,
+        body: { name: 'Revisión', durationMinutes: 60, bufferMinutes: 15 },
+      });
+
+      expect(response.statusCode).toBe(201);
+      expect(response.json()).toMatchObject({ durationMinutes: 60, bufferMinutes: 15 });
+    });
+
+    it.each([
+      ['not a multiple of 5', 7],
+      ['longer than four hours', 245],
+      ['negative', -5],
+    ])('rejects a margin that is %s with 400', async (_name, bufferMinutes) => {
+      const response = await world.call('POST', servicesUrl(), owner, {
+        centerId: center.centerId,
+        body: { name: 'Revisión', durationMinutes: 60, bufferMinutes },
+      });
+
+      expect(response.statusCode).toBe(400);
     });
 
     it('lets an admin choose the team that runs it', async () => {
@@ -191,6 +215,16 @@ describe('services', () => {
         durationMinutes: 45,
         color: '#112233',
       });
+    });
+
+    it('changes the margin without touching the rest', async () => {
+      const response = await world.call('PATCH', servicesUrl(`/${service.id}`), owner, {
+        centerId: center.centerId,
+        body: { bufferMinutes: 10 },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({ bufferMinutes: 10, durationMinutes: 45 });
     });
 
     it('replaces the team that runs the service', async () => {

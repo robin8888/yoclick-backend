@@ -96,10 +96,17 @@ async function findBusyIntervals(
       startsAt: { lt: range.endsAt },
       endsAt: { gt: range.startsAt },
     },
-    select: { staffMembershipId: true, startsAt: true, endsAt: true },
+    select: {
+      staffMembershipId: true,
+      startsAt: true,
+      endsAt: true,
+      service: { select: { bufferMinutes: true } },
+    },
   });
-  return sessions.flatMap(({ staffMembershipId, startsAt, endsAt }) =>
-    staffMembershipId === null ? [] : [{ staffMembershipId, startsAt, endsAt }],
+  return sessions.flatMap(({ staffMembershipId, startsAt, endsAt, service }) =>
+    staffMembershipId === null
+      ? []
+      : [{ staffMembershipId, startsAt, endsAt, bufferMinutes: service.bufferMinutes }],
   );
 }
 
@@ -134,6 +141,7 @@ export async function loadSchedulingFacts(
       color: service.color,
       durationMinutes: service.durationMinutes,
       minNoticeMinutes: service.minNoticeMinutes,
+      bufferMinutes: service.bufferMinutes,
       bookingWindowDays: service.bookingWindowDays,
       roomId: service.roomId,
       mode: service.mode,

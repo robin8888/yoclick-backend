@@ -123,6 +123,50 @@ describe('availability and bookings', () => {
       }
     });
 
+    it('leaves the service margin between one appointment and the next on the client grid', async () => {
+      const withMargin = await world.createService(ownerUserId, centerId, {
+        name: 'Revisión',
+        durationMinutes: 60,
+        bufferMinutes: 30,
+        minNoticeMinutes: 0,
+      });
+
+      const slots = await slotsFor(ana, withMargin);
+
+      const startsByDay: Record<string, number[]> = {};
+      for (const { startsAt } of slots) {
+        const day = startsAt.slice(0, 10);
+        startsByDay[day] = [...(startsByDay[day] ?? []), Date.parse(startsAt)];
+      }
+      const gapsInMinutes = Object.values(startsByDay).flatMap((starts) =>
+        starts.slice(1).map((start, index) => (start - (starts[index] ?? 0)) / 60_000),
+      );
+      expect(gapsInMinutes.length).toBeGreaterThan(0);
+      expect(Math.min(...gapsInMinutes)).toBeGreaterThanOrEqual(90);
+    });
+
+    it('does not offer a start that would crowd a booked appointment of a service with margin', async () => {
+      const withMargin = await world.createService(ownerUserId, centerId, {
+        name: 'Revisión',
+        durationMinutes: 60,
+        bufferMinutes: 30,
+        minNoticeMinutes: 0,
+      });
+      const [first] = await slotsFor(ana, withMargin);
+      if (first === undefined) throw new Error('The test needs an open slot');
+
+      const booked = await bookSlot(ana, first, withMargin);
+      const after = await slotsFor(bea, withMargin);
+
+      expect(booked.statusCode).toBe(201);
+      const blockedUntil = Date.parse(first.endsAt) + 30 * 60_000;
+      const crowded = after.filter(
+        ({ startsAt }) =>
+          Date.parse(startsAt) >= Date.parse(first.startsAt) && Date.parse(startsAt) < blockedUntil,
+      );
+      expect(crowded).toEqual([]);
+    });
+
     it('lets the team and the clients ask, and filters by professional', async () => {
       const forStaff = await world.fetchSlots(staff.userId, centerId, personalService.id);
       const forOwnerOnly = await world.fetchSlots(
