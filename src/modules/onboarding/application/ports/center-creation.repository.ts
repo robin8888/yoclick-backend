@@ -6,6 +6,8 @@ export interface NewCenter {
   readonly brandColor: string;
   readonly city: string | null;
   readonly isListed: boolean;
+  /** Los módulos que el centro no usa desde el principio (ver `CENTER_MODULE_IDS`). */
+  readonly disabledModules: string[];
   readonly joinCode: string;
   readonly trialEndsAt: Date;
 }

@@ -1,3 +1,9 @@
+import {
+  type CenterModules,
+  type CenterWorkMode,
+  listDisabledModulesForWorkMode,
+  resolveCenterModules,
+} from '../../../shared/centers/center-modules';
 import { Inject, Injectable } from '@nestjs/common';
 import { v7 as generateUuidV7 } from 'uuid';
 import { DomainError } from '../../../shared/errors/domain-error';
@@ -20,6 +26,7 @@ export interface CreateCenterRequest {
   readonly brandColor: string;
   readonly city: string | null;
   readonly isListed: boolean;
+  readonly workMode: CenterWorkMode;
 }
 
 export interface CreatedCenter {
@@ -30,6 +37,7 @@ export interface CreatedCenter {
   readonly sectorId: string;
   readonly brandColor: string;
   readonly isListed: boolean;
+  readonly modules: CenterModules;
   readonly joinCode: string;
   readonly trialEndsAt: string;
   readonly logoUrl: string | null;
@@ -77,6 +85,7 @@ function pickCenterFields(request: CreateCenterRequest) {
     brandColor: request.brandColor,
     city: request.city,
     isListed: request.isListed,
+    disabledModules: listDisabledModulesForWorkMode(request.workMode),
   };
 }
 
@@ -96,6 +105,7 @@ function toCreatedCenter(created: {
     sectorId: created.request.sectorId,
     brandColor: created.request.brandColor,
     isListed: created.request.isListed,
+    modules: resolveCenterModules(listDisabledModulesForWorkMode(created.request.workMode)),
     joinCode: created.joinCode,
     trialEndsAt: created.trialEndsAt.toISOString(),
     logoUrl: null,

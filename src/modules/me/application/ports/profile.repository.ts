@@ -1,3 +1,4 @@
+import { type CenterModules } from '../../../../shared/centers/center-modules';
 import { type CenterAppearance } from '../../../../shared/centers/center-appearance';
 
 export interface Profile {
@@ -39,6 +40,8 @@ export interface MyMembership {
     readonly sectorId: string;
     readonly brandColor: string;
     readonly logoUrl: string | null;
+    /** Lo que el centro usa (contenido, asistencia, bonos, lista de espera, salas). */
+    readonly modules: CenterModules;
     /** Personalización Premium; todo nulo si el plan del centro no la incluye. */
     readonly appearance: CenterAppearance;
   };

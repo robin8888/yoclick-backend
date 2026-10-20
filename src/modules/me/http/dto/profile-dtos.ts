@@ -1,5 +1,6 @@
 import { createZodDto } from '../../../../shared/http/create-zod-dto';
 import { z } from 'zod';
+import { centerModulesSchema } from '../../../../shared/centers/center-modules.schema';
 
 const MIN_FULL_NAME_LENGTH = 2;
 const MAX_FULL_NAME_LENGTH = 100;
@@ -62,6 +63,7 @@ const membershipResponseSchema = z.strictObject({
     sectorId: z.string(),
     brandColor: z.string(),
     logoUrl: z.string().nullable(),
+    modules: centerModulesSchema,
     appearance: z.strictObject({
       backgroundColor: z.string().nullable(),
       backgroundColorEnd: z.string().nullable(),

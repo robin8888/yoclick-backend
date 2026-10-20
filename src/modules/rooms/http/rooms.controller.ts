@@ -1,3 +1,4 @@
+import { RequiresModule } from '../../../shared/auth/decorators/requires-module.decorator';
 import {
   Body,
   Controller,
@@ -70,6 +71,7 @@ export class RoomsController {
     return { rooms: await this.listRooms.execute(actor) };
   }
 
+  @RequiresModule('rooms')
   @Post()
   @Roles('owner', 'admin')
   @AllowStaffWithPermission('services:manage')
@@ -90,6 +92,7 @@ export class RoomsController {
     return { ...room };
   }
 
+  @RequiresModule('rooms')
   @Patch(':roomId')
   @Roles('owner', 'admin')
   @AllowStaffWithPermission('services:manage')
@@ -109,6 +112,7 @@ export class RoomsController {
     return { ...room };
   }
 
+  @RequiresModule('rooms')
   @Delete(':roomId')
   @Roles('owner', 'admin')
   @AllowStaffWithPermission('services:manage')

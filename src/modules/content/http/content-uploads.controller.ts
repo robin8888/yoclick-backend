@@ -1,3 +1,4 @@
+import { RequiresModule } from '../../../shared/auth/decorators/requires-module.decorator';
 import { Body, Controller, HttpCode, HttpStatus, Param, Post, Query, Req } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -40,6 +41,7 @@ import {
 @ApiBearerAuth('bearer')
 @ApiHeader({ name: 'X-Center-Id', required: true })
 @ApiDefaultResponse({ type: ProblemDetailsDto, description: 'Error RFC 9457' })
+@RequiresModule('content')
 @Controller('centers/:centerId/content')
 export class ContentUploadsController {
   constructor(

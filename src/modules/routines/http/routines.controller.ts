@@ -1,3 +1,4 @@
+import { RequiresModule } from '../../../shared/auth/decorators/requires-module.decorator';
 import {
   Body,
   Controller,
@@ -110,6 +111,7 @@ function serializeMine(
 @ApiBearerAuth('bearer')
 @ApiHeader({ name: 'X-Center-Id', required: true })
 @ApiDefaultResponse({ type: ProblemDetailsDto, description: 'Error RFC 9457' })
+@RequiresModule('content')
 @Controller('centers/:centerId')
 export class RoutineLibraryController {
   constructor(
@@ -196,6 +198,7 @@ export class RoutineLibraryController {
 @ApiBearerAuth('bearer')
 @ApiHeader({ name: 'X-Center-Id', required: true })
 @ApiDefaultResponse({ type: ProblemDetailsDto, description: 'Error RFC 9457' })
+@RequiresModule('content')
 @Controller('centers/:centerId')
 export class RoutinesController {
   constructor(
@@ -256,6 +259,7 @@ export class RoutinesController {
 @ApiBearerAuth('bearer')
 @ApiHeader({ name: 'X-Center-Id', required: true })
 @ApiDefaultResponse({ type: ProblemDetailsDto, description: 'Error RFC 9457' })
+@RequiresModule('content')
 @Controller('centers/:centerId')
 export class RoutineEditingController {
   constructor(
@@ -295,6 +299,7 @@ export class RoutineEditingController {
 @ApiBearerAuth('bearer')
 @ApiHeader({ name: 'X-Center-Id', required: true })
 @ApiDefaultResponse({ type: ProblemDetailsDto, description: 'Error RFC 9457' })
+@RequiresModule('content')
 @Controller('centers/:centerId')
 export class RoutineAssignmentsController {
   constructor(

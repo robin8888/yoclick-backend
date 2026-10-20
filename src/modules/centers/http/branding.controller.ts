@@ -2,6 +2,7 @@ import { Controller, Get, Header, Param } from '@nestjs/common';
 import { ApiDefaultResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { createZodDto } from '../../../shared/http/create-zod-dto';
 import { z } from 'zod';
+import { centerModulesSchema } from '../../../shared/centers/center-modules.schema';
 import { Public } from '../../../shared/auth/decorators/public.decorator';
 import { ProblemDetailsDto } from '../../../shared/errors/problem-details.dto';
 import { GetCenterBrandingUseCase } from '../application/get-center-branding.use-case';
@@ -17,6 +18,8 @@ class CenterBrandingResponseDto extends createZodDto(
     sectorId: z.string(),
     brandColor: z.string(),
     logoUrl: z.string().nullable(),
+    /** Lo que el centro usa (contenido, asistencia con QR, bonos, lista de espera, salas). */
+    modules: centerModulesSchema,
     appearance: z.strictObject({
       backgroundColor: z.string().nullable(),
       backgroundColorEnd: z.string().nullable(),

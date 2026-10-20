@@ -1,7 +1,9 @@
+import { resolveCenterModules } from '../../../shared/centers/center-modules';
 import { resolveVisibleAppearance } from '../../../shared/centers/center-appearance';
 import { Injectable } from '@nestjs/common';
 import { buildCenterLogoUrl } from '../../../shared/media/center-logo-url';
 import { v7 as generateUuidV7 } from 'uuid';
+import { type Prisma } from '../../../generated/prisma/client';
 import { TenantPrismaService } from '../../../shared/database/tenant-prisma.service';
 import {
   type ConsentState,
@@ -60,6 +62,46 @@ function toDatabaseDate(isoDate: string): Date {
   return new Date(`${isoDate}T00:00:00.000Z`);
 }
 
+const MEMBERSHIP_INCLUDE = {
+  user: { select: { photoKey: true } },
+  center: {
+    select: {
+      name: true,
+      slug: true,
+      sectorId: true,
+      disabledModules: true,
+      brandColor: true,
+      logoUpdatedAt: true,
+      maxClients: true,
+      backgroundColor: true,
+      backgroundColorEnd: true,
+      hiveColor: true,
+    },
+  },
+} as const;
+
+type StoredMembership = Prisma.MembershipGetPayload<{ include: typeof MEMBERSHIP_INCLUDE }>;
+
+function toMyMembership(row: StoredMembership): MyMembership {
+  return {
+    membershipId: row.id,
+    centerId: row.centerId,
+    role: row.role,
+    status: row.status,
+    joinedAt: row.joinedAt,
+    photoKey: row.user.photoKey,
+    center: {
+      name: row.center.name,
+      slug: row.center.slug,
+      sectorId: row.center.sectorId,
+      brandColor: row.center.brandColor,
+      logoUrl: buildCenterLogoUrl(row.centerId, row.center.logoUpdatedAt),
+      modules: resolveCenterModules(row.center.disabledModules),
+      appearance: resolveVisibleAppearance(row.center),
+    },
+  };
+}
+
 @Injectable()
 export class PrismaProfileRepository implements ProfileRepository {
   constructor(private readonly tenantPrismaService: TenantPrismaService) {}
@@ -102,40 +144,10 @@ export class PrismaProfileRepository implements ProfileRepository {
       client.membership.findMany({
         where: { userId, status: { not: 'left' } },
         orderBy: { joinedAt: 'asc' },
-        include: {
-          user: { select: { photoKey: true } },
-          center: {
-            select: {
-              name: true,
-              slug: true,
-              sectorId: true,
-              brandColor: true,
-              logoUpdatedAt: true,
-              maxClients: true,
-              backgroundColor: true,
-              backgroundColorEnd: true,
-              hiveColor: true,
-            },
-          },
-        },
+        include: MEMBERSHIP_INCLUDE,
       }),
     );
-    return rows.map((row) => ({
-      membershipId: row.id,
-      centerId: row.centerId,
-      role: row.role,
-      status: row.status,
-      joinedAt: row.joinedAt,
-      photoKey: row.user.photoKey,
-      center: {
-        name: row.center.name,
-        slug: row.center.slug,
-        sectorId: row.center.sectorId,
-        brandColor: row.center.brandColor,
-        logoUrl: buildCenterLogoUrl(row.centerId, row.center.logoUpdatedAt),
-        appearance: resolveVisibleAppearance(row.center),
-      },
-    }));
+    return rows.map(toMyMembership);
   }
 
   async listLatestConsents(userId: string): Promise<ConsentState[]> {

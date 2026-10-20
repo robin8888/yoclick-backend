@@ -1,5 +1,9 @@
 import { createZodDto } from '../../../shared/http/create-zod-dto';
 import { z } from 'zod';
+import {
+  centerModuleChangesSchema,
+  centerModulesSchema,
+} from '../../../shared/centers/center-modules.schema';
 import { SECTOR_IDS } from '../../onboarding/http/create-center.dto';
 import { isValidTimeZone } from '../domain/opening-hours';
 import { openingHoursSchema } from './opening-hours.schema';
@@ -65,6 +69,7 @@ const centerSettingsShape = {
   openingHours: openingHoursSchema.nullable(),
   holidays: holidaysSchema.nullable(),
   cancelPolicy: cancelPolicySchema.nullable(),
+  modules: centerModulesSchema,
   trialEndsAt: z.iso.datetime().nullable(),
   /** Premium: fondo (liso, o degradado con el segundo color) y colmena. Nulo = los del tema. */
   backgroundColor: z.string().nullable(),
@@ -118,6 +123,8 @@ export class UpdateCenterSettingsRequestDto extends createZodDto(
       openingHours: openingHoursSchema.optional(),
       holidays: holidaysSchema.optional(),
       cancelPolicy: cancelPolicySchema.optional(),
+      /** Enciende o apaga módulos; solo los enviados cambian. */
+      modules: centerModuleChangesSchema.optional(),
       /** Premium. `null` quita el color y vuelve al del tema. */
       backgroundColor: hexColorSchema.nullable().optional(),
       backgroundColorEnd: hexColorSchema.nullable().optional(),

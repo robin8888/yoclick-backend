@@ -1,5 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { type Center, type Prisma } from '../../../generated/prisma/client';
+import {
+  applyCenterModuleChanges,
+  resolveCenterModules,
+} from '../../../shared/centers/center-modules';
 import { isPremiumPlan } from '../../../shared/centers/center-appearance';
 import { TenantPrismaService } from '../../../shared/database/tenant-prisma.service';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
@@ -37,6 +41,7 @@ function toSettings(center: Center): CenterSettings {
     openingHours: center.openingHours as OpeningHours | null,
     holidays: center.holidays as Holiday[] | null,
     cancelPolicy: center.cancelPolicy as CancelPolicy | null,
+    modules: resolveCenterModules(center.disabledModules),
     trialEndsAt: center.trialEndsAt,
     backgroundColor: center.backgroundColor,
     backgroundColorEnd: center.backgroundColorEnd,
@@ -46,9 +51,17 @@ function toSettings(center: Center): CenterSettings {
 }
 
 /** Solo los campos enviados: lo que falta no se toca (y `null` sí es un valor: borra el dato). */
-function toUpdateData(patch: CenterSettingsPatch): Prisma.CenterUpdateManyMutationInput {
-  const sentFields = Object.entries(patch).filter(([, value]) => value !== undefined);
-  return Object.fromEntries(sentFields);
+function toUpdateData(
+  patch: CenterSettingsPatch,
+  currentDisabledModules: readonly string[],
+): Prisma.CenterUpdateManyMutationInput {
+  const { modules, ...columns } = patch;
+  const sentFields = Object.entries(columns).filter(([, value]) => value !== undefined);
+  const disabledModules =
+    modules === undefined
+      ? {}
+      : { disabledModules: applyCenterModuleChanges(currentDisabledModules, modules) };
+  return { ...Object.fromEntries(sentFields), ...disabledModules };
 }
 
 @Injectable()
@@ -69,9 +82,13 @@ export class PrismaCenterSettingsRepository implements CenterSettingsRepository 
   ): Promise<CenterSettings | null> {
     return this.tenantPrismaService.runInTenantContext(actor, async (client) => {
       // Un solo UPDATE condicionado a la versión leída: si otra petición cambió el centro, no toca nada.
+      const current = await client.center.findUniqueOrThrow({
+        where: { id: actor.centerId },
+        select: { disabledModules: true },
+      });
       const result = await client.center.updateMany({
         where: { id: actor.centerId, updatedAt: expectedUpdatedAt },
-        data: toUpdateData(patch),
+        data: toUpdateData(patch, current.disabledModules),
       });
       if (result.count !== 1) return null;
       return toSettings(await client.center.findUniqueOrThrow({ where: { id: actor.centerId } }));

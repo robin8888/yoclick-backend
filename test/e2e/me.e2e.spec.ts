@@ -199,7 +199,7 @@ describe('the person own account (/v1/me)', () => {
         memberships: {
           centerId: string;
           role: string;
-          center: { slug: string; brandColor: string };
+          center: { slug: string; brandColor: string; modules: Record<string, boolean> };
         }[];
       }>();
       expect(
@@ -209,6 +209,13 @@ describe('the person own account (/v1/me)', () => {
       ).toEqual(['forja', 'studio-norte']);
       expect(memberships.find(({ centerId }) => centerId === forja)?.role).toBe('staff');
       expect(memberships[0]?.center.brandColor).toBe('#E4572E');
+      expect(memberships[0]?.center.modules).toEqual({
+        content: true,
+        attendance: true,
+        passes: true,
+        waitlist: true,
+        rooms: true,
+      });
     });
 
     it('leaves out the centers I have left', async () => {

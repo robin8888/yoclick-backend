@@ -172,6 +172,7 @@ describe('joining a center: lookup, search, branding and joining', () => {
         sectorId: 'gym',
         brandColor: '#E4572E',
         logoUrl: null,
+        modules: { content: true, attendance: true, passes: true, waitlist: true, rooms: true },
         appearance: { backgroundColor: null, backgroundColorEnd: null, hiveColor: null },
       });
     });

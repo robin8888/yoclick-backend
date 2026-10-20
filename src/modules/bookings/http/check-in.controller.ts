@@ -1,3 +1,4 @@
+import { RequiresModule } from '../../../shared/auth/decorators/requires-module.decorator';
 import { Body, Controller, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -102,6 +103,7 @@ export class CheckInController {
     };
   }
 
+  @RequiresModule('attendance')
   @Post('me/checkin-code')
   @Roles('client', 'owner', 'admin', 'staff')
   @HttpCode(HttpStatus.OK)
@@ -121,6 +123,7 @@ export class CheckInController {
     return { qrContent: code.qrContent, expiresAt: code.expiresAt.toISOString() };
   }
 
+  @RequiresModule('attendance')
   @Post('attendance/check-in')
   @Roles('owner', 'admin', 'staff')
   @HttpCode(HttpStatus.OK)

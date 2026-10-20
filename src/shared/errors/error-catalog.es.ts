@@ -77,6 +77,9 @@ export const ERROR_CATALOG = {
     title:
       'Esa persona ya da otra clase a esa hora en esos días. Elige otra hora, otra fecha u otra persona',
   },
+  MODULE_DISABLED: {
+    title: 'Tu centro no usa esta función. Puede activarla desde Módulos del centro',
+  },
   CLIENT_HAS_NO_PASS: {
     title:
       'Esa persona no tiene un bono en vigor con clases. Dale un bono desde su ficha para apuntarla',

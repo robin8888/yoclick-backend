@@ -1,5 +1,7 @@
 import { createZodDto } from '../../../shared/http/create-zod-dto';
 import { z } from 'zod';
+import { CENTER_WORK_MODES } from '../../../shared/centers/center-modules';
+import { centerModulesSchema } from '../../../shared/centers/center-modules.schema';
 import { LOGO_CONTENT_TYPES } from '../domain/center-logo-image';
 
 /** Los tipos de centro del producto; el vocabulario de cada uno vive en la app. */
@@ -35,6 +37,11 @@ export class CreateCenterRequestDto extends createZodDto(
     city: z.string().trim().min(1).max(MAX_CITY_LENGTH).optional(),
     /** Si el centro aparece en el buscador público. Por defecto no: se decide a propósito. */
     isListed: z.boolean().default(false),
+    /**
+     * Cómo trabaja el centro: con clases y grupos, solo con citas o con las dos cosas. Decide qué módulos
+     * lleva (con `appointments` nacen apagados; se encienden después desde los ajustes).
+     */
+    workMode: z.enum(CENTER_WORK_MODES).default('both'),
   }),
 ) {}
 
@@ -47,6 +54,7 @@ export class CreateCenterResponseDto extends createZodDto(
     sectorId: z.enum(SECTOR_IDS),
     brandColor: z.string(),
     isListed: z.boolean(),
+    modules: centerModulesSchema,
     /** El código con el que la clientela se une. Solo lo ve quien administra el centro. */
     joinCode: z.string(),
     trialEndsAt: z.iso.datetime(),

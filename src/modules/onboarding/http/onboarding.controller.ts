@@ -70,6 +70,7 @@ export class OnboardingController {
           brandColor: body.brandColor,
           city: body.city ?? null,
           isListed: body.isListed,
+          workMode: body.workMode,
         });
         return { status: HttpStatus.CREATED, body: { ...center } };
       },

@@ -20,6 +20,7 @@ interface CreatedCenterBody {
   trialEndsAt: string;
   brandColor: string;
   isListed: boolean;
+  modules: Record<string, boolean>;
 }
 
 describe('center onboarding', () => {
@@ -79,6 +80,28 @@ describe('center onboarding', () => {
     expect(memberships).toMatchObject([
       { id: body.ownerMembershipId, centerId: body.centerId, role: 'owner', status: 'active' },
     ]);
+  });
+
+  it('starts a center with everything on unless it only works with appointments', async () => {
+    const both = (await createCenter(person, VALID_BODY)).json<CreatedCenterBody>();
+    const appointmentsOnly = (
+      await createCenter(person, { ...VALID_BODY, name: 'Taller Norte', workMode: 'appointments' })
+    ).json<CreatedCenterBody>();
+
+    expect(both.modules).toEqual({
+      content: true,
+      attendance: true,
+      passes: true,
+      waitlist: true,
+      rooms: true,
+    });
+    expect(appointmentsOnly.modules).toEqual({
+      content: false,
+      attendance: false,
+      passes: false,
+      waitlist: false,
+      rooms: false,
+    });
   });
 
   it('lets people join the new center with the code it returns', async () => {

@@ -1,3 +1,7 @@
+import {
+  type CenterModuleChanges,
+  type CenterModules,
+} from '../../../../shared/centers/center-modules';
 import { type ActorContext } from '../../../../shared/tenancy/actor-context';
 import { type OpeningHours } from '../../domain/opening-hours';
 
@@ -36,6 +40,8 @@ export interface CenterSettings {
   readonly openingHours: OpeningHours | null;
   readonly holidays: readonly Holiday[] | null;
   readonly cancelPolicy: CancelPolicy | null;
+  /** Lo que el centro usa; la administración lo enciende o apaga desde los ajustes. */
+  readonly modules: CenterModules;
   readonly trialEndsAt: Date | null;
   /** Personalización Premium guardada (puede haber quedado de un plan anterior). */
   readonly backgroundColor: string | null;
@@ -64,6 +70,8 @@ export interface CenterSettingsPatch {
   readonly openingHours?: OpeningHours | undefined;
   readonly holidays?: readonly Holiday[] | undefined;
   readonly cancelPolicy?: CancelPolicy | undefined;
+  /** Solo los módulos que cambian: `{ passes: false }` apaga los bonos y deja el resto como estaba. */
+  readonly modules?: CenterModuleChanges | undefined;
   readonly backgroundColor?: string | null | undefined;
   readonly backgroundColorEnd?: string | null | undefined;
   readonly hiveColor?: string | null | undefined;

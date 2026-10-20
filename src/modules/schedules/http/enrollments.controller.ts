@@ -1,3 +1,4 @@
+import { RequiresModule } from '../../../shared/auth/decorators/requires-module.decorator';
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -38,6 +39,7 @@ function serializeEnrollment(enrollment: EnrollmentView): Record<string, unknown
 @ApiBearerAuth('bearer')
 @ApiHeader({ name: 'X-Center-Id', required: true })
 @ApiDefaultResponse({ type: ProblemDetailsDto, description: 'Error RFC 9457' })
+@RequiresModule('rooms')
 @Controller('centers/:centerId/schedules/:seriesId/enrollments')
 export class EnrollmentsController {
   constructor(

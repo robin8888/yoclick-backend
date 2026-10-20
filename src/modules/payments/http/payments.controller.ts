@@ -1,3 +1,4 @@
+import { RequiresModule } from '../../../shared/auth/decorators/requires-module.decorator';
 import { Controller, Get, HttpCode, HttpStatus, Param, Post, Req } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -128,6 +129,7 @@ export class PaymentsController {
     return { payments: payments.map(serializePaymentItem) };
   }
 
+  @RequiresModule('passes')
   @Post('passes/:passId/pay')
   @Roles('client')
   @ApiOperation({

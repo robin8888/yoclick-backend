@@ -199,6 +199,52 @@ describe('center settings (ETag / If-Match)', () => {
       expect(invalidTaxId.statusCode).toBe(400);
     });
 
+    it('turns modules off and on, and tells the public branding which ones the center uses', async () => {
+      const off = await call('PATCH', owner, {
+        ifMatch: await currentEtag(),
+        body: { modules: { passes: false, waitlist: false } },
+      });
+      const branding = await application.inject({
+        method: 'GET',
+        url: `/v1/centers/${centerId}/branding`,
+      });
+      const backOn = await call('PATCH', owner, {
+        ifMatch: await currentEtag(),
+        body: { modules: { passes: true } },
+      });
+
+      expect(off.json<{ modules: unknown }>().modules).toEqual({
+        content: true,
+        attendance: true,
+        passes: false,
+        waitlist: false,
+        rooms: true,
+      });
+      expect(branding.json<{ modules: unknown }>().modules).toMatchObject({
+        passes: false,
+        waitlist: false,
+        content: true,
+      });
+      expect(backOn.json<{ modules: unknown }>().modules).toMatchObject({
+        passes: true,
+        waitlist: false,
+      });
+    });
+
+    it('refuses an unknown module and an empty change', async () => {
+      const unknownModule = await call('PATCH', owner, {
+        ifMatch: await currentEtag(),
+        body: { modules: { teleport: false } },
+      });
+      const emptyChange = await call('PATCH', owner, {
+        ifMatch: await currentEtag(),
+        body: { modules: {} },
+      });
+
+      expect(unknownModule.statusCode).toBe(400);
+      expect(emptyChange.statusCode).toBe(400);
+    });
+
     it('lets an admin edit, and null clears an optional field', async () => {
       await call('PATCH', owner, { ifMatch: await currentEtag(), body: { city: 'Madrid' } });
 

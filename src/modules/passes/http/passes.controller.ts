@@ -1,3 +1,4 @@
+import { RequiresModule } from '../../../shared/auth/decorators/requires-module.decorator';
 import {
   Body,
   Controller,
@@ -92,6 +93,7 @@ export class RatesController {
     return { rates: await this.listRates.execute(actor) };
   }
 
+  @RequiresModule('passes')
   @Post()
   @Roles('owner', 'admin')
   @ApiOperation({
@@ -109,6 +111,7 @@ export class RatesController {
     return { ...(await this.createRate.execute(actor, body)) };
   }
 
+  @RequiresModule('passes')
   @Patch(':rateId')
   @Roles('owner', 'admin')
   @ApiOperation({
@@ -125,6 +128,7 @@ export class RatesController {
     return { ...(await this.updateRate.execute(actor, params.rateId, body)) };
   }
 
+  @RequiresModule('passes')
   @Delete(':rateId')
   @Roles('owner', 'admin')
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -141,6 +145,7 @@ export class RatesController {
     await this.archiveRate.execute(actor, params.rateId);
   }
 
+  @RequiresModule('passes')
   @Post(':rateId/request')
   @Roles('client')
   @ApiOperation({
@@ -229,6 +234,7 @@ export class PassesController {
     return { passes: passes.map(serializePass) };
   }
 
+  @RequiresModule('passes')
   @Post('assign')
   @Roles('owner', 'admin')
   @ApiOperation({
@@ -246,6 +252,7 @@ export class PassesController {
     return serializePass(await this.assignPass.execute(actor, body));
   }
 
+  @RequiresModule('passes')
   @Post(':passId/activate')
   @Roles('owner', 'admin')
   @HttpCode(HttpStatus.OK)
@@ -264,6 +271,7 @@ export class PassesController {
     );
   }
 
+  @RequiresModule('passes')
   @Post(':passId/reject')
   @Roles('owner', 'admin')
   @HttpCode(HttpStatus.OK)
@@ -282,6 +290,7 @@ export class PassesController {
     );
   }
 
+  @RequiresModule('passes')
   @Delete(':passId')
   @Roles('owner', 'admin')
   @HttpCode(HttpStatus.NO_CONTENT)

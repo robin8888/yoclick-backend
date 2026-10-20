@@ -326,6 +326,8 @@ model Center {
   holidays                  Json?
   /// Política de cancelación: { freeCancellationHours, lateCancellationConsumesCredit }
   cancelPolicy              Json?        @map("cancel_policy")
+  /// Módulos que el centro no usa (content, attendance, passes, waitlist, rooms). Vacío = todo encendido.
+  disabledModules           String[]     @default([]) @map("disabled_modules")
   /// Cu�ndo se subi� el logo vigente; nulo = sin logo. Sirve de versi�n de cach� sin leer los bytes.
   logoUpdatedAt             DateTime?    @map("logo_updated_at") @db.Timestamptz
   /// Espacio de vídeo contratado (plan Premium). Nulo = el plan no incluye vídeo. Solo lo cambia Yoclick.
@@ -645,6 +647,8 @@ model Service {
   bookingWindowDays   Int         @default(30) @map("booking_window_days")
   /// Antelación mínima para reservar.
   minNoticeMinutes    Int         @default(120) @map("min_notice_minutes")
+  /// Minutos que quedan libres tras cada cita de este servicio (preparar, limpiar). 0 = sin margen.
+  bufferMinutes       Int         @default(0) @map("buffer_minutes")
   /// Nulo = se usa la política de cancelación del centro.
   cancelNoticeMinutes Int?        @map("cancel_notice_minutes")
   isVisible           Boolean     @default(true) @map("is_visible")
