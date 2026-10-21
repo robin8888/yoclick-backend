@@ -11,4 +11,5 @@ export const HTTP_STATUS = {
   preconditionRequired: 428,
   tooManyRequests: 429,
   internalServerError: 500,
+  badGateway: 502,
 } as const;

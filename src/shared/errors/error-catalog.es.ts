@@ -141,6 +141,9 @@ export const ERROR_CATALOG = {
     title:
       'Esta cita está bloqueada: su bono se reembolsó. Hace falta un bono nuevo para atenderla',
   },
+  GEOCODING_UNAVAILABLE: {
+    title: 'Ahora mismo no podemos sugerirte direcciones. Escríbela a mano',
+  },
   TIME_ENTRY_OVERLAP: { title: 'Ese horario se solapa con otro turno que ya tienes registrado' },
   TIME_ENTRY_INVALID_RANGE: { title: 'La salida tiene que ser posterior a la entrada' },
   TIME_ENTRY_TOO_LONG: { title: 'Un turno no puede durar más de 16 horas' },

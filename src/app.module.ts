@@ -32,6 +32,7 @@ import { SchedulesModule } from './modules/schedules/schedules.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { MeModule } from './modules/me/me.module';
+import { GeocodeModule } from './modules/geocode/geocode.module';
 import { HealthModule } from './modules/health/health.module';
 import { AuthModule } from './shared/auth/auth.module';
 import { type Environment } from './shared/config/environment.schema';
@@ -68,6 +69,7 @@ import { buildLoggerOptions } from './shared/logging/build-logger-options';
     SchedulingModule,
     BookingsModule,
     ReportsModule,
+    GeocodeModule,
     RoomsModule,
     PassesModule,
     WaitlistModule,

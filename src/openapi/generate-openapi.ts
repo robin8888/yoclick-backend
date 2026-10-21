@@ -23,6 +23,7 @@ function fillPlaceholderEnvironment(): void {
     Buffer.alloc(PLACEHOLDER_PEPPER_BYTES).toString('base64');
   process.env['MFA_ENCRYPTION_KEY_BASE64'] ??=
     Buffer.alloc(PLACEHOLDER_PEPPER_BYTES).toString('base64');
+  process.env['GEOAPIFY_API_KEY'] ??= 'placeholder';
   process.env['LOG_LEVEL'] = 'silent';
 }
 

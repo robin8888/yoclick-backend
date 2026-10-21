@@ -58,6 +58,9 @@ const baseEnvironmentSchema = z.object({
       (value) => Buffer.from(value, 'base64').length === MFA_KEY_BYTES,
       `must decode to exactly ${String(MFA_KEY_BYTES)} bytes`,
     ),
+  // Clave de Geoapify (sugerencias de direcciones). Obligatoria en todos los entornos: desarrollo y producción
+  // usan el mismo proveedor. Plan gratuito en myprojects.geoapify.com.
+  GEOAPIFY_API_KEY: z.string().min(1),
   // Comprueba contraseñas contra filtraciones conocidas (k-anonymity, SEC-43). Solo se apaga sin red.
   PASSWORD_BREACH_CHECK: z.enum(['enabled', 'disabled']).default('enabled'),
   // Límite de peticiones por IP (SEC-46, SEC-50). Solo se apaga en tests; en producción es obligatorio.

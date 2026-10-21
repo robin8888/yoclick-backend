@@ -49,5 +49,7 @@ export const RATE_LIMITS = {
   uploadPhoto: { limit: 10, ttl: ONE_MINUTE },
   uploadDocument: { limit: 10, ttl: ONE_MINUTE },
   startVideoUpload: { limit: 10, ttl: MILLISECONDS_PER_HOUR },
+  /** Sugerencias de dirección: cada una llama a un tercero gratuito; la app pregunta al teclear, con espera. */
+  searchAddress: { limit: 40, ttl: ONE_MINUTE },
   accountSecurity: { limit: 5, ttl: ONE_MINUTE },
 } as const satisfies Record<string, RateLimitPolicy>;

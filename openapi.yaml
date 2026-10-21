@@ -3236,6 +3236,34 @@ paths:
       summary: "Informes del centro de la última semana, mes (30 días) o trimestre (90 días): ingresos estimados por las citas, ocupación, retención, clientes inactivos, ocupación por servicio, horas por profesional y retención por mes de alta."
       tags:
         - reports
+  /v1/geocode/suggestions:
+    post:
+      operationId: geocode_search_suggestions
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddressSuggestionsRequestDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AddressSuggestionsResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Direcciones o ciudades que encajan con lo escrito, con sus coordenadas. Responde 502 GEOCODING_UNAVAILABLE si el proveedor no contesta.
+      tags:
+        - geocode
   /v1/centers/{centerId}/rooms:
     get:
       operationId: rooms_list
@@ -13676,6 +13704,69 @@ components:
         - services
         - staff
         - retentionByJoinMonth
+      additionalProperties: false
+    AddressSuggestionsRequestDto:
+      type: object
+      properties:
+        query:
+          type: string
+          minLength: 3
+          maxLength: 200
+        kind:
+          type: string
+          enum:
+            - address
+            - city
+        countryCode:
+          type: string
+          enum:
+            - ES
+            - CO
+      required:
+        - query
+        - kind
+      additionalProperties: false
+    AddressSuggestionsResponseDto:
+      type: object
+      properties:
+        suggestions:
+          type: array
+          items:
+            type: object
+            properties:
+              label:
+                type: string
+              street:
+                type: string
+                nullable: true
+              houseNumber:
+                type: string
+                nullable: true
+              city:
+                type: string
+                nullable: true
+              postcode:
+                type: string
+                nullable: true
+              latitude:
+                type: number
+                minimum: -90
+                maximum: 90
+              longitude:
+                type: number
+                minimum: -180
+                maximum: 180
+            required:
+              - label
+              - street
+              - houseNumber
+              - city
+              - postcode
+              - latitude
+              - longitude
+            additionalProperties: false
+      required:
+        - suggestions
       additionalProperties: false
     RoomListResponseDto:
       type: object

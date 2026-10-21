@@ -15,6 +15,7 @@ function developmentEnvironment(overrides: Record<string, unknown> = {}): Record
     JWT_ACCESS_PUBLIC_KEY_BASE64: FAKE_KEY_BASE64,
     AUTH_CODE_PEPPER_BASE64: FAKE_PEPPER_BASE64,
     MFA_ENCRYPTION_KEY_BASE64: FAKE_MFA_KEY_BASE64,
+    GEOAPIFY_API_KEY: 'geoapify-key',
     ...overrides,
   };
 }
@@ -163,6 +164,14 @@ describe('parseEnvironment', () => {
       );
 
       expect(errorMessage).not.toContain(FAKE_KEY_BASE64);
+    });
+  });
+
+  describe('GEOAPIFY_API_KEY', () => {
+    it('is required in every environment, so development and production use the same provider', () => {
+      expect(() =>
+        parseEnvironment(developmentEnvironment({ GEOAPIFY_API_KEY: undefined })),
+      ).toThrow(/GEOAPIFY_API_KEY/);
     });
   });
 
