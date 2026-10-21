@@ -2,12 +2,16 @@ import { type Reflector } from '@nestjs/core';
 import { type MembershipRoleName } from '../tenancy/actor-context';
 import { ALLOWED_ROLES_ROUTE_KEY } from './decorators/roles.decorator';
 import { IS_PUBLIC_ROUTE_KEY } from './decorators/public.decorator';
+import { PLATFORM_ROLES_ROUTE_KEY } from './decorators/platform-roles.decorator';
 import { IS_USER_SCOPED_ROUTE_KEY } from './decorators/user-scoped.decorator';
+import { type PlatformRoleName } from './authenticated-request';
 
 export type AccessPolicy =
   | { readonly kind: 'public' }
   | { readonly kind: 'user' }
   | { readonly kind: 'roles'; readonly roles: readonly MembershipRoleName[] }
+  /** Administración de la plataforma: rol de plataforma de la persona y segundo factor obligatorio. */
+  | { readonly kind: 'platform'; readonly roles: readonly PlatformRoleName[] }
   /** La ruta no declara quién puede llamarla (o se contradice): se deniega. */
   | { readonly kind: 'undeclared' };
 
@@ -15,6 +19,7 @@ interface Declarations {
   readonly isPublic: boolean;
   readonly isUserScoped: boolean;
   readonly roles: readonly MembershipRoleName[] | undefined;
+  readonly platformRoles: readonly PlatformRoleName[] | undefined;
 }
 
 type DecoratedTarget = Parameters<Reflector['get']>[1];
@@ -27,6 +32,10 @@ function readDeclarations(reflector: Reflector, target: DecoratedTarget): Declar
       ALLOWED_ROLES_ROUTE_KEY,
       target,
     ),
+    platformRoles: reflector.get<readonly PlatformRoleName[] | undefined>(
+      PLATFORM_ROLES_ROUTE_KEY,
+      target,
+    ),
   };
 }
 
@@ -35,6 +44,7 @@ function countDeclarations(declarations: Declarations): number {
     declarations.isPublic,
     declarations.isUserScoped,
     declarations.roles !== undefined,
+    declarations.platformRoles !== undefined,
   ].filter(Boolean).length;
 }
 
@@ -43,6 +53,13 @@ function resolvePolicy(declarations: Declarations): AccessPolicy {
   if (countDeclarations(declarations) !== 1) return { kind: 'undeclared' };
   if (declarations.isPublic) return { kind: 'public' };
   if (declarations.isUserScoped) return { kind: 'user' };
+
+  if (declarations.platformRoles !== undefined) {
+    // Una lista vacía no puede significar «cualquiera»: se deniega.
+    return declarations.platformRoles.length > 0
+      ? { kind: 'platform', roles: declarations.platformRoles }
+      : { kind: 'undeclared' };
+  }
 
   const roles = declarations.roles ?? [];
   // Una lista vacía no puede significar "cualquiera": es un descuido, no una política.

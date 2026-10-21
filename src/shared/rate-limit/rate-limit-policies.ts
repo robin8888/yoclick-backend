@@ -29,6 +29,8 @@ export const RATE_LIMITS = {
   /** Cambiar contraseña, exportar datos, eliminar la cuenta: lo que haría quien robara un token. */
   /** Dar de alta centros: poco frecuente y atractivo para el abuso. */
   createCenter: { limit: 5, ttl: ONE_MINUTE },
+  /** Administración de la plataforma: una persona, unas pocas pantallas por minuto. */
+  platformAdmin: { limit: 60, ttl: ONE_MINUTE },
   /** Subir el logo: se hace una vez al dar de alta el centro y rara vez después. */
   uploadCenterLogo: { limit: 10, ttl: MILLISECONDS_PER_HOUR },
   /** Reservar: una persona normal reserva pocas citas por minuto; un bucle de reservas no. */

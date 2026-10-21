@@ -6,6 +6,7 @@ import { AccessTokenService } from './access-token.service';
 import { AuthenticationGuard } from './guards/authentication.guard';
 import { AuthorizationGuard } from './guards/authorization.guard';
 import { ModuleGuard } from './guards/module.guard';
+import { PlatformRoleFinder } from './platform-role.finder';
 import { SecondFactorEnrollmentChecker } from './second-factor-enrollment.checker';
 import { TenantGuard } from './guards/tenant.guard';
 
@@ -15,6 +16,7 @@ import { TenantGuard } from './guards/tenant.guard';
     AccessTokenService,
     ActiveMembershipFinder,
     SecondFactorEnrollmentChecker,
+    PlatformRoleFinder,
     CenterModulesFinder,
     // El ORDEN importa: primero quién eres, luego a qué centro perteneces, al final qué puedes hacer.
     { provide: APP_GUARD, useClass: AuthenticationGuard },

@@ -60,3 +60,26 @@ export async function runStatementAsOwnerForUser(
     await client.end();
   }
 }
+
+/**
+ * Concede un rol de plataforma como dueño de las tablas, que es como lo hace el script de la línea de
+ * comandos. La API no puede: un trigger rechaza el cambio hecho con su rol.
+ */
+export async function grantPlatformRoleAsOwner(
+  userId: string,
+  platformRole: 'admin' | 'accountant',
+): Promise<void> {
+  const migrationUrl = readRequiredEnvironmentVariable('TEST_MIGRATION_DATABASE_URL');
+  assertIsTestDatabase(migrationUrl);
+  const client = new Client({ connectionString: migrationUrl });
+  await client.connect();
+  try {
+    const result = await client.query(
+      'update "users" set "platform_role" = $1::platform_role where "id" = $2',
+      [platformRole, userId],
+    );
+    if (result.rowCount === 0) throw new Error(`No user ${userId} to grant ${platformRole}`);
+  } finally {
+    await client.end();
+  }
+}

@@ -20,6 +20,15 @@ enum CenterStatus {
   @@map("center_status")
 }
 
+/// Rol de la persona en la plataforma (no en un centro). Solo se concede con el script de la línea de comandos.
+enum PlatformRole {
+  none
+  admin
+  accountant
+
+  @@map("platform_role")
+}
+
 enum MembershipRole {
   owner
   admin
@@ -263,34 +272,37 @@ enum MembershipStatus {
 
 /// Persona con cuenta. Global (sin center_id): una persona puede tener varios centros.
 model User {
-  id               String    @id @db.Uuid
-  email            String    @unique @db.Citext
-  passwordHash     String    @map("password_hash")
-  fullName         String    @map("full_name")
-  emailVerifiedAt  DateTime? @map("email_verified_at") @db.Timestamptz
-  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz
+  id               String       @id @db.Uuid
+  email            String       @unique @db.Citext
+  passwordHash     String       @map("password_hash")
+  fullName         String       @map("full_name")
+  emailVerifiedAt  DateTime?    @map("email_verified_at") @db.Timestamptz
+  deletedAt        DateTime?    @map("deleted_at") @db.Timestamptz
   /// Intentos de inicio de sesión fallidos seguidos; al llegar al límite se bloquea un rato.
-  failedLoginCount Int       @default(0) @map("failed_login_count")
-  lockedUntil      DateTime? @map("locked_until") @db.Timestamptz
-  lastLoginAt      DateTime? @map("last_login_at") @db.Timestamptz
+  failedLoginCount Int          @default(0) @map("failed_login_count")
+  lockedUntil      DateTime?    @map("locked_until") @db.Timestamptz
+  lastLoginAt      DateTime?    @map("last_login_at") @db.Timestamptz
+  /// Administración de la plataforma: `admin` (dueño) o `accountant` (gestor, solo lectura). Nunca lo cambia la API.
+  platformRole     PlatformRole @default(none) @map("platform_role")
   phone            String?
   /// Dirección postal opcional que la persona da a su centro.
   address          String?
-  birthDate        DateTime? @map("birth_date") @db.Date
-  locale           String    @default("es-ES")
+  birthDate        DateTime?    @map("birth_date") @db.Date
+  locale           String       @default("es-ES")
   /// Ruta de su foto de perfil en el almacén de ficheros; una por persona, la misma en todos sus centros.
-  photoKey         String?   @map("photo_key")
-  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  photoKey         String?      @map("photo_key")
+  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime     @updatedAt @map("updated_at") @db.Timestamptz
 
-  memberships       Membership[]
-  idempotencyKeys   IdempotencyKey[]
-  consents          Consent[]
-  pushDevices       PushDevice[]
-  verificationCodes VerificationCode[]
-  refreshTokens     RefreshToken[]
-  mfaFactor         MfaFactor?
-  mfaRecoveryCodes  MfaRecoveryCode[]
+  memberships          Membership[]
+  platformAuditEntries PlatformAuditEntry[]
+  idempotencyKeys      IdempotencyKey[]
+  consents             Consent[]
+  pushDevices          PushDevice[]
+  verificationCodes    VerificationCode[]
+  refreshTokens        RefreshToken[]
+  mfaFactor            MfaFactor?
+  mfaRecoveryCodes     MfaRecoveryCode[]
 
   @@map("users")
 }
@@ -352,41 +364,42 @@ model Center {
   createdAt                 DateTime     @default(now()) @map("created_at") @db.Timestamptz
   updatedAt                 DateTime     @updatedAt @map("updated_at") @db.Timestamptz
 
-  videos              Video[]
-  contentItems        ContentItem[]
-  contentAssignments  ContentAssignment[]
-  staffProfiles       StaffProfile[]
-  staffCertifications StaffCertification[]
-  staffProfilePhotos  StaffProfilePhoto[]
-  staffReviews        StaffReview[]
-  privacyRequests     PrivacyRequest[]
-  memberships         Membership[]
-  invitations         Invitation[]
-  logo                CenterLogo?
-  services            Service[]
-  classSessions       ClassSession[]
-  bookings            Booking[]
-  rooms               Room[]
-  rates               Rate[]
-  clientPasses        ClientPass[]
-  payments            Payment[]
-  waitlistEntries     WaitlistEntry[]
-  staffTimeEntries    StaffTimeEntry[]
-  balanceMovements    BalanceMovement[]
-  staffAvailabilities StaffAvailability[]
-  routines            Routine[]
-  routineAssignments  RoutineAssignment[]
-  routineCompletions  RoutineCompletion[]
-  staffAbsences       StaffAbsence[]
-  clientGroups        ClientGroup[]
-  notifications       Notification[]
-  activityLogs        ActivityLog[]
-  sessionSchedules    SessionSchedule[]
-  scheduleEnrollments ScheduleEnrollment[]
-  roomBlocks          RoomBlock[]
-  conversations       Conversation[]
-  messages            Message[]
-  guardianLinks       GuardianLink[]
+  videos               Video[]
+  contentItems         ContentItem[]
+  contentAssignments   ContentAssignment[]
+  staffProfiles        StaffProfile[]
+  staffCertifications  StaffCertification[]
+  staffProfilePhotos   StaffProfilePhoto[]
+  staffReviews         StaffReview[]
+  privacyRequests      PrivacyRequest[]
+  memberships          Membership[]
+  invitations          Invitation[]
+  logo                 CenterLogo?
+  services             Service[]
+  classSessions        ClassSession[]
+  bookings             Booking[]
+  rooms                Room[]
+  rates                Rate[]
+  clientPasses         ClientPass[]
+  payments             Payment[]
+  waitlistEntries      WaitlistEntry[]
+  staffTimeEntries     StaffTimeEntry[]
+  balanceMovements     BalanceMovement[]
+  staffAvailabilities  StaffAvailability[]
+  routines             Routine[]
+  routineAssignments   RoutineAssignment[]
+  routineCompletions   RoutineCompletion[]
+  staffAbsences        StaffAbsence[]
+  clientGroups         ClientGroup[]
+  notifications        Notification[]
+  activityLogs         ActivityLog[]
+  sessionSchedules     SessionSchedule[]
+  scheduleEnrollments  ScheduleEnrollment[]
+  roomBlocks           RoomBlock[]
+  conversations        Conversation[]
+  messages             Message[]
+  guardianLinks        GuardianLink[]
+  platformAuditEntries PlatformAuditEntry[]
 
   @@map("centers")
 }
@@ -1463,10 +1476,10 @@ model Payment {
   clientPass       ClientPass? @relation(fields: [clientPassId], references: [id])
   roomBlock        RoomBlock?  @relation(fields: [roomBlockId], references: [id], onDelete: SetNull)
 
+  @@unique([centerId, receiptNumber])
   @@index([centerId, status])
   @@index([clientPassId])
   @@index([roomBlockId])
-  @@unique([centerId, receiptNumber])
   @@map("payments")
 }
 
@@ -1568,4 +1581,22 @@ model WaitlistEntry {
   @@index([centerId, classSessionId, status])
   @@index([centerId, clientMembershipId, status])
   @@map("waitlist_entries")
+}
+
+/// Lo que hace la plataforma sobre un centro (ampliar la prueba, suspender, cambiar límites). Solo se inserta.
+model PlatformAuditEntry {
+  id          String   @id @db.Uuid
+  actorUserId String   @map("actor_user_id") @db.Uuid
+  /// Qué se hizo (`center_suspended`, `trial_extended`…).
+  action      String
+  centerId    String?  @map("center_id") @db.Uuid
+  details     Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  actor  User    @relation(fields: [actorUserId], references: [id])
+  center Center? @relation(fields: [centerId], references: [id])
+
+  @@index([createdAt(sort: Desc)])
+  @@index([centerId, createdAt(sort: Desc)])
+  @@map("platform_audit_log")
 }

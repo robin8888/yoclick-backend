@@ -3,7 +3,8 @@ import { Reflector } from '@nestjs/core';
 import { DomainError } from '../../errors/domain-error';
 import { HTTP_STATUS } from '../../errors/http-status';
 import { readAccessPolicy } from '../access-policy';
-import { type AuthenticatedRequest } from '../authenticated-request';
+import { type AuthenticatedRequest, type PlatformRoleName } from '../authenticated-request';
+import { PlatformRoleFinder } from '../platform-role.finder';
 import { STAFF_PERMISSION_ROUTE_KEY } from '../decorators/staff-permission.decorator';
 import { type TeamPermission } from '../../tenancy/team-permissions';
 import { SecondFactorEnrollmentChecker } from '../second-factor-enrollment.checker';
@@ -20,6 +21,7 @@ export class AuthorizationGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly enrollmentChecker: SecondFactorEnrollmentChecker,
+    private readonly platformRoleFinder: PlatformRoleFinder,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -42,9 +44,34 @@ export class AuthorizationGuard implements CanActivate {
         }
         return true;
       }
+      case 'platform':
+        return this.authorizePlatformRoute(context, policy.roles);
       case 'undeclared':
         throw new DomainError('FORBIDDEN', HTTP_STATUS.forbidden);
     }
+  }
+
+  /**
+   * Administración de la plataforma: el rol sale de la base de datos y la sesión debe haberse abierto con
+   * segundo factor. A quien no tiene rol de plataforma se le responde como a una ruta que no existe, para
+   * no revelar que hay una administración.
+   */
+  private async authorizePlatformRoute(
+    context: ExecutionContext,
+    allowedRoles: readonly PlatformRoleName[],
+  ): Promise<boolean> {
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
+    const { authenticatedUserId } = request;
+    if (authenticatedUserId === undefined) {
+      throw new DomainError('UNAUTHENTICATED', HTTP_STATUS.unauthorized);
+    }
+    const role = await this.platformRoleFinder.find(authenticatedUserId);
+    if (role === null) throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
+    if (!allowedRoles.includes(role)) throw new DomainError('FORBIDDEN', HTTP_STATUS.forbidden);
+    if (request.isMfaVerified !== true)
+      throw new DomainError('MFA_REQUIRED', HTTP_STATUS.forbidden);
+    request.platformActor = { userId: authenticatedUserId, role };
+    return true;
   }
 
   /**
