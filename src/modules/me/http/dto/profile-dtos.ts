@@ -44,6 +44,8 @@ const profileResponseSchema = z.strictObject({
   /** Enlace firmado y temporal a mi foto de perfil; nulo si no tengo. */
   photoUrl: z.string().nullable(),
   isEmailVerified: z.boolean(),
+  /** Rol en la administración de la plataforma; la app lo usa para enseñar esa zona. */
+  platformRole: z.enum(['none', 'admin', 'accountant']),
   createdAt: z.iso.datetime(),
 });
 

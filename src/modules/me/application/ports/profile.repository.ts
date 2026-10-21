@@ -13,6 +13,8 @@ export interface Profile {
   /** Ruta de su foto de perfil en el almacén; la API la convierte en un enlace firmado. */
   readonly photoKey: string | null;
   readonly isEmailVerified: boolean;
+  /** Rol en la administración de la plataforma; `none` para casi todas las personas. */
+  readonly platformRole: 'none' | 'admin' | 'accountant';
   readonly createdAt: Date;
 }
 

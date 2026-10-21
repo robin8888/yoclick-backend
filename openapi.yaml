@@ -3904,6 +3904,208 @@ paths:
       summary: "Quita un bono asignado (por error o dado de baja): deja de salir y de poder usarse. No se borra del libro. 404 si no existe o ya estaba quitado."
       tags:
         - passes
+  /v1/platform/overview:
+    get:
+      operationId: platform_get_overview
+      parameters: []
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlatformOverviewResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: "Cifras de toda la plataforma: centros por estado, altas, pruebas que acaban, clientes y reservas agregados y evolución de 12 meses."
+      tags:
+        - platform
+  /v1/platform/centers:
+    get:
+      operationId: platform_list_centers
+      parameters:
+        - name: limit
+          required: false
+          in: query
+          schema:
+            minimum: 1
+            maximum: 100
+            default: 20
+            type: integer
+        - name: cursor
+          required: false
+          in: query
+          schema:
+            maxLength: 512
+            type: string
+        - name: status
+          required: false
+          in: query
+          schema:
+            type: string
+            enum:
+              - trial
+              - active
+              - past_due
+              - suspended
+        - name: sectorId
+          required: false
+          in: query
+          schema:
+            type: string
+            enum:
+              - gym
+              - estudio
+              - readap
+              - box
+              - yoga
+              - academia
+              - baile
+              - marciales
+              - musica
+              - cocina
+              - peluqueria
+              - estetica
+              - fisioterapia
+              - psicologia
+              - otro
+        - name: search
+          required: false
+          in: query
+          schema:
+            minLength: 1
+            maxLength: 80
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlatformCenterListResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Centros con su plan, estado y cifras de uso (clientes activos, equipo, reservas de 30 días). Filtros por estado, sector y nombre.
+      tags:
+        - platform
+  /v1/platform/centers/{centerId}:
+    get:
+      operationId: platform_get_center
+      parameters:
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlatformCenterDetailResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Un centro con sus límites, módulos y cifras de uso.
+      tags:
+        - platform
+    patch:
+      operationId: platform_update_center
+      parameters:
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePlatformCenterRequestDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlatformCenterDetailResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Cambia el estado, el fin de la prueba (siempre en el futuro) o el tope de clientes de un centro. Cada cambio queda en el registro de auditoría.
+      tags:
+        - platform
+  /v1/platform/audit-log:
+    get:
+      operationId: platform_list_audit_log
+      parameters:
+        - name: limit
+          required: false
+          in: query
+          schema:
+            minimum: 1
+            maximum: 100
+            default: 20
+            type: integer
+        - name: cursor
+          required: false
+          in: query
+          schema:
+            maxLength: 512
+            type: string
+        - name: centerId
+          required: false
+          in: query
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlatformAuditListResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Registro de lo que se ha hecho desde la administración de la plataforma, lo último primero.
+      tags:
+        - platform
   /v1/centers/{centerId}/payments/status:
     get:
       operationId: payments_get_status
@@ -8292,6 +8494,12 @@ components:
           nullable: true
         isEmailVerified:
           type: boolean
+        platformRole:
+          type: string
+          enum:
+            - none
+            - admin
+            - accountant
         createdAt:
           type: string
           format: date-time
@@ -8306,6 +8514,7 @@ components:
         - locale
         - photoUrl
         - isEmailVerified
+        - platformRole
         - createdAt
       additionalProperties: false
     UpdateProfileRequestDto:
@@ -8553,6 +8762,12 @@ components:
               nullable: true
             isEmailVerified:
               type: boolean
+            platformRole:
+              type: string
+              enum:
+                - none
+                - admin
+                - accountant
             createdAt:
               type: string
               format: date-time
@@ -8567,6 +8782,7 @@ components:
             - locale
             - photoUrl
             - isEmailVerified
+            - platformRole
             - createdAt
           additionalProperties: false
         memberships:
@@ -14364,6 +14580,376 @@ components:
       required:
         - rateId
         - clientMembershipId
+      additionalProperties: false
+    PlatformOverviewResponseDto:
+      type: object
+      properties:
+        generatedAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+        centers:
+          type: object
+          properties:
+            total:
+              type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+            byStatus:
+              type: object
+              properties:
+                trial:
+                  type: integer
+                  minimum: -9007199254740991
+                  maximum: 9007199254740991
+                active:
+                  type: integer
+                  minimum: -9007199254740991
+                  maximum: 9007199254740991
+                past_due:
+                  type: integer
+                  minimum: -9007199254740991
+                  maximum: 9007199254740991
+                suspended:
+                  type: integer
+                  minimum: -9007199254740991
+                  maximum: 9007199254740991
+              required:
+                - trial
+                - active
+                - past_due
+                - suspended
+              additionalProperties: false
+            newLast30Days:
+              type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+            trialsEndingWithin7Days:
+              type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+          required:
+            - total
+            - byStatus
+            - newLast30Days
+            - trialsEndingWithin7Days
+          additionalProperties: false
+        people:
+          type: object
+          properties:
+            activeClients:
+              type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+            activeTeamMembers:
+              type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+          required:
+            - activeClients
+            - activeTeamMembers
+          additionalProperties: false
+        bookingsLast30Days:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        monthly:
+          type: object
+          properties:
+            newCenters:
+              type: array
+              items:
+                type: object
+                properties:
+                  month:
+                    type: string
+                  count:
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                required:
+                  - month
+                  - count
+                additionalProperties: false
+            bookings:
+              type: array
+              items:
+                type: object
+                properties:
+                  month:
+                    type: string
+                  count:
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                required:
+                  - month
+                  - count
+                additionalProperties: false
+          required:
+            - newCenters
+            - bookings
+          additionalProperties: false
+        centersBySector:
+          type: array
+          items:
+            type: object
+            properties:
+              sectorId:
+                type: string
+              count:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+            required:
+              - sectorId
+              - count
+            additionalProperties: false
+      required:
+        - generatedAt
+        - centers
+        - people
+        - bookingsLast30Days
+        - monthly
+        - centersBySector
+      additionalProperties: false
+    PlatformCenterListResponseDto:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              name:
+                type: string
+              slug:
+                type: string
+              sectorId:
+                type: string
+              city:
+                type: string
+                nullable: true
+              status:
+                type: string
+                enum:
+                  - trial
+                  - active
+                  - past_due
+                  - suspended
+              createdAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+              trialEndsAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                nullable: true
+              maxClients:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+                nullable: true
+              activeClientCount:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+              teamMemberCount:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+              bookingsLast30Days:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+              lastBookingAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                nullable: true
+            required:
+              - id
+              - name
+              - slug
+              - sectorId
+              - city
+              - status
+              - createdAt
+              - trialEndsAt
+              - maxClients
+              - activeClientCount
+              - teamMemberCount
+              - bookingsLast30Days
+              - lastBookingAt
+            additionalProperties: false
+        nextCursor:
+          type: string
+          nullable: true
+      required:
+        - data
+        - nextCursor
+      additionalProperties: false
+    PlatformCenterDetailResponseDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        name:
+          type: string
+        slug:
+          type: string
+        sectorId:
+          type: string
+        city:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum:
+            - trial
+            - active
+            - past_due
+            - suspended
+        createdAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+        trialEndsAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+          nullable: true
+        maxClients:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+          nullable: true
+        activeClientCount:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        teamMemberCount:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        bookingsLast30Days:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        lastBookingAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+          nullable: true
+        timezone:
+          type: string
+        disabledModules:
+          type: array
+          items:
+            type: string
+        stripeChargesEnabled:
+          type: boolean
+        documentStorageLimitBytes:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        videoStorageLimitBytes:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+          nullable: true
+        photoStorageLimitBytes:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+      required:
+        - id
+        - name
+        - slug
+        - sectorId
+        - city
+        - status
+        - createdAt
+        - trialEndsAt
+        - maxClients
+        - activeClientCount
+        - teamMemberCount
+        - bookingsLast30Days
+        - lastBookingAt
+        - timezone
+        - disabledModules
+        - stripeChargesEnabled
+        - documentStorageLimitBytes
+        - videoStorageLimitBytes
+        - photoStorageLimitBytes
+      additionalProperties: false
+    UpdatePlatformCenterRequestDto:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - trial
+            - active
+            - past_due
+            - suspended
+        trialEndsAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+          nullable: true
+        maxClients:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+          nullable: true
+      additionalProperties: false
+    PlatformAuditListResponseDto:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              action:
+                type: string
+              centerId:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                nullable: true
+              details:
+                type: object
+                additionalProperties: {}
+              createdAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+            required:
+              - id
+              - action
+              - centerId
+              - details
+              - createdAt
+            additionalProperties: false
+        nextCursor:
+          type: string
+          nullable: true
+      required:
+        - data
+        - nextCursor
       additionalProperties: false
     PaymentsStatusResponseDto:
       type: object

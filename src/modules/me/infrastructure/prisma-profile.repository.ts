@@ -26,6 +26,7 @@ interface ProfileRow {
   locale: string;
   photoKey: string | null;
   emailVerifiedAt: Date | null;
+  platformRole: 'none' | 'admin' | 'accountant';
   createdAt: Date;
 }
 
@@ -39,6 +40,7 @@ const PROFILE_SELECT = {
   locale: true,
   photoKey: true,
   emailVerifiedAt: true,
+  platformRole: true,
   createdAt: true,
 } as const;
 
@@ -53,6 +55,7 @@ function toProfile(row: ProfileRow): Profile {
     locale: row.locale,
     photoKey: row.photoKey,
     isEmailVerified: row.emailVerifiedAt !== null,
+    platformRole: row.platformRole,
     createdAt: row.createdAt,
   };
 }
