@@ -16,6 +16,10 @@ export const SECTOR_IDS = [
   'marciales',
   'musica',
   'cocina',
+  'peluqueria',
+  'estetica',
+  'fisioterapia',
+  'psicologia',
   'otro',
 ] as const;
 

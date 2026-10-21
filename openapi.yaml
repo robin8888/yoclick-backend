@@ -8862,6 +8862,10 @@ components:
             - marciales
             - musica
             - cocina
+            - peluqueria
+            - estetica
+            - fisioterapia
+            - psicologia
             - otro
         brandColor:
           type: string
@@ -8912,6 +8916,10 @@ components:
             - marciales
             - musica
             - cocina
+            - peluqueria
+            - estetica
+            - fisioterapia
+            - psicologia
             - otro
         brandColor:
           type: string
@@ -10018,6 +10026,10 @@ components:
             - marciales
             - musica
             - cocina
+            - peluqueria
+            - estetica
+            - fisioterapia
+            - psicologia
             - otro
         brandColor:
           type: string

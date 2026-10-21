@@ -14,6 +14,10 @@ type SectorId =
   | 'marciales'
   | 'musica'
   | 'cocina'
+  | 'peluqueria'
+  | 'estetica'
+  | 'fisioterapia'
+  | 'psicologia'
   | 'otro';
 
 /**
@@ -81,6 +85,30 @@ export const SECTOR_SERVICE_SUGGESTIONS: Readonly<Record<SectorId, readonly Sugg
     { name: 'Panadería y masas', durationMinutes: 180 },
     { name: 'Repostería', durationMinutes: 150 },
     { name: 'Taller de sushi', durationMinutes: 120 },
+  ],
+  peluqueria: [
+    { name: 'Corte de pelo', durationMinutes: 30 },
+    { name: 'Color', durationMinutes: 90 },
+    { name: 'Peinado', durationMinutes: 45 },
+    { name: 'Corte y barba', durationMinutes: 45 },
+  ],
+  estetica: [
+    { name: 'Manicura', durationMinutes: 45 },
+    { name: 'Tratamiento facial', durationMinutes: 60 },
+    { name: 'Depilación', durationMinutes: 30 },
+    { name: 'Masaje relajante', durationMinutes: 60 },
+  ],
+  fisioterapia: [
+    { name: 'Sesión de fisioterapia', durationMinutes: 45 },
+    { name: 'Primera visita', durationMinutes: 60 },
+    { name: 'Masaje terapéutico', durationMinutes: 30 },
+    { name: 'Punción seca', durationMinutes: 30 },
+  ],
+  psicologia: [
+    { name: 'Sesión de terapia', durationMinutes: 50 },
+    { name: 'Primera visita', durationMinutes: 60 },
+    { name: 'Sesión de seguimiento', durationMinutes: 30 },
+    { name: 'Terapia de pareja', durationMinutes: 75 },
   ],
   otro: [
     { name: 'Clase individual', durationMinutes: 60 },
