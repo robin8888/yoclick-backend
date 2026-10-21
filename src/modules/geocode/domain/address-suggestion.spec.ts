@@ -101,4 +101,15 @@ describe('selectSuggestions for cities', () => {
     expect(narrowed?.label).toBe('Medellín, Antioquia');
     expect(open?.label).toBe('Medellín, Antioquia, Colombia');
   });
+
+  it('skips urban perimeters, which OpenStreetMap lists next to the city itself', () => {
+    const perimeter: GeocodedPlace = { ...medellin, name: 'Perímetro Urbano Medellín' };
+
+    const labels = selectSuggestions([perimeter, medellin], {
+      kind: 'city',
+      countryCode: 'CO',
+    }).map(({ label }) => label);
+
+    expect(labels).toEqual(['Medellín, Antioquia']);
+  });
 });

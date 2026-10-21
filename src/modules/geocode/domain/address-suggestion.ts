@@ -61,8 +61,12 @@ function toAddressSuggestion(place: GeocodedPlace): AddressSuggestion | null {
   };
 }
 
+/** Zonas administrativas de OpenStreetMap que no son un lugar donde escribir una dirección. */
+const NON_CITY_NAME_PATTERN = /^per[ií]metro/i;
+
 function toCitySuggestion(place: GeocodedPlace, isCountryNamed: boolean): AddressSuggestion | null {
   if (place.name === undefined || place.name === '') return null;
+  if (NON_CITY_NAME_PATTERN.test(place.name)) return null;
   return {
     // Con la provincia y, si no se filtró por país, el país: hay Medellines en los dos.
     label: joinNonEmpty(
