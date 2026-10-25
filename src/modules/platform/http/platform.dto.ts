@@ -6,6 +6,8 @@ import { SECTOR_IDS } from '../../onboarding/http/create-center.dto';
 const CENTER_STATUSES = ['trial', 'active', 'past_due', 'suspended'] as const;
 const MAX_SEARCH_LENGTH = 80;
 const MAX_CLIENT_LIMIT = 1_000_000;
+const PLAN_IDS = ['basic', 'pro', 'premium'] as const;
+const MAX_PLAN_PRICE_CENTS = 1_000_000;
 
 export class PlatformCenterRouteParamsDto extends createZodDto(
   z.strictObject({ centerId: z.uuid() }),
@@ -31,6 +33,8 @@ export class UpdatePlatformCenterRequestDto extends createZodDto(
       status: z.enum(CENTER_STATUSES).optional(),
       /** Nueva fecha de fin de la prueba (en el futuro) o `null` para quitarla. */
       trialEndsAt: z.iso.datetime().nullable().optional(),
+      /** Plan del centro: se copian al centro los límites del plan (clientes, documentos, vídeo). */
+      planId: z.enum(PLAN_IDS).optional(),
       /** Tope de clientes activos; `null` = sin tope. */
       maxClients: z.number().int().min(0).max(MAX_CLIENT_LIMIT).nullable().optional(),
     })
@@ -73,6 +77,7 @@ const centerSummaryShape = {
   sectorId: z.string(),
   city: z.string().nullable(),
   status: z.enum(CENTER_STATUSES),
+  planId: z.enum(PLAN_IDS),
   createdAt: z.iso.datetime(),
   trialEndsAt: z.iso.datetime().nullable(),
   maxClients: z.number().int().nullable(),
@@ -113,5 +118,52 @@ export class PlatformAuditListResponseDto extends createZodDto(
       }),
     ),
     nextCursor: z.string().nullable(),
+  }),
+) {}
+
+export class PlatformPlanRouteParamsDto extends createZodDto(
+  z.strictObject({ planId: z.enum(PLAN_IDS) }),
+) {}
+
+const priceCentsShape = z.number().int().min(0).max(MAX_PLAN_PRICE_CENTS);
+
+/** Importes en céntimos, sin IVA; hace falta al menos uno. */
+export class UpdatePlatformPlanRequestDto extends createZodDto(
+  z
+    .strictObject({
+      monthlyPriceCents: priceCentsShape.optional(),
+      /** Precio por mes pagando el año entero; no puede superar al mensual. */
+      annualMonthlyPriceCents: priceCentsShape.optional(),
+      /** Cuota de alta, una sola vez, en la primera factura. */
+      setupFeeCents: priceCentsShape.optional(),
+    })
+    .refine((body) => Object.keys(body).length > 0, { message: 'At least one field is required' }),
+) {}
+
+const planShape = {
+  id: z.enum(PLAN_IDS),
+  name: z.string(),
+  monthlyPriceCents: z.number().int(),
+  annualMonthlyPriceCents: z.number().int(),
+  setupFeeCents: z.number().int(),
+  maxClients: z.number().int().nullable(),
+  documentStorageLimitBytes: z.number().int(),
+  videoStorageLimitBytes: z.number().int().nullable(),
+  /** Centros de este plan por estado. */
+  centerCountByStatus: z.strictObject({
+    trial: z.number().int(),
+    active: z.number().int(),
+    past_due: z.number().int(),
+    suspended: z.number().int(),
+  }),
+};
+
+export class PlatformPlanResponseDto extends createZodDto(z.strictObject(planShape)) {}
+
+export class PlatformPlanListResponseDto extends createZodDto(
+  z.strictObject({
+    plans: z.array(z.strictObject(planShape)),
+    /** Ingresos recurrentes al mes, sin IVA, de los centros que pagan (activos y en gracia). */
+    monthlyRecurringRevenueCents: z.number().int(),
   }),
 ) {}

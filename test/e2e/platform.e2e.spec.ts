@@ -28,6 +28,23 @@ interface Overview {
   monthly: { newCenters: { month: string; count: number }[] };
 }
 
+interface PlanRow {
+  id: string;
+  name: string;
+  monthlyPriceCents: number;
+  annualMonthlyPriceCents: number;
+  setupFeeCents: number;
+  maxClients: number | null;
+  documentStorageLimitBytes: number;
+  videoStorageLimitBytes: number | null;
+  centerCountByStatus: Record<string, number>;
+}
+
+interface PlanList {
+  plans: PlanRow[];
+  monthlyRecurringRevenueCents: number;
+}
+
 interface AuditPage {
   data: { action: string; centerId: string | null; details: Record<string, unknown> }[];
 }
@@ -240,6 +257,100 @@ describe('platform administration', () => {
       );
 
       expect(response.statusCode).toBe(404);
+    });
+  });
+
+  describe('plans', () => {
+    const findPlan = (list: PlanList, planId: string): PlanRow =>
+      list.plans.find(({ id }) => id === planId) as PlanRow;
+
+    it('lists the three plans with their prices and how many centers have each', async () => {
+      const response = await asAdmin('GET', '/v1/platform/plans');
+
+      expect(response.statusCode).toBe(200);
+      const list = response.json<PlanList>();
+      expect(list.plans.map(({ id }) => id)).toEqual(['basic', 'pro', 'premium']);
+      expect(findPlan(list, 'basic')).toMatchObject({
+        monthlyPriceCents: 3900,
+        annualMonthlyPriceCents: 3200,
+        setupFeeCents: 0,
+        maxClients: 150,
+      });
+      expect(findPlan(list, 'premium')).toMatchObject({ setupFeeCents: 29000, maxClients: null });
+      // Un centro nuevo prueba el plan Pro.
+      expect(findPlan(list, 'pro').centerCountByStatus).toMatchObject({ trial: 2 });
+      expect(list.monthlyRecurringRevenueCents).toBe(0);
+    });
+
+    it('counts as revenue only the centers that pay: active and in grace', async () => {
+      await asAdmin('PATCH', `/v1/platform/centers/${firstCenterId}`, { status: 'active' });
+      await asAdmin('PATCH', `/v1/platform/centers/${secondCenterId}`, {
+        status: 'past_due',
+        planId: 'basic',
+      });
+
+      const list = (await asAdmin('GET', '/v1/platform/plans')).json<PlanList>();
+
+      expect(list.monthlyRecurringRevenueCents).toBe(7900 + 3900);
+      expect(findPlan(list, 'basic').centerCountByStatus).toMatchObject({ past_due: 1 });
+    });
+
+    it('changes the monthly price and the setup fee, leaving a trace of each', async () => {
+      const response = await asAdmin('PATCH', '/v1/platform/plans/premium', {
+        monthlyPriceCents: 15900,
+        setupFeeCents: 19000,
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json<PlanRow>()).toMatchObject({
+        monthlyPriceCents: 15900,
+        setupFeeCents: 19000,
+      });
+      const audit = (await asAdmin('GET', '/v1/platform/audit-log')).json<AuditPage>();
+      expect(audit.data.filter(({ action }) => action === 'plan_price_changed')).toHaveLength(2);
+    });
+
+    it('does not let the annual price be above the monthly one', async () => {
+      const response = await asAdmin('PATCH', '/v1/platform/plans/pro', {
+        annualMonthlyPriceCents: 9000,
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('rejects a plan that does not exist', async () => {
+      const response = await asAdmin('PATCH', '/v1/platform/plans/gold', {
+        monthlyPriceCents: 1000,
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('gives a center the limits of the plan it moves to', async () => {
+      const response = await asAdmin('PATCH', `/v1/platform/centers/${firstCenterId}`, {
+        planId: 'premium',
+      });
+
+      expect(
+        response.json<CenterRow & { planId: string; videoStorageLimitBytes: number }>(),
+      ).toMatchObject({
+        planId: 'premium',
+        maxClients: null,
+        videoStorageLimitBytes: 21_474_836_480,
+      });
+    });
+
+    it('is closed to the accountant and to ordinary users', async () => {
+      const ordinaryUser = await world.fixtures.createUser('ordinary-plans');
+
+      expect((await world.call('GET', '/v1/platform/plans', ordinaryUser)).statusCode).toBe(404);
+      expect(
+        (
+          await world.call('PATCH', '/v1/platform/plans/pro', ordinaryUser, {
+            body: { monthlyPriceCents: 1 },
+          })
+        ).statusCode,
+      ).toBe(404);
     });
   });
 

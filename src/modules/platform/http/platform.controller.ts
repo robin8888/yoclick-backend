@@ -121,6 +121,7 @@ export class PlatformController {
   ): Promise<unknown> {
     const detail: PlatformCenterDetail = await this.updateCenter.execute(actor, params.centerId, {
       ...(body.status === undefined ? {} : { status: body.status }),
+      ...(body.planId === undefined ? {} : { planId: body.planId }),
       ...(body.trialEndsAt === undefined
         ? {}
         : { trialEndsAt: body.trialEndsAt === null ? null : new Date(body.trialEndsAt) }),

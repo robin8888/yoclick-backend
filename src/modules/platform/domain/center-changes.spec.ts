@@ -2,6 +2,7 @@ import { describeCenterChanges, isValidTrialEnd } from './center-changes';
 
 const CURRENT = {
   status: 'trial',
+  planId: 'pro',
   trialEndsAt: new Date('2026-11-01T00:00:00Z'),
   maxClients: 150,
 } as const;
@@ -22,6 +23,13 @@ describe('describeCenterChanges', () => {
       },
       { action: 'max_clients_changed', details: { from: 150, to: null } },
     ]);
+  });
+
+  it('records a plan change', () => {
+    expect(describeCenterChanges(CURRENT, { planId: 'premium' })).toEqual([
+      { action: 'center_plan_changed', details: { from: 'pro', to: 'premium' } },
+    ]);
+    expect(describeCenterChanges(CURRENT, { planId: 'pro' })).toEqual([]);
   });
 
   it('records nothing when the values are the same as now', () => {

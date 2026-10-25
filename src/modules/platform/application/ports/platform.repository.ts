@@ -1,8 +1,10 @@
 import { type PlatformActorContext } from '../../../../shared/auth/authenticated-request';
 import { type Page } from '../../../../shared/pagination/build-page';
 import { type MonthlyCount } from '../../domain/monthly-series';
+import { type PlanPriceChanges } from '../../domain/plan-rules';
 
 export const PLATFORM_REPOSITORY = Symbol('PLATFORM_REPOSITORY');
+export const PLATFORM_PLAN_REPOSITORY = Symbol('PLATFORM_PLAN_REPOSITORY');
 
 export type CenterStatus = 'trial' | 'active' | 'past_due' | 'suspended';
 
@@ -32,6 +34,8 @@ export interface PlatformCenterSummary {
   readonly sectorId: string;
   readonly city: string | null;
   readonly status: CenterStatus;
+  /** Plan contratado (`basic`, `pro`, `premium`); durante la prueba es Pro. */
+  readonly planId: string;
   readonly createdAt: Date;
   readonly trialEndsAt: Date | null;
   /** Tope de clientes activos del plan; `null` = sin tope. */
@@ -64,6 +68,8 @@ export interface CenterChanges {
   readonly status?: CenterStatus | undefined;
   readonly trialEndsAt?: Date | null | undefined;
   readonly maxClients?: number | null | undefined;
+  /** Al cambiar de plan se copian al centro los límites del nuevo plan. */
+  readonly planId?: string | undefined;
 }
 
 export interface AuditEntryInput {
@@ -111,4 +117,31 @@ export interface PlatformRepository {
     actor: PlatformActorContext,
     query: AuditListQuery,
   ): Promise<Page<PlatformAuditEntry>>;
+}
+
+/** Un plan con su precio, sus límites y cuántos centros lo tienen. */
+export interface PlatformPlanSummary {
+  readonly id: string;
+  readonly name: string;
+  readonly monthlyPriceCents: number;
+  readonly annualMonthlyPriceCents: number;
+  readonly setupFeeCents: number;
+  readonly maxClients: number | null;
+  readonly documentStorageLimitBytes: number;
+  readonly videoStorageLimitBytes: number | null;
+  readonly centerCountByStatus: Readonly<Record<CenterStatus, number>>;
+}
+
+export interface PlanPriceUpdate {
+  readonly actor: PlatformActorContext;
+  readonly planId: string;
+  readonly changes: PlanPriceChanges;
+  readonly auditEntries: readonly AuditEntryInput[];
+}
+
+export interface PlatformPlanRepository {
+  listPlans(actor: PlatformActorContext): Promise<PlatformPlanSummary[]>;
+  findPlan(actor: PlatformActorContext, planId: string): Promise<PlatformPlanSummary | null>;
+  /** Cambia los importes y deja su rastro de auditoría en la misma transacción. */
+  updatePlanPrices(update: PlanPriceUpdate): Promise<boolean>;
 }

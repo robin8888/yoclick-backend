@@ -139,6 +139,7 @@ function toSummary(center: CenterRow, usage: CenterUsage): PlatformCenterSummary
     sectorId: center.sectorId,
     city: center.city,
     status: center.status,
+    planId: center.planId,
     createdAt: center.createdAt,
     trialEndsAt: center.trialEndsAt,
     maxClients: center.maxClients,
@@ -169,6 +170,21 @@ function buildCenterFilter(query: CenterListQuery): Prisma.CenterWhereInput {
       ? {}
       : { name: { contains: query.search, mode: 'insensitive' as const } }),
     ...buildOlderThanFilter(query.cursor),
+  };
+}
+
+/** Al asignar un plan, el centro recibe sus límites (docs/spec/17 §2.1); un tope puesto a mano a la vez manda. */
+async function readPlanLimits(
+  client: TenantTransactionClient,
+  planId: string | undefined,
+): Promise<Prisma.CenterUncheckedUpdateManyInput> {
+  if (planId === undefined) return {};
+  const plan = await client.platformPlan.findUniqueOrThrow({ where: { id: planId } });
+  return {
+    planId: plan.id,
+    maxClients: plan.maxClients,
+    documentStorageLimitBytes: plan.documentStorageLimitBytes,
+    videoStorageLimitBytes: plan.videoStorageLimitBytes,
   };
 }
 
@@ -301,12 +317,15 @@ export class PrismaPlatformRepository implements PlatformRepository {
   async updateCenter(update: CenterUpdate): Promise<boolean> {
     const { actor, centerId, changes, auditEntries } = update;
     return this.tenantPrismaService.runInPlatformContext(actor, async (client) => {
+      const planLimits = await readPlanLimits(client, changes.planId);
       const result = await client.center.updateMany({
         where: { id: centerId },
         data: {
+          ...planLimits,
           ...(changes.status === undefined ? {} : { status: changes.status }),
           ...(changes.trialEndsAt === undefined ? {} : { trialEndsAt: changes.trialEndsAt }),
           ...(changes.maxClients === undefined ? {} : { maxClients: changes.maxClients }),
+          ...planLimits,
         },
       });
       if (result.count === 0) return false;

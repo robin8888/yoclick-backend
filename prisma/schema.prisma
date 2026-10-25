@@ -322,6 +322,8 @@ model Center {
   city                      String?
   latitude                  Float?
   longitude                 Float?
+  /// Plan que tiene contratado (o que prueba): de él salen el precio y los límites. Solo lo cambia Yoclick.
+  planId                    String       @default("pro") @map("plan_id")
   /// Tope de clientes activos del plan. Nulo = sin tope.
   maxClients                Int?         @map("max_clients")
   trialEndsAt               DateTime?    @map("trial_ends_at") @db.Timestamptz
@@ -399,6 +401,7 @@ model Center {
   conversations        Conversation[]
   messages             Message[]
   guardianLinks        GuardianLink[]
+  plan                 PlatformPlan         @relation(fields: [planId], references: [id])
   platformAuditEntries PlatformAuditEntry[]
 
   @@map("centers")
@@ -1599,4 +1602,27 @@ model PlatformAuditEntry {
   @@index([createdAt(sort: Desc)])
   @@index([centerId, createdAt(sort: Desc)])
   @@map("platform_audit_log")
+}
+
+/// Los planes de Yoclick con su precio y límites: es la única fuente de importes (docs/spec/17). Solo la
+/// administración de la plataforma los cambia; al asignar un plan a un centro se copian sus límites.
+model PlatformPlan {
+  id                        String   @id
+  name                      String
+  /// Importes en céntimos, sin IVA. El anual es el precio por mes pagando el año entero.
+  monthlyPriceCents         Int      @map("monthly_price_cents")
+  annualMonthlyPriceCents   Int      @map("annual_monthly_price_cents")
+  /// Cuota de alta, una sola vez, en la primera factura (Premium).
+  setupFeeCents             Int      @default(0) @map("setup_fee_cents")
+  /// Nulo = sin tope.
+  maxClients                Int?     @map("max_clients")
+  documentStorageLimitBytes BigInt   @map("document_storage_limit_bytes")
+  /// Nulo = el plan no incluye vídeo.
+  videoStorageLimitBytes    BigInt?  @map("video_storage_limit_bytes")
+  sortOrder                 Int      @map("sort_order")
+  updatedAt                 DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  centers Center[]
+
+  @@map("platform_plans")
 }

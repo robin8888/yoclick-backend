@@ -4,7 +4,10 @@ import {
   type PlatformCenterSummary,
 } from '../application/ports/platform.repository';
 
-type CurrentCenter = Pick<PlatformCenterSummary, 'status' | 'trialEndsAt' | 'maxClients'>;
+type CurrentCenter = Pick<
+  PlatformCenterSummary,
+  'status' | 'planId' | 'trialEndsAt' | 'maxClients'
+>;
 
 function toIsoOrNull(date: Date | null): string | null {
   return date === null ? null : date.toISOString();
@@ -23,6 +26,12 @@ export function describeCenterChanges(
     entries.push({
       action: 'center_status_changed',
       details: { from: current.status, to: changes.status },
+    });
+  }
+  if (changes.planId !== undefined && changes.planId !== current.planId) {
+    entries.push({
+      action: 'center_plan_changed',
+      details: { from: current.planId, to: changes.planId },
     });
   }
   if (changes.trialEndsAt !== undefined) {
