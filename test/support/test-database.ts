@@ -29,6 +29,17 @@ export async function resetTestDatabase(): Promise<void> {
     await client.query(
       'TRUNCATE TABLE "idempotency_keys", "verification_codes", "consents", "memberships", "centers", "users" RESTART IDENTITY CASCADE',
     );
+    // Los planes son una tabla global que ningún TRUNCATE de arriba toca: un test que cambie un precio
+    // dejaría el cambio para el siguiente. Se devuelven a los importes de la migración.
+    // La tabla tiene seguridad por filas forzada: solo deja cambiarla en el contexto de plataforma.
+    await client.query("select set_config('app.platform_role', 'admin', false)");
+    await client.query(`
+      update "platform_plans" as plan
+      set "monthly_price_cents" = defaults.monthly, "annual_monthly_price_cents" = defaults.annual,
+          "setup_fee_cents" = defaults.setup
+      from (values ('basic', 3900, 3200, 0), ('pro', 7900, 6500, 0), ('premium', 14900, 12400, 29000))
+        as defaults(id, monthly, annual, setup)
+      where plan."id" = defaults.id`);
   } finally {
     await client.end();
   }

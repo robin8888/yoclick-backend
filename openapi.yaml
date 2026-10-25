@@ -14793,6 +14793,9 @@ components:
               city:
                 type: string
                 nullable: true
+              logoUrl:
+                type: string
+                nullable: true
               status:
                 type: string
                 enum:
@@ -14843,6 +14846,7 @@ components:
               - slug
               - sectorId
               - city
+              - logoUrl
               - status
               - planId
               - createdAt
@@ -14874,6 +14878,9 @@ components:
         sectorId:
           type: string
         city:
+          type: string
+          nullable: true
+        logoUrl:
           type: string
           nullable: true
         status:
@@ -14947,6 +14954,7 @@ components:
         - slug
         - sectorId
         - city
+        - logoUrl
         - status
         - planId
         - createdAt

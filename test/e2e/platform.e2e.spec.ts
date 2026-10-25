@@ -166,7 +166,12 @@ describe('platform administration', () => {
         centers.map(({ name }) => name).sort((first, second) => first.localeCompare(second)),
       ).toEqual(['Primer Centro', 'Segundo Dojo']);
       const first = centers.find(({ id }) => id === firstCenterId);
-      expect(first).toMatchObject({ activeClientCount: 2, teamMemberCount: 1, status: 'trial' });
+      expect(first).toMatchObject({
+        activeClientCount: 2,
+        teamMemberCount: 1,
+        status: 'trial',
+        logoUrl: null,
+      });
     });
 
     it('filters by status and by name', async () => {

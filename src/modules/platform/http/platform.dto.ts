@@ -76,6 +76,8 @@ const centerSummaryShape = {
   slug: z.string(),
   sectorId: z.string(),
   city: z.string().nullable(),
+  /** Ruta del logo del centro (se completa con el origen de la API); `null` si no tiene. */
+  logoUrl: z.string().nullable(),
   status: z.enum(CENTER_STATUSES),
   planId: z.enum(PLAN_IDS),
   createdAt: z.iso.datetime(),

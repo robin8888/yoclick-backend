@@ -33,6 +33,8 @@ export interface PlatformCenterSummary {
   readonly slug: string;
   readonly sectorId: string;
   readonly city: string | null;
+  /** Ruta del logo del centro; `null` si no ha subido ninguno. */
+  readonly logoUrl: string | null;
   readonly status: CenterStatus;
   /** Plan contratado (`basic`, `pro`, `premium`); durante la prueba es Pro. */
   readonly planId: string;

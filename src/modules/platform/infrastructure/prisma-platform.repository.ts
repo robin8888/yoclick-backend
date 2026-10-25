@@ -9,6 +9,7 @@ import {
 } from '../../../shared/database/tenant-prisma.service';
 import { buildPage, type Page } from '../../../shared/pagination/build-page';
 import { decodeCursor } from '../../../shared/pagination/cursor';
+import { buildCenterLogoUrl } from '../../../shared/media/center-logo-url';
 import { MILLISECONDS_PER_DAY } from '../../../shared/time/time-units';
 import {
   fillMonthlySeries,
@@ -138,6 +139,7 @@ function toSummary(center: CenterRow, usage: CenterUsage): PlatformCenterSummary
     slug: center.slug,
     sectorId: center.sectorId,
     city: center.city,
+    logoUrl: buildCenterLogoUrl(center.id, center.logoUpdatedAt),
     status: center.status,
     planId: center.planId,
     createdAt: center.createdAt,
