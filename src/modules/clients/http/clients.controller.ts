@@ -48,6 +48,10 @@ function serializeClient(client: SignedClient): Record<string, unknown> {
     joinedAt: client.joinedAt.toISOString(),
     lastBookingAt: client.lastBookingAt?.toISOString() ?? null,
     nextBookingAt: client.nextBookingAt?.toISOString() ?? null,
+    passSummary: {
+      ...client.passSummary,
+      expiresAt: client.passSummary.expiresAt?.toISOString() ?? null,
+    },
   };
 }
 

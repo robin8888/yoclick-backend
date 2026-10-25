@@ -1,5 +1,6 @@
 import { type ActorContext } from '../../../../shared/tenancy/actor-context';
 import { type ClientActivity } from '../../domain/client-activity';
+import { type ClientPassSummary } from '../../domain/client-pass-summary';
 import { type ClientLevelName, type ClientStatusFilter } from '../../domain/client-rules';
 
 /** Un cliente tal y como lo ve quien administra el centro. */
@@ -20,6 +21,7 @@ export interface ClientView {
   readonly lastBookingAt: Date | null;
   /** La próxima cita no cancelada, o `null` si no tiene ninguna por delante. */
   readonly nextBookingAt: Date | null;
+  readonly passSummary: ClientPassSummary;
 }
 
 export interface ClientListQuery {

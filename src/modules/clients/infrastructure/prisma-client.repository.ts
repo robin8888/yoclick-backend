@@ -14,6 +14,11 @@ import {
   type ClientView,
 } from '../application/ports/client.repository';
 import { resolveClientActivity } from '../domain/client-activity';
+import {
+  type ClientPassSummary,
+  NO_PASS_SUMMARY,
+  resolveClientPassSummary,
+} from '../domain/client-pass-summary';
 
 const LISTED_STATUSES = ['active', 'blocked'] as const;
 
@@ -57,11 +62,36 @@ async function loadBookingStats(
   return new Map(rows.map((row) => [row.membershipId, row]));
 }
 
+/** Los bonos de cada cliente agrupados por persona, ya resumidos para la lista. */
+async function loadPassSummaries(
+  client: TenantTransactionClient,
+  now: Date,
+): Promise<Map<string, ClientPassSummary>> {
+  const passes = await client.clientPass.findMany({
+    select: { clientMembershipId: true, status: true, remainingSessions: true, expiresAt: true },
+  });
+  const passesByClient = new Map<string, typeof passes>();
+  for (const pass of passes) {
+    const clientPasses = passesByClient.get(pass.clientMembershipId) ?? [];
+    passesByClient.set(pass.clientMembershipId, [...clientPasses, pass]);
+  }
+  return new Map(
+    [...passesByClient].map(([membershipId, clientPasses]) => [
+      membershipId,
+      resolveClientPassSummary(clientPasses, now),
+    ]),
+  );
+}
+
 function toClientView(
   membership: MembershipWithUserAndGroup,
-  stats: BookingStats | undefined,
-  now: Date,
+  context: {
+    stats: BookingStats | undefined;
+    passSummary: ClientPassSummary | undefined;
+    now: Date;
+  },
 ): ClientView {
+  const { stats, passSummary, now } = context;
   const lastBookingAt = stats?.lastBookingAt ?? null;
   return {
     membershipId: membership.id,
@@ -77,6 +107,7 @@ function toClientView(
     bookingCount: stats?.bookingCount ?? 0,
     lastBookingAt,
     nextBookingAt: stats?.nextBookingAt ?? null,
+    passSummary: passSummary ?? NO_PASS_SUMMARY,
   };
 }
 
@@ -102,16 +133,21 @@ async function findClientViews(
   where: Prisma.MembershipWhereInput,
   scope: StatsScope,
 ): Promise<ClientView[]> {
-  const [memberships, stats] = await Promise.all([
+  const [memberships, stats, passSummaries] = await Promise.all([
     client.membership.findMany({
       where: { role: 'client', status: { in: [...LISTED_STATUSES] }, ...where },
       include: WITH_USER_AND_GROUP,
       orderBy: [{ user: { fullName: 'asc' } }, { id: 'asc' }],
     }),
     loadBookingStats(client, scope),
+    loadPassSummaries(client, scope.now),
   ]);
   const views = memberships.map((membership) =>
-    toClientView(membership, stats.get(membership.id), scope.now),
+    toClientView(membership, {
+      stats: stats.get(membership.id),
+      passSummary: passSummaries.get(membership.id),
+      now: scope.now,
+    }),
   );
   // Una profesional solo conoce a quienes han reservado con ella.
   return scope.staffMembershipId === null ? views : views.filter((view) => view.bookingCount > 0);

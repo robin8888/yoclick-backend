@@ -64,6 +64,12 @@ const clientShape = {
   lastBookingAt: z.iso.datetime().nullable(),
   /** La próxima cita no cancelada; `null` si no tiene ninguna por delante. */
   nextBookingAt: z.iso.datetime().nullable(),
+  /** Sus bonos de un vistazo: ninguno, pedido, vigente (con clases y caducidad) o terminado. */
+  passSummary: z.strictObject({
+    state: z.enum(['none', 'pending', 'active', 'ended']),
+    remainingSessions: z.number().int().nullable(),
+    expiresAt: z.iso.datetime().nullable(),
+  }),
 };
 
 export class ClientResponseDto extends createZodDto(z.strictObject(clientShape)) {}
