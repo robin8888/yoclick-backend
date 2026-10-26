@@ -2,6 +2,7 @@ import { v7 as generateUuidV7 } from 'uuid';
 import { type TenantTransactionClient } from '../../../shared/database/tenant-prisma.service';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
 import {
+  type BookingNotificationData,
   type EnrollmentNotificationData,
   type SessionCancelledNotificationData,
 } from '../../notifications/domain/notification-rules';
@@ -58,7 +59,7 @@ export async function recordSessionCancelledNotices(
 }
 
 export interface EnrollmentNotice {
-  readonly kind: 'schedule_enrolled' | 'schedule_unenrolled';
+  readonly kind: 'schedule_enrolled' | 'schedule_unenrolled' | 'schedule_updated';
   readonly clientMembershipIds: readonly string[];
   readonly series: {
     readonly label: string | null;
@@ -92,4 +93,46 @@ export async function recordEnrollmentNotices(
       data: noticeData,
     })),
   });
+}
+
+export interface MovedSessionNotice {
+  readonly session: {
+    readonly startsAt: Date;
+    readonly staffMembershipId: string | null;
+    readonly service: { readonly name: string };
+    readonly staffMembership: { readonly user: { readonly fullName: string } } | null;
+  };
+  readonly clientMembershipIds: readonly string[];
+}
+
+/**
+ * Avisa a cada persona con plaza (y a quien da la clase) de que ese día cambia de hora, con el
+ * mismo aviso que un cambio de hora hecho por el centro. Devuelve a cuántas personas avisó.
+ */
+export async function recordSessionMovedNotices(
+  client: TenantTransactionClient,
+  actor: ActorContext,
+  notice: MovedSessionNotice,
+): Promise<number> {
+  const recipients = new Set(notice.clientMembershipIds);
+  if (notice.session.staffMembershipId !== null) recipients.add(notice.session.staffMembershipId);
+  recipients.delete(actor.membershipId);
+  if (recipients.size === 0) return 0;
+  const noticeData: BookingNotificationData = {
+    clientName: '',
+    serviceName: notice.session.service.name,
+    startsAt: notice.session.startsAt.toISOString(),
+    staffName: notice.session.staffMembership?.user.fullName ?? '',
+    actorName: await findFullName(client, actor.membershipId),
+  };
+  await client.notification.createMany({
+    data: [...recipients].map((recipientMembershipId) => ({
+      id: generateUuidV7(),
+      centerId: actor.centerId,
+      recipientMembershipId,
+      kind: 'booking_rescheduled_by_team' as const,
+      data: noticeData,
+    })),
+  });
+  return recipients.size;
 }

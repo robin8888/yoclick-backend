@@ -8,6 +8,7 @@ import {
   ListEnrollmentsUseCase,
   ListBusyTimesUseCase,
   ListScheduleSeriesUseCase,
+  MoveSessionDayUseCase,
   UnenrollClientUseCase,
   UpdateScheduleSeriesUseCase,
 } from './application/schedule.use-cases';
@@ -35,6 +36,7 @@ import { PrismaScheduleRepository } from './infrastructure/prisma-schedule.repos
     EnrollClientsUseCase,
     UnenrollClientUseCase,
     CancelSessionDayUseCase,
+    MoveSessionDayUseCase,
     { provide: SCHEDULE_REPOSITORY, useClass: PrismaScheduleRepository },
   ],
 })

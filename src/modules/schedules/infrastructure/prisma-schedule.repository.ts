@@ -6,6 +6,7 @@ import {
   type EndSeriesOutcome,
   type EnrollmentView,
   type EnrollOutcome,
+  type MoveSessionOutcome,
   type NewEnrollments,
   type NewScheduleSeries,
   type BusyTimeView,
@@ -15,6 +16,7 @@ import {
   type ScheduleSeriesUpdateOutcome,
   type ScheduleSeriesView,
   type SessionCancellation,
+  type SessionMove,
   type UnenrollOutcome,
 } from '../application/ports/schedule.repository';
 import { enrollInTransaction, unenrollInTransaction } from './enrollment-writes';
@@ -32,6 +34,7 @@ import {
   updateSeriesInTransaction,
 } from './series-writes';
 import { cancelSessionWithBookings, findCancellableSession } from './session-cancellation';
+import { moveSessionInTransaction } from './session-move';
 
 @Injectable()
 export class PrismaScheduleRepository implements ScheduleRepository {
@@ -139,5 +142,11 @@ export class PrismaScheduleRepository implements ScheduleRepository {
       });
       return { kind: 'cancelled', affectedBookingCount };
     });
+  }
+
+  async moveSession(actor: ActorContext, move: SessionMove): Promise<MoveSessionOutcome> {
+    return this.tenantPrismaService.runInTenantContext(actor, (client) =>
+      moveSessionInTransaction(client, actor, move),
+    );
   }
 }

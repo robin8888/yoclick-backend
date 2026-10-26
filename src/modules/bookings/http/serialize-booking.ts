@@ -10,6 +10,7 @@ export function serializeBooking(booking: BookingView): Record<string, unknown> 
     service: booking.service,
     staff: booking.staff,
     room: booking.room,
+    location: booking.location,
     session: booking.session,
     cancelledAt: booking.cancelledAt?.toISOString() ?? null,
     cancelWithinPolicy: booking.cancelWithinPolicy,

@@ -304,6 +304,7 @@ describe('availability and bookings', () => {
         },
         staff: { membershipId: center.ownerMembershipId, fullName: 'owner' },
         room: null,
+        location: null,
         session: {
           id: expect.stringMatching(/^[0-9a-f-]{36}$/) as string,
           mode: 'private',

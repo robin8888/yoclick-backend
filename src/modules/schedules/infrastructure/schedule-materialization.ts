@@ -85,6 +85,10 @@ interface StoredSchedule {
   readonly startsOn: Date;
   readonly endsOn: Date | null;
   readonly materializedUntil: Date | null;
+  readonly locationName: string | null;
+  readonly locationAddress: string | null;
+  readonly locationLatitude: number | null;
+  readonly locationLongitude: number | null;
 }
 
 interface NewScheduledSession {
@@ -116,12 +120,14 @@ async function insertSession(
   const inserted = await client.$queryRaw<{ id: string }[]>`
     insert into class_sessions
       (id, center_id, service_id, staff_membership_id, starts_at, ends_at, room_id, mode, capacity,
-       schedule_id, status, cancelled_reason)
+       schedule_id, status, cancelled_reason, location_name, location_address,
+       location_latitude, location_longitude)
     values (${generateUuidV7()}::uuid, ${schedule.centerId}::uuid, ${schedule.serviceId}::uuid,
             ${schedule.staffMembershipId}::uuid, ${session.startsAt}::timestamptz,
             ${session.endsAt}::timestamptz, ${schedule.roomId}::uuid, ${schedule.mode}::session_mode,
             ${schedule.capacity}, ${schedule.id}::uuid, ${status}::class_session_status,
-            ${cancelledReason})
+            ${cancelledReason}, ${schedule.locationName}, ${schedule.locationAddress},
+            ${schedule.locationLatitude}, ${schedule.locationLongitude})
     on conflict do nothing
     returning id`;
   return inserted.length === 1 ? 'inserted' : 'conflict';

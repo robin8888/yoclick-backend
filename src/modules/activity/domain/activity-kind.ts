@@ -15,6 +15,7 @@ export const ACTIVITY_KINDS = [
   'schedule_enrolled',
   'schedule_unenrolled',
   'session_cancelled',
+  'session_moved',
   'client_updated',
   'clients_imported',
   'group_created',

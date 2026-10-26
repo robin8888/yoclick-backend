@@ -1,4 +1,5 @@
 import { type TenantTransactionClient } from '../../../shared/database/tenant-prisma.service';
+import { toSessionLocation } from '../../../shared/location/session-location';
 import { getUtcRangeOfLocalDates, toLocalDate } from '../../../shared/time/zoned-time';
 import { listOpeningRangesOfDate, type OpeningHours } from '../../centers/domain/opening-hours';
 import { materializeSchedulesInTransaction } from '../../schedules/infrastructure/schedule-materialization';
@@ -72,6 +73,7 @@ function toRoomSessionView(session: StoredSession): RoomSessionView {
             fullName: session.staffMembership.user.fullName,
           },
     schedule: session.schedule,
+    location: toSessionLocation(session),
     cancelledReason: session.status === 'cancelled' ? session.cancelledReason : null,
     attendees: session.bookings.map((booking) => ({
       bookingId: booking.id,

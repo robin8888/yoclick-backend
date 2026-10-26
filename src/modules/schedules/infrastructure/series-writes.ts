@@ -1,7 +1,13 @@
 import { v7 as generateUuidV7 } from 'uuid';
 import { type Prisma } from '../../../generated/prisma/client';
 import { type TenantTransactionClient } from '../../../shared/database/tenant-prisma.service';
+import {
+  toLocationColumns,
+  toSessionLocation,
+  isSameLocation,
+} from '../../../shared/location/session-location';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
+import { type SessionLocation } from '../../../shared/location/session-location';
 import {
   type EndSeriesOutcome,
   type NewScheduleSeries,
@@ -20,6 +26,13 @@ import { findScheduleOverlap, type ScheduleCandidate } from './schedule-overlap'
 import { findSeriesView } from './schedule-view.mapper';
 import { resolveSeriesParts, type ResolvedSeriesParts } from './series-validation';
 import { cancelSessionWithBookings, listFutureSessionsOfSchedules } from './session-cancellation';
+
+const emptyColumns = {
+  locationName: null,
+  locationAddress: null,
+  locationLatitude: null,
+  locationLongitude: null,
+} as const;
 
 interface ScheduleRowsInput {
   readonly actor: ActorContext;
@@ -51,6 +64,7 @@ function buildScheduleRows(input: ScheduleRowsInput): Prisma.SessionScheduleCrea
     startsOn: toDateColumn(newSeries.startsOn),
     endsOn: newSeries.endsOn === null ? null : toDateColumn(newSeries.endsOn),
     label: newSeries.label,
+    ...toLocationColumns(newSeries.location),
     createdByMembershipId: actor.membershipId,
   }));
 }
@@ -103,6 +117,10 @@ interface ActiveSeriesRow {
   readonly capacity: number;
   readonly label: string | null;
   readonly endsOn: Date | null;
+  readonly locationName: string | null;
+  readonly locationAddress: string | null;
+  readonly locationLatitude: number | null;
+  readonly locationLongitude: number | null;
 }
 
 async function listActiveRows(
@@ -125,6 +143,10 @@ async function listActiveRows(
       capacity: true,
       label: true,
       endsOn: true,
+      locationName: true,
+      locationAddress: true,
+      locationLatitude: true,
+      locationLongitude: true,
     },
   });
 }
@@ -309,6 +331,69 @@ async function cancelSessionsAffectedByPatch(
   });
 }
 
+/** Quien está matriculado y quien da la clase (antes y ahora) se entera de que el horario cambió. */
+async function notifyScheduleChanged(
+  client: TenantTransactionClient,
+  actor: ActorContext,
+  input: {
+    seriesId: string;
+    series: Awaited<ReturnType<typeof findSeriesView>>;
+    previousStaffMembershipIds: readonly (string | null)[];
+  },
+): Promise<void> {
+  const enrollments = await client.scheduleEnrollment.findMany({
+    where: { seriesId: input.seriesId, status: 'active' },
+    select: { clientMembershipId: true },
+  });
+  const staffIds = [input.series.staff?.membershipId, ...input.previousStaffMembershipIds];
+  const recipients = new Set([
+    ...enrollments.map(({ clientMembershipId }) => clientMembershipId),
+    ...staffIds.filter((id): id is string => id !== undefined && id !== null),
+  ]);
+  await recordEnrollmentNotices(client, actor, {
+    kind: 'schedule_updated',
+    clientMembershipIds: [...recipients],
+    series: input.series,
+  });
+}
+
+/** Pone la nueva ubicación en el horario y en sus sesiones futuras (las de otro día cambiado a mano también). */
+async function applySeriesLocation(
+  client: TenantTransactionClient,
+  input: { scheduleIds: readonly string[]; location: SessionLocation | null; now: Date },
+): Promise<void> {
+  const columns = toLocationColumns(input.location);
+  await client.sessionSchedule.updateMany({
+    where: { id: { in: [...input.scheduleIds] } },
+    data: columns,
+  });
+  await client.classSession.updateMany({
+    where: {
+      scheduleId: { in: [...input.scheduleIds] },
+      status: 'scheduled',
+      startsAt: { gt: input.now },
+    },
+    data: columns,
+  });
+}
+
+/** El aforo y la ubicación se ponen en las sesiones que ya existen; lo demás las rehace. */
+async function applyChangesToFutureSessions(
+  client: TenantTransactionClient,
+  input: {
+    scheduleIds: readonly string[];
+    patch: ScheduleSeriesPatch;
+    location: SessionLocation | null | undefined;
+    now: Date;
+  },
+): Promise<void> {
+  const { scheduleIds, patch, location, now } = input;
+  if (patch.capacity !== undefined && !needsRebuild(patch)) {
+    await applyCapacityToFutureSessions(client, { scheduleIds, capacity: patch.capacity, now });
+  }
+  if (location !== undefined) await applySeriesLocation(client, { scheduleIds, location, now });
+}
+
 export async function updateSeriesInTransaction(
   client: TenantTransactionClient,
   actor: ActorContext,
@@ -318,25 +403,29 @@ export async function updateSeriesInTransaction(
   const refusal = await findUpdateRefusal(client, { rows, patch: request.patch, now: request.now });
   if (refusal !== null) return refusal;
   const scheduleIds = rows.map(({ id }) => id);
-  const { patch } = request;
+  const { location, ...patch } = request.patch;
+  const isLocationChanged =
+    location !== undefined && !isSameLocation(location, toSessionLocation(rows[0] ?? emptyColumns));
 
   await cancelSessionsAffectedByPatch(client, actor, { scheduleIds, patch, now: request.now });
   await client.sessionSchedule.updateMany({
     where: { id: { in: scheduleIds } },
     data: toScheduleUpdate(patch),
   });
-  if (patch.capacity !== undefined && !needsRebuild(patch)) {
-    await applyCapacityToFutureSessions(client, {
-      scheduleIds,
-      capacity: patch.capacity,
-      now: request.now,
-    });
-  }
+  await applyChangesToFutureSessions(client, { scheduleIds, patch, location, now: request.now });
   const skipped = await materializeSchedulesInTransaction(client, {
     today: request.today,
     scheduleIds,
   });
-  return { kind: 'updated', series: await findSeriesView(client, request.seriesId), skipped };
+  const series = await findSeriesView(client, request.seriesId);
+  if (needsRebuild(patch) || isLocationChanged) {
+    await notifyScheduleChanged(client, actor, {
+      seriesId: request.seriesId,
+      series,
+      previousStaffMembershipIds: rows.map(({ staffMembershipId }) => staffMembershipId),
+    });
+  }
+  return { kind: 'updated', series, skipped };
 }
 
 export async function endSeriesInTransaction(

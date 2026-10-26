@@ -1,3 +1,4 @@
+import { type SessionLocation } from '../../../../shared/location/session-location';
 import { type ActorContext } from '../../../../shared/tenancy/actor-context';
 import { type ScheduleWeekday, type SessionModeName } from '../../domain/schedule-rules';
 
@@ -27,6 +28,7 @@ export interface ScheduleSeriesView {
   /** `null` en los alquileres: la sala se cede sin profesor. */
   readonly staff: PersonRef | null;
   readonly room: { readonly id: string; readonly name: string } | null;
+  readonly location: SessionLocation | null;
   readonly days: readonly ScheduleDayView[];
   /** Personas matriculadas (grupo fijo) ahora mismo. */
   readonly enrolledCount: number;
@@ -42,6 +44,8 @@ export interface SkippedOccurrence {
 }
 
 export interface NewScheduleSeries {
+  /** Dónde se da si no es en una sala del centro; `null` si no se indica. */
+  readonly location: SessionLocation | null;
   readonly serviceId: string;
   /** Sin él se usa el profesor fijo de la sala. */
   readonly staffMembershipId: string | null;
@@ -87,6 +91,8 @@ export interface ScheduleSeriesPatch {
   readonly roomId?: string | null | undefined;
   readonly startsAtTime?: string | undefined;
   readonly endsAtTime?: string | undefined;
+  /** `null` la quita; sin enviar no se toca. */
+  readonly location?: SessionLocation | null | undefined;
 }
 
 export type ScheduleSeriesUpdateOutcome =
@@ -167,6 +173,27 @@ export type CancelSessionOutcome =
   /** Ya cancelada o ya empezada. */
   | { readonly kind: 'not_cancellable' };
 
+export interface SessionMove {
+  readonly sessionId: string;
+  /** Día destino (`YYYY-MM-DD`, zona del centro) y horas (`HH:MM`). */
+  readonly date: string;
+  readonly startsAtTime: string;
+  readonly endsAtTime: string;
+  /** `null` la quita; sin enviar no se toca. */
+  readonly location?: SessionLocation | null | undefined;
+  readonly now: Date;
+}
+
+export type MoveSessionOutcome =
+  | { readonly kind: 'moved'; readonly notifiedPersonCount: number }
+  | { readonly kind: 'not_found' }
+  /** Ya empezada, cancelada, o el destino queda en el pasado. */
+  | { readonly kind: 'not_movable' }
+  | { readonly kind: 'room_overlap' }
+  | { readonly kind: 'teacher_overlap' }
+  /** Alguien con plaza ya tiene otra cita a la nueva hora. */
+  | { readonly kind: 'client_busy' };
+
 /** Una franja semanal ya ocupada por una clase activa, de la sala o del profesor consultados. */
 export interface BusyTimeView {
   /** 1 = lunes … 7 = domingo. */
@@ -214,6 +241,8 @@ export interface ScheduleRepository {
     actor: ActorContext,
     cancellation: SessionCancellation,
   ): Promise<CancelSessionOutcome>;
+  /** Mueve un solo día (otra fecha u hora) sin tocar el resto de la serie; avisa a cada persona. */
+  moveSession(actor: ActorContext, move: SessionMove): Promise<MoveSessionOutcome>;
 }
 
 export const SCHEDULE_REPOSITORY = Symbol('SCHEDULE_REPOSITORY');

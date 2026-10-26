@@ -12,6 +12,7 @@ interface Person {
 }
 
 interface SeriesBody {
+  location: { name: string; address: string | null } | null;
   seriesId: string;
   label: string | null;
   mode: string;
@@ -35,6 +36,7 @@ interface RoomSessionBody {
   bookedCount: number;
   schedule: { seriesId: string; label: string | null } | null;
   cancelledReason: string | null;
+  location: { name: string; address: string | null } | null;
   attendees: { clientMembershipId: string; source: string }[];
 }
 
@@ -925,6 +927,168 @@ describe('room schedules and fixed groups', () => {
     expect(again.statusCode).toBe(404);
   });
 
+  it('moves one day of a series to another date: the seats go with it, the rest of the series stays and everybody is told', async () => {
+    const { series } = await createSeries();
+    await call('POST', `/schedules/${series.seriesId}/enrollments`, {
+      clientMembershipIds: [clients[0]!.membershipId],
+    });
+    const [firstSession] = await readRoomSessions(firstDate);
+    const newDate = addDaysToLocalDate(firstDate, 1);
+
+    const moved = await call('POST', `/sessions/${firstSession!.id}/move`, {
+      date: newDate,
+      startsAtTime: '10:00',
+      endsAtTime: '11:00',
+    });
+
+    expect(moved.statusCode).toBe(200);
+    expect(moved.json<{ notifiedPersonCount: number }>().notifiedPersonCount).toBe(2);
+    expect(await readRoomSessions(firstDate)).toHaveLength(0);
+    expect((await readRoomSessions(newDate))[0]).toMatchObject({
+      id: firstSession!.id,
+      bookedCount: 1,
+    });
+    expect((await readRoomSessions(addDaysToLocalDate(firstDate, 7)))[0]?.bookedCount).toBe(1);
+    const noticesOfClient = await world.call('GET', url('/notifications'), clients[0]!.userId, {
+      centerId: center.centerId,
+    });
+    expect(
+      noticesOfClient
+        .json<{ notifications: { kind: string }[] }>()
+        .notifications.map(({ kind }) => kind),
+    ).toContain('booking_rescheduled_by_team');
+  });
+
+  it('does not move a day onto the room of another class, or into the past', async () => {
+    await createSeries();
+    const [firstSession] = await readRoomSessions(firstDate);
+    const nextWeek = addDaysToLocalDate(firstDate, 7);
+    const [nextSession] = await readRoomSessions(nextWeek);
+
+    const overlapping = await call('POST', `/sessions/${firstSession!.id}/move`, {
+      date: nextWeek,
+      startsAtTime: '18:30',
+      endsAtTime: '19:30',
+    });
+    const inThePast = await call('POST', `/sessions/${nextSession!.id}/move`, {
+      date: addDaysToLocalDate(toLocalDate(new Date(), MADRID), -1),
+      startsAtTime: '10:00',
+      endsAtTime: '11:00',
+    });
+    const unknown = await call('POST', `/sessions/${randomUUID()}/move`, {
+      date: nextWeek,
+      startsAtTime: '10:00',
+      endsAtTime: '11:00',
+    });
+
+    expect(overlapping.statusCode).toBe(409);
+    expect(overlapping.json<{ code: string }>().code).toBe('ROOM_SCHEDULE_OVERLAP');
+    expect(inThePast.statusCode).toBe(409);
+    expect(inThePast.json<{ code: string }>().code).toBe('SESSION_NOT_MOVABLE');
+    expect(unknown.statusCode).toBe(404);
+  });
+
+  describe('a class outside the rooms of the center', () => {
+    const PARK = {
+      name: 'Parque del Retiro',
+      address: 'Plaza de la Independencia 7, Madrid',
+      latitude: 40.4153,
+      longitude: -3.6844,
+    };
+    const AUDITORIUM = {
+      name: 'Auditorio Municipal',
+      address: 'Calle Mayor 1, Madrid',
+      latitude: 40.4168,
+      longitude: -3.7038,
+    };
+
+    it('gives every session of the series its location and shows it to the people with a seat', async () => {
+      const { series } = await createSeries({ location: PARK });
+      await call('POST', `/schedules/${series.seriesId}/enrollments`, {
+        clientMembershipIds: [clients[0]!.membershipId],
+      });
+
+      expect(series.location).toEqual(PARK);
+      const [session] = await readRoomSessions(firstDate);
+      expect(session?.location).toMatchObject({ name: 'Parque del Retiro' });
+      const mine = await call(
+        'GET',
+        '/bookings/mine?scope=upcoming&limit=5',
+        undefined,
+        clients[0]!.userId,
+      );
+      expect(
+        mine.json<{ bookings: { location: { name: string } | null }[] }>().bookings[0]?.location,
+      ).toMatchObject({ name: 'Parque del Retiro' });
+    });
+
+    it('changes the place of the whole series, tells everybody and leaves the times alone', async () => {
+      const { series } = await createSeries({ location: PARK });
+      await call('POST', `/schedules/${series.seriesId}/enrollments`, {
+        clientMembershipIds: [clients[0]!.membershipId],
+      });
+
+      const changed = await call('PATCH', `/schedules/${series.seriesId}`, {
+        location: AUDITORIUM,
+      });
+
+      expect(changed.statusCode).toBe(200);
+      expect((await readRoomSessions(firstDate))[0]?.location).toMatchObject({
+        name: 'Auditorio Municipal',
+      });
+      expect((await readRoomSessions(addDaysToLocalDate(firstDate, 7)))[0]?.location).toMatchObject(
+        {
+          name: 'Auditorio Municipal',
+        },
+      );
+      const notices = await world.call('GET', url('/notifications'), clients[0]!.userId, {
+        centerId: center.centerId,
+      });
+      expect(
+        notices.json<{ notifications: { kind: string }[] }>().notifications.map(({ kind }) => kind),
+      ).toContain('schedule_updated');
+      const removed = await call('PATCH', `/schedules/${series.seriesId}`, { location: null });
+      expect(removed.json<SeriesWriteBody>().series.location).toBeNull();
+    });
+
+    it('moves only one day to another place', async () => {
+      const { series } = await createSeries({ location: PARK });
+      const [firstSession] = await readRoomSessions(firstDate);
+
+      const moved = await call('POST', `/sessions/${firstSession!.id}/move`, {
+        date: firstDate,
+        startsAtTime: '18:00',
+        endsAtTime: '19:00',
+        location: AUDITORIUM,
+      });
+
+      expect(moved.statusCode).toBe(200);
+      expect((await readRoomSessions(firstDate))[0]?.location).toMatchObject({
+        name: 'Auditorio Municipal',
+      });
+      expect((await readRoomSessions(addDaysToLocalDate(firstDate, 7)))[0]?.location).toMatchObject(
+        {
+          name: 'Parque del Retiro',
+        },
+      );
+      expect(series.status).toBe('active');
+    });
+
+    it('refuses coordinates that come alone', async () => {
+      const response = await call('POST', '/schedules', {
+        serviceId: groupServiceId,
+        roomId,
+        weekdays: [getScheduleWeekdayOfLocalDate(firstDate)],
+        startsAtTime: '18:00',
+        endsAtTime: '19:00',
+        startsOn: firstDate,
+        location: { name: 'Parque', address: null, latitude: 40.4, longitude: null },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+  });
+
   it('changes the time of a series when nobody booked loose seats, and refuses when they did', async () => {
     const { series } = await createSeries();
     await call('POST', `/schedules/${series.seriesId}/enrollments`, {
@@ -941,6 +1105,14 @@ describe('room schedules and fixed groups', () => {
       startsAtTime: '19:00',
       endsAtTime: '20:00',
     });
+    const noticesOfClient = await world.call('GET', url('/notifications'), clients[0]!.userId, {
+      centerId: center.centerId,
+    });
+    expect(
+      noticesOfClient
+        .json<{ notifications: { kind: string }[] }>()
+        .notifications.map(({ kind }) => kind),
+    ).toContain('schedule_updated');
     const sessions = await readRoomSessions(firstDate);
     const live = sessions.filter(({ cancelledReason }) => cancelledReason === null);
     expect(live).toHaveLength(1);

@@ -97,6 +97,12 @@ export const ERROR_CATALOG = {
   SCHEDULE_HAS_BOOKINGS: {
     title: 'Hay citas sueltas en sesiones futuras de este horario. Cancélalas o muévelas antes',
   },
+  SESSION_NOT_MOVABLE: {
+    title: 'Esta sesión ya ha empezado, está cancelada o la nueva hora ya ha pasado',
+  },
+  SESSION_MOVE_CLIENT_BUSY: {
+    title: 'Alguien con plaza ya tiene otra cita a esa hora. Elige otra hora',
+  },
   SESSION_NOT_CANCELLABLE: { title: 'Esta sesión ya ha empezado o ya estaba cancelada' },
   ROOM_HAS_BOOKINGS: {
     title: 'Hay clases o citas en ese tramo. Cancélalas o muévelas antes de bloquear la sala',

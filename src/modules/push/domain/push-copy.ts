@@ -47,6 +47,8 @@ const COPY_BY_KIND: Readonly<Record<string, PushCopy>> = {
     body: 'Tienes 12 horas para confirmarla. Abre la aplicación para verla.',
   },
   waitlist_offer_expired: { title: 'Tu plaza ofrecida ha caducado', body: OPEN_APP_BODY },
+  pass_rejected: { title: 'Tu solicitud de bono no se ha aceptado', body: OPEN_APP_BODY },
+  schedule_updated: { title: 'Ha cambiado un horario tuyo', body: OPEN_APP_BODY },
 };
 
 const FALLBACK_COPY: PushCopy = { title: 'Tienes un aviso nuevo', body: OPEN_APP_BODY };

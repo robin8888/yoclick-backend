@@ -7,6 +7,7 @@ import {
   type EndSeriesOutcome,
   type EnrollmentView,
   type EnrollOutcome,
+  type MoveSessionOutcome,
   type NewEnrollments,
   type NewScheduleSeries,
   type BusyTimeView,
@@ -16,6 +17,7 @@ import {
   type ScheduleSeriesUpdateOutcome,
   type ScheduleSeriesView,
   type SessionCancellation,
+  type SessionMove,
   type SkippedOccurrence,
   type UnenrollOutcome,
 } from './ports/schedule.repository';
@@ -157,6 +159,31 @@ export class CancelSessionDayUseCase {
     if (outcome.kind === 'cancelled') return outcome;
     if (outcome.kind === 'not_found') throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
     throw new DomainError('SESSION_NOT_CANCELLABLE', HTTP_STATUS.conflict);
+  }
+}
+
+const MOVE_REFUSALS: Readonly<
+  Record<Exclude<MoveSessionOutcome['kind'], 'moved'>, ErrorArguments>
+> = {
+  not_found: ['NOT_FOUND', HTTP_STATUS.notFound],
+  not_movable: ['SESSION_NOT_MOVABLE', HTTP_STATUS.conflict],
+  room_overlap: ['ROOM_SCHEDULE_OVERLAP', HTTP_STATUS.conflict],
+  teacher_overlap: ['TEACHER_SCHEDULE_OVERLAP', HTTP_STATUS.conflict],
+  client_busy: ['SESSION_MOVE_CLIENT_BUSY', HTTP_STATUS.conflict],
+};
+
+/** Mover un día de una serie a otra fecha u hora: solo esa sesión y solo si aún no ha empezado. */
+@Injectable()
+export class MoveSessionDayUseCase {
+  constructor(@Inject(SCHEDULE_REPOSITORY) private readonly schedules: ScheduleRepository) {}
+
+  async execute(
+    actor: ActorContext,
+    move: Omit<SessionMove, 'now'>,
+  ): Promise<{ notifiedPersonCount: number }> {
+    const outcome = await this.schedules.moveSession(actor, { ...move, now: new Date() });
+    if (outcome.kind === 'moved') return outcome;
+    throw new DomainError(...MOVE_REFUSALS[outcome.kind]);
   }
 }
 

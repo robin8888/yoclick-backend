@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { createZodDto } from '../../../shared/http/create-zod-dto';
+import { sessionLocationShape } from '../../../shared/location/session-location';
 import { daysBetweenLocalDates } from '../../../shared/time/zoned-time';
 import { isValidTimeOfDay } from '../../centers/domain/opening-hours';
 import {
@@ -49,6 +50,8 @@ const seriesShape = {
   service: z.strictObject({ id: z.uuid(), name: z.string(), color: z.string().nullable() }),
   staff: personShape.nullable(),
   room: z.strictObject({ id: z.uuid(), name: z.string() }).nullable(),
+  /** Dónde se da si no es en una sala del centro (exterior, auditorio…). */
+  location: sessionLocationShape.nullable(),
   /** Un elemento por día de la semana (1 = lunes … 7 = domingo). */
   days: z.array(
     z.strictObject({
@@ -107,6 +110,8 @@ export class CreateScheduleSeriesRequestDto extends createZodDto(
       startsOn: z.iso.date(),
       endsOn: z.iso.date().nullable().default(null),
       label: labelSchema.optional(),
+      /** Dónde se da si no es en una sala del centro. */
+      location: sessionLocationShape.nullable().optional(),
     })
     .refine(
       (body) => isTimeRangeOrdered(body.startsAtTime, body.endsAtTime),
@@ -126,6 +131,8 @@ export class UpdateScheduleSeriesRequestDto extends createZodDto(
       roomId: z.uuid().nullable().optional(),
       startsAtTime: timeSchema.optional(),
       endsAtTime: timeSchema.optional(),
+      /** `null` quita la ubicación; cambiarla avisa y no rehace las sesiones. */
+      location: sessionLocationShape.nullable().optional(),
     })
     .refine((patch) => Object.keys(patch).length > 0, 'send at least one field to change')
     .refine(
@@ -200,6 +207,26 @@ export class CancelSessionRequestDto extends createZodDto(
 
 export class CancelSessionResponseDto extends createZodDto(
   z.strictObject({ affectedBookingCount: z.number().int() }),
+) {}
+
+export class MoveSessionRequestDto extends createZodDto(
+  z
+    .strictObject({
+      /** Día (en la zona del centro) al que pasa la sesión. */
+      date: z.iso.date(),
+      startsAtTime: timeSchema,
+      endsAtTime: timeSchema,
+      /** Nueva ubicación solo de este día; `null` la quita y sin enviar no cambia. */
+      location: sessionLocationShape.nullable().optional(),
+    })
+    .refine(({ startsAtTime, endsAtTime }) => isTimeRangeOrdered(startsAtTime, endsAtTime), {
+      path: ['endsAtTime'],
+      message: 'ends before it starts',
+    }),
+) {}
+
+export class MoveSessionResponseDto extends createZodDto(
+  z.strictObject({ notifiedPersonCount: z.number().int() }),
 ) {}
 
 export class BusyTimesQueryDto extends createZodDto(

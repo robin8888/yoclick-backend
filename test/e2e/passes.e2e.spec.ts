@@ -235,6 +235,28 @@ describe('passes (bonos)', () => {
       ).toContain('pass_requested');
     });
 
+    it('tells the client when the center does not accept the request', async () => {
+      const rate = (
+        await createRate({ name: 'Bono 5', sessionsCount: 5, validDays: 30, priceCents: 3000 })
+      ).json<RateBody>();
+      const requested = await world.call('POST', url(`/rates/${rate.id}/request`), ana.userId, {
+        centerId,
+      });
+
+      const rejected = await world.call(
+        'POST',
+        url(`/passes/${requested.json<PassBody>().id}/reject`),
+        ownerUserId,
+        { centerId },
+      );
+
+      expect(rejected.statusCode).toBe(200);
+      const notices = await world.call('GET', url('/notifications'), ana.userId, { centerId });
+      expect(
+        notices.json<{ notifications: { kind: string }[] }>().notifications.map(({ kind }) => kind),
+      ).toContain('pass_rejected');
+    });
+
     it('only shows a client their own passes', async () => {
       await createActivePass(ana);
 

@@ -1,4 +1,5 @@
 import { type Prisma } from '../../../generated/prisma/client';
+import { toSessionLocation } from '../../../shared/location/session-location';
 import { type TenantTransactionClient } from '../../../shared/database/tenant-prisma.service';
 import {
   type EnrollmentView,
@@ -40,6 +41,7 @@ function toSeriesView(
             fullName: first.staffMembership.user.fullName,
           },
     room: first.room,
+    location: toSessionLocation(first),
     days: [...rows]
       .sort((left, right) => left.weekday - right.weekday)
       .map((row) => ({

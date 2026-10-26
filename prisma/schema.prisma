@@ -187,6 +187,8 @@ enum NotificationKind {
   message_received
   waitlist_offer
   waitlist_offer_expired
+  pass_rejected
+  schedule_updated
 
   @@map("notification_kind")
 }
@@ -944,6 +946,11 @@ model ClassSession {
   /// Por qué se canceló el día (festivo, profesor enfermo…), si lo canceló el centro.
   cancelledReason         String?            @map("cancelled_reason")
   cancelledByMembershipId String?            @map("cancelled_by_membership_id") @db.Uuid
+  /// Dónde se da cuando no es en una sala del centro (exterior, auditorio…); sin nombre no hay ubicación.
+  locationName            String?            @map("location_name")
+  locationAddress         String?            @map("location_address")
+  locationLatitude        Float?             @map("location_latitude")
+  locationLongitude       Float?             @map("location_longitude")
   createdAt               DateTime           @default(now()) @map("created_at") @db.Timestamptz
 
   center          Center           @relation(fields: [centerId], references: [id])
@@ -982,6 +989,11 @@ model SessionSchedule {
   endsOn                DateTime?      @map("ends_on") @db.Date
   status                ScheduleStatus @default(active)
   label                 String?
+  /// Dónde se da cuando no es en una sala del centro (exterior, auditorio…); sin nombre no hay ubicación.
+  locationName        String?        @map("location_name")
+  locationAddress         String?        @map("location_address")
+  locationLatitude        Float?         @map("location_latitude")
+  locationLongitude       Float?         @map("location_longitude")
   /// Hasta qué fecha local (incluida) existen ya sus sesiones.
   materializedUntil     DateTime?      @map("materialized_until") @db.Date
   createdByMembershipId String         @map("created_by_membership_id") @db.Uuid

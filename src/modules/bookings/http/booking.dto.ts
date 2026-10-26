@@ -1,5 +1,6 @@
 import { MILLISECONDS_PER_DAY } from '../../../shared/time/time-units';
 import { z } from 'zod';
+import { sessionLocationShape } from '../../../shared/location/session-location';
 import { createZodDto } from '../../../shared/http/create-zod-dto';
 
 const MIN_PAGE_SIZE = 1;
@@ -90,6 +91,7 @@ const roomSessionShape = z.strictObject({
   teacher: z.strictObject({ membershipId: z.uuid(), fullName: z.string() }).nullable(),
   /** Horario del que nació la sesión; `null` si se creó al dar una cita. */
   schedule: z.strictObject({ seriesId: z.uuid(), label: z.string().nullable() }).nullable(),
+  location: sessionLocationShape.nullable(),
   /** Cancelada por el centro ese día y por qué (festivo, ausencia, bloqueo…); `null` si sigue en pie. */
   cancelledReason: z.string().nullable(),
   attendees: z.array(
@@ -223,6 +225,8 @@ export const bookingShape = {
   staff: z.strictObject({ membershipId: z.uuid(), fullName: z.string() }),
   /** Sala donde se da; `null` si la cita no tiene sala. */
   room: z.strictObject({ id: z.uuid(), name: z.string() }).nullable(),
+  /** Dónde se da si no es en una sala del centro (exterior, auditorio…); `null` si no se indica. */
+  location: sessionLocationShape.nullable(),
   /** La sesión que ocupa: privada, o grupal con su aforo y las plazas ya ocupadas. */
   session: z.strictObject({
     id: z.uuid(),

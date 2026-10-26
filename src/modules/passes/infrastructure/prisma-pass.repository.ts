@@ -148,6 +148,21 @@ async function notifyAdministrators(
   });
 }
 
+async function notifyClientPassRejected(
+  client: TenantTransactionClient,
+  input: { centerId: string; clientMembershipId: string; rateName: string },
+): Promise<void> {
+  await client.notification.create({
+    data: {
+      id: generateUuidV7(),
+      centerId: input.centerId,
+      recipientMembershipId: input.clientMembershipId,
+      kind: 'pass_rejected',
+      data: { rateName: input.rateName },
+    },
+  });
+}
+
 async function notifyClientPassActive(
   client: TenantTransactionClient,
   input: { centerId: string; clientMembershipId: string; rateName: string },
@@ -419,13 +434,13 @@ export class PrismaPassRepository implements PassRepository {
         where: { id: command.passId },
         include: PASS_INCLUDE,
       });
-      if (isActivating) {
-        await notifyClientPassActive(client, {
-          centerId: actor.centerId,
-          clientMembershipId: pass.clientMembershipId,
-          rateName: pass.name,
-        });
-      }
+      const decision = {
+        centerId: actor.centerId,
+        clientMembershipId: pass.clientMembershipId,
+        rateName: pass.name,
+      };
+      if (isActivating) await notifyClientPassActive(client, decision);
+      else await notifyClientPassRejected(client, decision);
       return { kind: 'decided', pass: await viewPass(client, { pass, now: command.now }) };
     });
   }

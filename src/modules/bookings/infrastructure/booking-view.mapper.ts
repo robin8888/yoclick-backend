@@ -1,4 +1,5 @@
 import { type TenantTransactionClient } from '../../../shared/database/tenant-prisma.service';
+import { toSessionLocation } from '../../../shared/location/session-location';
 import { findBookingsBlockedByRefund } from '../../passes/infrastructure/refund-block';
 import { requireTeacher } from './require-teacher';
 import { type Prisma } from '../../../generated/prisma/client';
@@ -78,6 +79,7 @@ export function toBookingView(booking: BookingWithSessionDetails): BookingView {
       fullName: requireTeacher(classSession.staffMembership).user.fullName,
     },
     room: classSession.room,
+    location: toSessionLocation(classSession),
     session: {
       id: classSession.id,
       mode: classSession.mode,

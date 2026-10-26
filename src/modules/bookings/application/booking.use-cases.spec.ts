@@ -38,6 +38,7 @@ function buildBooking(overrides: Partial<BookingView> = {}): BookingView {
     service: { id: 'service-1', name: 'Sesión', durationMinutes: 60, color: null },
     staff: { membershipId: 'membership-staff', fullName: 'Ana' },
     room: null,
+    location: null,
     session: { id: 'session-1', mode: 'private', capacity: 1, bookedCount: 1 },
     cancelledAt: null,
     cancelWithinPolicy: null,

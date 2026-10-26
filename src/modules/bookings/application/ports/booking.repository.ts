@@ -1,3 +1,4 @@
+import { type SessionLocation } from '../../../../shared/location/session-location';
 import { type ActorContext } from '../../../../shared/tenancy/actor-context';
 import { type BookingStatusName } from '../../domain/cancellation-policy';
 
@@ -15,6 +16,8 @@ export interface BookingView {
   readonly staff: { readonly membershipId: string; readonly fullName: string };
   /** Sala donde se da; `null` si la cita no tiene sala. */
   readonly room: { readonly id: string; readonly name: string } | null;
+  /** Dónde se da si no es en una sala del centro (exterior, auditorio…); `null` si no se indica. */
+  readonly location: SessionLocation | null;
   /** La sesión que ocupa: privada (una persona) o grupal (varias hasta el aforo). */
   readonly session: {
     readonly id: string;
@@ -257,6 +260,7 @@ export interface RoomSessionView {
   readonly teacher: { readonly membershipId: string; readonly fullName: string } | null;
   /** Horario del que nació la sesión (con su etiqueta); `null` si se creó al dar una cita. */
   readonly schedule: { readonly seriesId: string; readonly label: string | null } | null;
+  readonly location: SessionLocation | null;
   /** Cancelada por el centro ese día (festivo, profesor enfermo…) y por qué; `null` si sigue en pie. */
   readonly cancelledReason: string | null;
   readonly attendees: readonly {

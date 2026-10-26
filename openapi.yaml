@@ -4865,6 +4865,53 @@ paths:
       summary: Cancela una sesión que no ha empezado (festivo, profesor enfermo…) con todas sus plazas, sin gastar bono a nadie, y avisa a cada persona y a quien la daba. 409 SESSION_NOT_CANCELLABLE si ya empezó.
       tags:
         - schedules
+  /v1/centers/{centerId}/sessions/{sessionId}/move:
+    post:
+      operationId: sessions_move
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: sessionId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MoveSessionRequestDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MoveSessionResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Mueve una sola sesión que no ha empezado a otra fecha u hora (la serie no cambia). Las plazas se van con ella y se avisa a cada persona y a quien la da. 409 si ya empezó, si la sala o el profesor están ocupados o si alguien con plaza tiene otra cita a esa hora.
+      tags:
+        - schedules
   /v1/centers/{centerId}/clients:
     get:
       operationId: clients_list
@@ -11214,6 +11261,35 @@ components:
             - name
           additionalProperties: false
           nullable: true
+        location:
+          type: object
+          properties:
+            name:
+              type: string
+              minLength: 1
+              maxLength: 120
+            address:
+              type: string
+              minLength: 1
+              maxLength: 250
+              nullable: true
+            latitude:
+              type: number
+              minimum: -90
+              maximum: 90
+              nullable: true
+            longitude:
+              type: number
+              minimum: -180
+              maximum: 180
+              nullable: true
+          required:
+            - name
+            - address
+            - latitude
+            - longitude
+          additionalProperties: false
+          nullable: true
         session:
           type: object
           properties:
@@ -11309,6 +11385,7 @@ components:
         - service
         - staff
         - room
+        - location
         - session
         - cancelledAt
         - cancelWithinPolicy
@@ -11395,6 +11472,35 @@ components:
                 required:
                   - id
                   - name
+                additionalProperties: false
+                nullable: true
+              location:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    minLength: 1
+                    maxLength: 120
+                  address:
+                    type: string
+                    minLength: 1
+                    maxLength: 250
+                    nullable: true
+                  latitude:
+                    type: number
+                    minimum: -90
+                    maximum: 90
+                    nullable: true
+                  longitude:
+                    type: number
+                    minimum: -180
+                    maximum: 180
+                    nullable: true
+                required:
+                  - name
+                  - address
+                  - latitude
+                  - longitude
                 additionalProperties: false
                 nullable: true
               session:
@@ -11492,6 +11598,7 @@ components:
               - service
               - staff
               - room
+              - location
               - session
               - cancelledAt
               - cancelWithinPolicy
@@ -11579,6 +11686,35 @@ components:
               required:
                 - id
                 - name
+              additionalProperties: false
+              nullable: true
+            location:
+              type: object
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 120
+                address:
+                  type: string
+                  minLength: 1
+                  maxLength: 250
+                  nullable: true
+                latitude:
+                  type: number
+                  minimum: -90
+                  maximum: 90
+                  nullable: true
+                longitude:
+                  type: number
+                  minimum: -180
+                  maximum: 180
+                  nullable: true
+              required:
+                - name
+                - address
+                - latitude
+                - longitude
               additionalProperties: false
               nullable: true
             session:
@@ -11676,6 +11812,7 @@ components:
             - service
             - staff
             - room
+            - location
             - session
             - cancelledAt
             - cancelWithinPolicy
@@ -11820,6 +11957,35 @@ components:
                       - name
                     additionalProperties: false
                     nullable: true
+                  location:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                        minLength: 1
+                        maxLength: 120
+                      address:
+                        type: string
+                        minLength: 1
+                        maxLength: 250
+                        nullable: true
+                      latitude:
+                        type: number
+                        minimum: -90
+                        maximum: 90
+                        nullable: true
+                      longitude:
+                        type: number
+                        minimum: -180
+                        maximum: 180
+                        nullable: true
+                    required:
+                      - name
+                      - address
+                      - latitude
+                      - longitude
+                    additionalProperties: false
+                    nullable: true
                   session:
                     type: object
                     properties:
@@ -11915,6 +12081,7 @@ components:
                   - service
                   - staff
                   - room
+                  - location
                   - session
                   - cancelledAt
                   - cancelWithinPolicy
@@ -12425,6 +12592,35 @@ components:
                         - label
                       additionalProperties: false
                       nullable: true
+                    location:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                          minLength: 1
+                          maxLength: 120
+                        address:
+                          type: string
+                          minLength: 1
+                          maxLength: 250
+                          nullable: true
+                        latitude:
+                          type: number
+                          minimum: -90
+                          maximum: 90
+                          nullable: true
+                        longitude:
+                          type: number
+                          minimum: -180
+                          maximum: 180
+                          nullable: true
+                      required:
+                        - name
+                        - address
+                        - latitude
+                        - longitude
+                      additionalProperties: false
+                      nullable: true
                     cancelledReason:
                       type: string
                       nullable: true
@@ -12476,6 +12672,7 @@ components:
                     - service
                     - teacher
                     - schedule
+                    - location
                     - cancelledReason
                     - attendees
                   additionalProperties: false
@@ -12562,6 +12759,35 @@ components:
                   - label
                 additionalProperties: false
                 nullable: true
+              location:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    minLength: 1
+                    maxLength: 120
+                  address:
+                    type: string
+                    minLength: 1
+                    maxLength: 250
+                    nullable: true
+                  latitude:
+                    type: number
+                    minimum: -90
+                    maximum: 90
+                    nullable: true
+                  longitude:
+                    type: number
+                    minimum: -180
+                    maximum: 180
+                    nullable: true
+                required:
+                  - name
+                  - address
+                  - latitude
+                  - longitude
+                additionalProperties: false
+                nullable: true
               cancelledReason:
                 type: string
                 nullable: true
@@ -12613,6 +12839,7 @@ components:
               - service
               - teacher
               - schedule
+              - location
               - cancelledReason
               - attendees
             additionalProperties: false
@@ -12812,6 +13039,35 @@ components:
                       - name
                     additionalProperties: false
                     nullable: true
+                  location:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                        minLength: 1
+                        maxLength: 120
+                      address:
+                        type: string
+                        minLength: 1
+                        maxLength: 250
+                        nullable: true
+                      latitude:
+                        type: number
+                        minimum: -90
+                        maximum: 90
+                        nullable: true
+                      longitude:
+                        type: number
+                        minimum: -180
+                        maximum: 180
+                        nullable: true
+                    required:
+                      - name
+                      - address
+                      - latitude
+                      - longitude
+                    additionalProperties: false
+                    nullable: true
                   session:
                     type: object
                     properties:
@@ -12907,6 +13163,7 @@ components:
                   - service
                   - staff
                   - room
+                  - location
                   - session
                   - cancelledAt
                   - cancelWithinPolicy
@@ -13189,6 +13446,35 @@ components:
                 - name
               additionalProperties: false
               nullable: true
+            location:
+              type: object
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 120
+                address:
+                  type: string
+                  minLength: 1
+                  maxLength: 250
+                  nullable: true
+                latitude:
+                  type: number
+                  minimum: -90
+                  maximum: 90
+                  nullable: true
+                longitude:
+                  type: number
+                  minimum: -180
+                  maximum: 180
+                  nullable: true
+              required:
+                - name
+                - address
+                - latitude
+                - longitude
+              additionalProperties: false
+              nullable: true
             session:
               type: object
               properties:
@@ -13284,6 +13570,7 @@ components:
             - service
             - staff
             - room
+            - location
             - session
             - cancelledAt
             - cancelWithinPolicy
@@ -15527,6 +15814,35 @@ components:
                   - name
                 additionalProperties: false
                 nullable: true
+              location:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    minLength: 1
+                    maxLength: 120
+                  address:
+                    type: string
+                    minLength: 1
+                    maxLength: 250
+                    nullable: true
+                  latitude:
+                    type: number
+                    minimum: -90
+                    maximum: 90
+                    nullable: true
+                  longitude:
+                    type: number
+                    minimum: -180
+                    maximum: 180
+                    nullable: true
+                required:
+                  - name
+                  - address
+                  - latitude
+                  - longitude
+                additionalProperties: false
+                nullable: true
               days:
                 type: array
                 items:
@@ -15565,6 +15881,7 @@ components:
               - service
               - staff
               - room
+              - location
               - days
               - enrolledCount
             additionalProperties: false
@@ -15622,6 +15939,35 @@ components:
           type: string
           minLength: 1
           maxLength: 80
+        location:
+          type: object
+          properties:
+            name:
+              type: string
+              minLength: 1
+              maxLength: 120
+            address:
+              type: string
+              minLength: 1
+              maxLength: 250
+              nullable: true
+            latitude:
+              type: number
+              minimum: -90
+              maximum: 90
+              nullable: true
+            longitude:
+              type: number
+              minimum: -180
+              maximum: 180
+              nullable: true
+          required:
+            - name
+            - address
+            - latitude
+            - longitude
+          additionalProperties: false
+          nullable: true
       required:
         - serviceId
         - weekdays
@@ -15710,6 +16056,35 @@ components:
                 - name
               additionalProperties: false
               nullable: true
+            location:
+              type: object
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 120
+                address:
+                  type: string
+                  minLength: 1
+                  maxLength: 250
+                  nullable: true
+                latitude:
+                  type: number
+                  minimum: -90
+                  maximum: 90
+                  nullable: true
+                longitude:
+                  type: number
+                  minimum: -180
+                  maximum: 180
+                  nullable: true
+              required:
+                - name
+                - address
+                - latitude
+                - longitude
+              additionalProperties: false
+              nullable: true
             days:
               type: array
               items:
@@ -15748,6 +16123,7 @@ components:
             - service
             - staff
             - room
+            - location
             - days
             - enrolledCount
           additionalProperties: false
@@ -15807,6 +16183,35 @@ components:
           type: string
         endsAtTime:
           type: string
+        location:
+          type: object
+          properties:
+            name:
+              type: string
+              minLength: 1
+              maxLength: 120
+            address:
+              type: string
+              minLength: 1
+              maxLength: 250
+              nullable: true
+            latitude:
+              type: number
+              minimum: -90
+              maximum: 90
+              nullable: true
+            longitude:
+              type: number
+              minimum: -180
+              maximum: 180
+              nullable: true
+          required:
+            - name
+            - address
+            - latitude
+            - longitude
+          additionalProperties: false
+          nullable: true
       additionalProperties: false
     EndSeriesResponseDto:
       type: object
@@ -16017,6 +16422,61 @@ components:
           maximum: 9007199254740991
       required:
         - affectedBookingCount
+      additionalProperties: false
+    MoveSessionRequestDto:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+        startsAtTime:
+          type: string
+        endsAtTime:
+          type: string
+        location:
+          type: object
+          properties:
+            name:
+              type: string
+              minLength: 1
+              maxLength: 120
+            address:
+              type: string
+              minLength: 1
+              maxLength: 250
+              nullable: true
+            latitude:
+              type: number
+              minimum: -90
+              maximum: 90
+              nullable: true
+            longitude:
+              type: number
+              minimum: -180
+              maximum: 180
+              nullable: true
+          required:
+            - name
+            - address
+            - latitude
+            - longitude
+          additionalProperties: false
+          nullable: true
+      required:
+        - date
+        - startsAtTime
+        - endsAtTime
+      additionalProperties: false
+    MoveSessionResponseDto:
+      type: object
+      properties:
+        notifiedPersonCount:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+      required:
+        - notifiedPersonCount
       additionalProperties: false
     ClientListResponseDto:
       type: object
@@ -16520,6 +16980,8 @@ components:
                   - message_received
                   - waitlist_offer
                   - waitlist_offer_expired
+                  - pass_rejected
+                  - schedule_updated
               data:
                 type: object
                 additionalProperties:

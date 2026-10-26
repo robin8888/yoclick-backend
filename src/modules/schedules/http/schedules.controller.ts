@@ -84,6 +84,7 @@ export class SchedulesController {
       roomId: body.roomId ?? null,
       mode: body.mode,
       capacity: body.capacity ?? null,
+      location: body.location ?? null,
       weekdays: body.weekdays as ScheduleWeekday[],
       startsAtTime: body.startsAtTime,
       endsAtTime: body.endsAtTime,
