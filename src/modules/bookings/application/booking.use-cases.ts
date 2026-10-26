@@ -47,6 +47,8 @@ const REFUSALS_BY_OUTCOME: Readonly<
   room_unavailable: ['ROOM_UNAVAILABLE', HTTP_STATUS.conflict],
   mode_not_allowed: ['SESSION_MODE_NOT_ALLOWED', HTTP_STATUS.conflict],
   service_scheduled_only: ['SERVICE_ONLY_IN_SCHEDULE', HTTP_STATUS.conflict],
+  pass_fully_booked: ['PASS_FULLY_BOOKED', HTTP_STATUS.conflict],
+  pass_required: ['PASS_NEEDED_TO_BOOK', HTTP_STATUS.conflict],
 };
 
 /** Reservar un hueco individual. La hora se vuelve a comprobar en el servidor, nunca se confía en la app. */
@@ -80,6 +82,9 @@ export class JoinGroupSessionUseCase {
     }
     if (outcome.kind === 'pass_fully_booked') {
       throw new DomainError('PASS_FULLY_BOOKED', HTTP_STATUS.conflict);
+    }
+    if (outcome.kind === 'pass_required') {
+      throw new DomainError('PASS_NEEDED_TO_BOOK', HTTP_STATUS.conflict);
     }
     if (outcome.kind === 'client_has_no_pass') {
       throw new DomainError('CLIENT_HAS_NO_PASS', HTTP_STATUS.conflict);

@@ -50,3 +50,33 @@ export async function countBookableClasses(
   });
   return Math.max(remaining - reserved, 0);
 }
+
+/** Si el centro vende algún bono que valga para ese servicio: entonces reservarlo exige tener uno. */
+async function isPassRequiredFor(
+  client: TenantTransactionClient,
+  serviceId: string,
+): Promise<boolean> {
+  const rates = await client.rate.findMany({
+    where: { archivedAt: null },
+    select: { serviceIds: true },
+  });
+  return rates.some((rate) => rate.serviceIds.length === 0 || rate.serviceIds.includes(serviceId));
+}
+
+export type OwnPassCheck = 'ok' | 'pass_required' | 'pass_fully_booked';
+
+/**
+ * Lo que dice el bono cuando la propia persona reserva:
+ * - con bono en vigor para el servicio: solo tantas clases como le queden menos las ya agendadas;
+ * - sin bono: si el centro vende alguno para ese servicio, primero tiene que adquirirlo; si no
+ *   vende ninguno, la reserva es libre.
+ */
+export async function checkOwnPass(
+  client: TenantTransactionClient,
+  input: { clientMembershipId: string; serviceId: string; now: Date },
+): Promise<OwnPassCheck> {
+  const bookable = await countBookableClasses(client, input);
+  if (bookable === null)
+    return (await isPassRequiredFor(client, input.serviceId)) ? 'pass_required' : 'ok';
+  return bookable <= 0 ? 'pass_fully_booked' : 'ok';
+}

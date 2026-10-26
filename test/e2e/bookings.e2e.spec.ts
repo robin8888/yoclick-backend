@@ -285,6 +285,94 @@ describe('availability and bookings', () => {
   });
 
   describe('POST /bookings', () => {
+    describe('with a pass', () => {
+      async function givePass(person: Person, sessionsCount: number) {
+        const rate = (
+          await world.call('POST', `/v1/centers/${centerId}/rates`, ownerUserId, {
+            centerId,
+            body: { name: 'Bono', sessionsCount, validDays: 30, priceCents: 1000, serviceIds: [] },
+          })
+        ).json<{ id: string }>();
+        await world.call('POST', `/v1/centers/${centerId}/passes/assign`, ownerUserId, {
+          centerId,
+          body: { rateId: rate.id, clientMembershipId: person.membershipId },
+        });
+      }
+
+      async function remainingSessionsOf(person: Person): Promise<number> {
+        const response = await world.call(
+          'GET',
+          `/v1/centers/${centerId}/passes/mine`,
+          person.userId,
+          {
+            centerId,
+          },
+        );
+        return response
+          .json<{ passes: { remainingSessions: number }[] }>()
+          .passes.reduce((total, pass) => total + pass.remainingSessions, 0);
+      }
+
+      /** Horas que no se pisan entre sí, para poder reservar varias. */
+      function pickSeparateSlots(slots: readonly TestSlot[], count: number): TestSlot[] {
+        const picked: TestSlot[] = [];
+        for (const slot of slots) {
+          const isFree = picked.every(
+            (other) => slot.startsAt >= other.endsAt || slot.endsAt <= other.startsAt,
+          );
+          const isFarEnough = Date.parse(slot.startsAt) - Date.now() > 72 * 3_600_000;
+          if (isFree && isFarEnough) picked.push(slot);
+          if (picked.length === count) break;
+        }
+        return picked;
+      }
+
+      it('asks for a pass first when the center sells them, and lets the hour be booked once there is one', async () => {
+        await world.call('POST', `/v1/centers/${centerId}/rates`, ownerUserId, {
+          centerId,
+          body: { name: 'Bono', sessionsCount: 2, validDays: 30, priceCents: 1000, serviceIds: [] },
+        });
+        const [slot] = pickSeparateSlots(await slotsFor(ana), 1);
+
+        const withoutPass = await bookSlot(ana, slot!);
+
+        expect(withoutPass.statusCode).toBe(409);
+        expect(withoutPass.json<{ code: string }>().code).toBe('PASS_NEEDED_TO_BOOK');
+        await givePass(ana, 2);
+        expect((await bookSlot(ana, slot!)).statusCode).toBe(201);
+      });
+
+      it('lets the client book freely when the center sells no passes', async () => {
+        const [slot] = pickSeparateSlots(await slotsFor(ana), 1);
+
+        expect((await bookSlot(ana, slot!)).statusCode).toBe(201);
+      });
+
+      it('does not take a class off the pass when the hour is booked, only when it is lived', async () => {
+        await givePass(ana, 2);
+        const [first] = pickSeparateSlots(await slotsFor(ana), 1);
+
+        const booked = await bookSlot(ana, first!);
+
+        expect(booked.statusCode).toBe(201);
+        expect(await remainingSessionsOf(ana)).toBe(2);
+      });
+
+      it('does not let a client book more free hours than the pass has left', async () => {
+        await givePass(ana, 2);
+        const [first, second, third] = pickSeparateSlots(await slotsFor(ana), 3);
+
+        const results = [
+          await bookSlot(ana, first!),
+          await bookSlot(ana, second!),
+          await bookSlot(ana, third!),
+        ];
+
+        expect(results.map((result) => result.statusCode)).toEqual([201, 201, 409]);
+        expect(results[2]?.json<{ code: string }>().code).toBe('PASS_FULLY_BOOKED');
+      });
+    });
+
     it('books a slot: 201 with the booking, service and professional', async () => {
       const slot = firstSlotAtLeast(await slotsFor(ana), 72);
 

@@ -140,6 +140,7 @@ const REFUSALS_BY_REASON: Readonly<
   already_booked: ['ALREADY_BOOKED', HTTP_STATUS.conflict],
   outside_window: ['OUTSIDE_BOOKING_WINDOW', HTTP_STATUS.conflict],
   pass_fully_booked: ['PASS_FULLY_BOOKED', HTTP_STATUS.conflict],
+  pass_required: ['PASS_NEEDED_TO_BOOK', HTTP_STATUS.conflict],
   client_has_no_pass: ['CLIENT_HAS_NO_PASS', HTTP_STATUS.conflict],
 };
 

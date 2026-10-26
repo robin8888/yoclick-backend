@@ -19,7 +19,11 @@ import { isModeAllowedByService } from '../../schedules/domain/schedule-rules';
 import { toBookingView, WITH_SESSION_DETAILS } from './booking-view.mapper';
 import { hasOverlappingBooking } from './client-overlap';
 import { listUsableRooms, type UsableRoom } from './usable-rooms';
-import { countBookableClasses } from '../../passes/infrastructure/pass-availability';
+import {
+  checkOwnPass,
+  countBookableClasses,
+  type OwnPassCheck,
+} from '../../passes/infrastructure/pass-availability';
 import { consumePassForBooking } from '../../passes/infrastructure/pass-consumption';
 
 /**
@@ -147,7 +151,10 @@ export type SessionReservation =
     }
   | Exclude<
       CreateBookingOutcome,
-      { readonly kind: 'created' } | { readonly kind: 'service_scheduled_only' }
+      | { readonly kind: 'created' }
+      | { readonly kind: 'service_scheduled_only' }
+      | { readonly kind: 'pass_fully_booked' }
+      | { readonly kind: 'pass_required' }
     >;
 
 type RoomChoice =
@@ -316,6 +323,24 @@ export async function reserveSessionInTransaction(
   });
 }
 
+/**
+ * Quien reserva una hora libre por sí mismo tiene que cumplir con su bono: reservar no descuenta
+ * (se descuenta al asistir), pero con bono no se agenda de más y, si el centro vende bonos, sin bono
+ * no se reserva. Si es el equipo quien reserva, el bono no se mira aquí.
+ */
+async function checkPassOfBooker(
+  client: TenantTransactionClient,
+  actor: ActorContext,
+  command: CreateBookingCommand,
+): Promise<OwnPassCheck> {
+  if (actor.role !== 'client') return 'ok';
+  return checkOwnPass(client, {
+    clientMembershipId: command.clientMembershipId ?? actor.membershipId,
+    serviceId: command.serviceId,
+    now: command.now,
+  });
+}
+
 export async function createBookingInTransaction(
   client: TenantTransactionClient,
   actor: ActorContext,
@@ -324,6 +349,8 @@ export async function createBookingInTransaction(
   if (await isOnlyGivenInSchedule(client, command.serviceId)) {
     return { kind: 'service_scheduled_only' };
   }
+  const passCheck = await checkPassOfBooker(client, actor, command);
+  if (passCheck !== 'ok') return { kind: passCheck };
   const reservation = await reserveSessionInTransaction(client, actor, command);
   if (reservation.kind !== 'reserved') return reservation;
   const clientMembershipId = command.clientMembershipId ?? actor.membershipId;
@@ -423,22 +450,22 @@ async function isSessionFull(
 
 /**
  * Lo que dice el bono sobre apuntar a esta persona a la clase:
- * - la propia persona con bono: solo tantas clases como le queden menos las ya agendadas;
+ * - la propia persona: con bono, solo tantas clases como le queden menos las ya agendadas; sin bono,
+ *   primero lo adquiere si el centro vende alguno;
  * - el centro: la persona tiene que tener un bono en vigor con clases (sin bono no se apunta).
  */
 async function checkPassForJoin(
   client: TenantTransactionClient,
   command: JoinGroupSessionCommand,
   session: { serviceId: string },
-): Promise<'ok' | 'pass_fully_booked' | 'client_has_no_pass'> {
-  const bookable = await countBookableClasses(client, {
+): Promise<OwnPassCheck | 'client_has_no_pass'> {
+  const passFacts = {
     clientMembershipId: command.clientMembershipId,
     serviceId: session.serviceId,
     now: command.now,
-  });
-  if (command.isClientBooking === true) {
-    return bookable !== null && bookable <= 0 ? 'pass_fully_booked' : 'ok';
-  }
+  };
+  if (command.isClientBooking === true) return checkOwnPass(client, passFacts);
+  const bookable = await countBookableClasses(client, passFacts);
   return bookable === null || bookable <= 0 ? 'client_has_no_pass' : 'ok';
 }
 

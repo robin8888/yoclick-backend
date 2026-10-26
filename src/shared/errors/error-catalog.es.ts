@@ -84,6 +84,9 @@ export const ERROR_CATALOG = {
     title:
       'Esa persona no tiene un bono en vigor con clases. Dale un bono desde su ficha para apuntarla',
   },
+  PASS_NEEDED_TO_BOOK: {
+    title: 'Para reservar necesitas un bono. Elige uno en la pestaña Bonos y vuelve a reservar',
+  },
   PASS_FULLY_BOOKED: {
     title:
       'Ya tienes agendadas todas las clases de tu bono. Cancela alguna o pide otro bono para agendar más',

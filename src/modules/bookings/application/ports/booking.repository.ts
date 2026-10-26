@@ -88,7 +88,11 @@ export type CreateBookingOutcome =
   /** El servicio no se da en ese modo (solo privado o solo en grupo). */
   | { readonly kind: 'mode_not_allowed' }
   /** El servicio tiene horario de sala: solo se puede reservar en sus clases, no en una hora libre. */
-  | { readonly kind: 'service_scheduled_only' };
+  | { readonly kind: 'service_scheduled_only' }
+  /** La persona ya tiene agendadas tantas clases como le quedan en su bono. */
+  | { readonly kind: 'pass_fully_booked' }
+  /** El centro vende bonos para este servicio y la persona no tiene ninguno en vigor. */
+  | { readonly kind: 'pass_required' };
 
 export type JoinGroupSessionOutcome =
   | { readonly kind: 'created'; readonly booking: BookingView }
@@ -101,6 +105,8 @@ export type JoinGroupSessionOutcome =
   | { readonly kind: 'outside_window' }
   /** Ya tiene agendadas todas las clases que le quedan en su bono. */
   | { readonly kind: 'pass_fully_booked' }
+  /** El centro vende bonos para este servicio y la persona no tiene ninguno en vigor. */
+  | { readonly kind: 'pass_required' }
   /** El centro intenta apuntar a alguien sin bono en vigor con clases. */
   | { readonly kind: 'client_has_no_pass' };
 

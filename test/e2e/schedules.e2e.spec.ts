@@ -655,6 +655,17 @@ describe('room schedules and fixed groups', () => {
       expect((await joinNth(2)).statusCode).toBe(201);
     });
 
+    it('asks a client without a pass to get one first, because the center sells passes', async () => {
+      await createSeries();
+      const withoutPass = await world.addMember(center.centerId, 'nopass', 'client');
+      const [session] = await openSessions(withoutPass.userId);
+
+      const response = await joinAsClient(session!.id, withoutPass);
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json<{ code: string }>().code).toBe('PASS_NEEDED_TO_BOOK');
+    });
+
     it('is only for clients: the team assigns through the agenda', async () => {
       const sessionId = await firstOpenSessionId();
 
