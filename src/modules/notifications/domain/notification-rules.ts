@@ -170,6 +170,8 @@ export type SessionCancelledNotificationData = {
 
 /** Los datos del aviso de entrar en (o salir de) un grupo fijo. */
 export type EnrollmentNotificationData = {
+  /** El sitio nuevo cuando el aviso es de que cambia el lugar de la clase. */
+  readonly placeName?: string;
   readonly serviceName: string;
   readonly label: string;
   readonly staffName: string;

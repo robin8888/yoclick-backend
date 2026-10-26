@@ -14403,6 +14403,30 @@ components:
                     - id
                     - name
                   additionalProperties: false
+              place:
+                type: object
+                properties:
+                  address:
+                    type: string
+                    minLength: 1
+                    maxLength: 250
+                    nullable: true
+                  latitude:
+                    type: number
+                    minimum: -90
+                    maximum: 90
+                    nullable: true
+                  longitude:
+                    type: number
+                    minimum: -180
+                    maximum: 180
+                    nullable: true
+                required:
+                  - address
+                  - latitude
+                  - longitude
+                additionalProperties: false
+                nullable: true
             required:
               - id
               - name
@@ -14410,6 +14434,7 @@ components:
               - staff
               - fixedService
               - services
+              - place
             additionalProperties: false
       required:
         - rooms
@@ -14446,6 +14471,31 @@ components:
             type: string
             format: uuid
             pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        place:
+          type: object
+          properties:
+            address:
+              type: string
+              minLength: 1
+              maxLength: 250
+              nullable: true
+            latitude:
+              type: number
+              minimum: -90
+              maximum: 90
+              nullable: true
+            longitude:
+              type: number
+              minimum: -180
+              maximum: 180
+              nullable: true
+          required:
+            - address
+            - latitude
+            - longitude
+          additionalProperties: false
+          default: null
+          nullable: true
       required:
         - name
       additionalProperties: false
@@ -14505,6 +14555,30 @@ components:
               - id
               - name
             additionalProperties: false
+        place:
+          type: object
+          properties:
+            address:
+              type: string
+              minLength: 1
+              maxLength: 250
+              nullable: true
+            latitude:
+              type: number
+              minimum: -90
+              maximum: 90
+              nullable: true
+            longitude:
+              type: number
+              minimum: -180
+              maximum: 180
+              nullable: true
+          required:
+            - address
+            - latitude
+            - longitude
+          additionalProperties: false
+          nullable: true
       required:
         - id
         - name
@@ -14512,6 +14586,7 @@ components:
         - staff
         - fixedService
         - services
+        - place
       additionalProperties: false
     UpdateRoomRequestDto:
       type: object
@@ -14541,6 +14616,30 @@ components:
             type: string
             format: uuid
             pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        place:
+          type: object
+          properties:
+            address:
+              type: string
+              minLength: 1
+              maxLength: 250
+              nullable: true
+            latitude:
+              type: number
+              minimum: -90
+              maximum: 90
+              nullable: true
+            longitude:
+              type: number
+              minimum: -180
+              maximum: 180
+              nullable: true
+          required:
+            - address
+            - latitude
+            - longitude
+          additionalProperties: false
+          nullable: true
       additionalProperties: false
     RateListResponseDto:
       type: object

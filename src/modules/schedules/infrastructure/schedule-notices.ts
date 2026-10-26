@@ -61,6 +61,8 @@ export async function recordSessionCancelledNotices(
 export interface EnrollmentNotice {
   readonly kind: 'schedule_enrolled' | 'schedule_unenrolled' | 'schedule_updated';
   readonly clientMembershipIds: readonly string[];
+  /** El sitio nuevo si lo único que cambia es el lugar de la clase. */
+  readonly placeName?: string | undefined;
   readonly series: {
     readonly label: string | null;
     readonly service: { readonly name: string };
@@ -78,6 +80,7 @@ export async function recordEnrollmentNotices(
   const recipients = notice.clientMembershipIds.filter((id) => id !== actor.membershipId);
   if (recipients.length === 0) return;
   const noticeData: EnrollmentNotificationData = {
+    ...(notice.placeName === undefined ? {} : { placeName: notice.placeName }),
     serviceName: notice.series.service.name,
     label: notice.series.label ?? '',
     staffName: notice.series.staff?.fullName ?? '',
@@ -96,6 +99,9 @@ export async function recordEnrollmentNotices(
 }
 
 export interface MovedSessionNotice {
+  /** La hora cambia (si solo cambia el lugar, el aviso dice el sitio nuevo). */
+  readonly isTimeChanged: boolean;
+  readonly newPlaceName: string | null;
   readonly session: {
     readonly startsAt: Date;
     readonly staffMembershipId: string | null;
@@ -118,6 +124,13 @@ export async function recordSessionMovedNotices(
   if (notice.session.staffMembershipId !== null) recipients.add(notice.session.staffMembershipId);
   recipients.delete(actor.membershipId);
   if (recipients.size === 0) return 0;
+  if (!notice.isTimeChanged && notice.newPlaceName !== null) {
+    return recordPlaceChangedNotices(client, actor, {
+      recipients: [...recipients],
+      session: notice.session,
+      placeName: notice.newPlaceName,
+    });
+  }
   const noticeData: BookingNotificationData = {
     clientName: '',
     serviceName: notice.session.service.name,
@@ -135,4 +148,36 @@ export async function recordSessionMovedNotices(
     })),
   });
   return recipients.size;
+}
+
+interface PlaceChangedNotices {
+  readonly recipients: readonly string[];
+  readonly session: MovedSessionNotice['session'];
+  readonly placeName: string;
+}
+
+/** «Ahora es en el Auditorio Municipal»: el aviso de un día cuya hora no cambia pero sí el lugar. */
+async function recordPlaceChangedNotices(
+  client: TenantTransactionClient,
+  actor: ActorContext,
+  input: PlaceChangedNotices,
+): Promise<number> {
+  const noticeData: EnrollmentNotificationData = {
+    placeName: input.placeName,
+    serviceName: input.session.service.name,
+    label: input.session.service.name,
+    staffName: '',
+    roomName: '',
+    actorName: await findFullName(client, actor.membershipId),
+  };
+  await client.notification.createMany({
+    data: input.recipients.map((recipientMembershipId) => ({
+      id: generateUuidV7(),
+      centerId: actor.centerId,
+      recipientMembershipId,
+      kind: 'schedule_updated' as const,
+      data: noticeData,
+    })),
+  });
+  return input.recipients.length;
 }

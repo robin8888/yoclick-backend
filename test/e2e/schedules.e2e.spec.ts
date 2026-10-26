@@ -1074,6 +1074,90 @@ describe('room schedules and fixed groups', () => {
       expect(series.status).toBe('active');
     });
 
+    async function createOutdoorRoom(): Promise<string> {
+      const response = await call('POST', '/rooms', {
+        name: 'Pista exterior',
+        capacity: 2,
+        staffMembershipId: teacherAna.membershipId,
+        place: { address: PARK.address, latitude: PARK.latitude, longitude: PARK.longitude },
+      });
+      expect(response.statusCode).toBe(201);
+      expect(response.json<{ place: { address: string } | null }>().place?.address).toBe(
+        PARK.address,
+      );
+      return response.json<{ id: string }>().id;
+    }
+
+    async function readNoticeKinds(userId: string): Promise<string[]> {
+      const notices = await world.call('GET', url('/notifications'), userId, {
+        centerId: center.centerId,
+      });
+      return notices
+        .json<{ notifications: { kind: string }[] }>()
+        .notifications.map(({ kind }) => kind);
+    }
+
+    it('takes the place of an outdoor room, and changing the room tells the people with a class in it', async () => {
+      const outdoorRoomId = await createOutdoorRoom();
+      const { series } = await createSeries({ roomId: outdoorRoomId });
+      await call('POST', `/schedules/${series.seriesId}/enrollments`, {
+        clientMembershipIds: [clients[0]!.membershipId],
+      });
+      const readOutdoorSession = async () =>
+        (await readRoomAgenda(firstDate)).rooms.find((room) => room.id === outdoorRoomId)
+          ?.sessions[0];
+
+      expect((await readOutdoorSession())?.location).toMatchObject({
+        name: 'Pista exterior',
+        address: PARK.address,
+      });
+      const mine = await call(
+        'GET',
+        '/bookings/mine?scope=upcoming&limit=5',
+        undefined,
+        clients[0]!.userId,
+      );
+      expect(
+        mine.json<{ bookings: { location: { name: string } | null }[] }>().bookings[0]?.location,
+      ).toMatchObject({ name: 'Pista exterior' });
+
+      const moved = await call('PATCH', `/rooms/${outdoorRoomId}`, {
+        place: { address: AUDITORIUM.address, latitude: null, longitude: null },
+      });
+
+      expect(moved.statusCode).toBe(200);
+      expect((await readOutdoorSession())?.location).toMatchObject({ address: AUDITORIUM.address });
+      expect(await readNoticeKinds(clients[0]!.userId)).toContain('schedule_updated');
+      const backInside = await call('PATCH', `/rooms/${outdoorRoomId}`, { place: null });
+      expect(backInside.json<{ place: unknown }>().place).toBeNull();
+      expect((await readOutdoorSession())?.location).toBeNull();
+    });
+
+    it('tells the new place when a day only changes where it is', async () => {
+      await createSeries();
+      await call(
+        'POST',
+        `/schedules/${(await readRoomSessions(firstDate))[0]!.schedule!.seriesId}/enrollments`,
+        {
+          clientMembershipIds: [clients[0]!.membershipId],
+        },
+      );
+      const [session] = await readRoomSessions(firstDate);
+
+      const moved = await call('POST', `/sessions/${session!.id}/move`, {
+        date: firstDate,
+        startsAtTime: '18:00',
+        endsAtTime: '19:00',
+        location: AUDITORIUM,
+      });
+
+      expect(moved.statusCode).toBe(200);
+      expect(await readNoticeKinds(clients[0]!.userId)).toContain('schedule_updated');
+      expect(await readNoticeKinds(clients[0]!.userId)).not.toContain(
+        'booking_rescheduled_by_team',
+      );
+    });
+
     it('refuses coordinates that come alone', async () => {
       const response = await call('POST', '/schedules', {
         serviceId: groupServiceId,

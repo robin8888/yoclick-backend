@@ -59,3 +59,65 @@ export function isSameLocation(
 ): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
 }
+
+/** Dónde está una sala exterior; la sala en sí pone el nombre. */
+export interface RoomPlace {
+  readonly address: string | null;
+  readonly latitude: number | null;
+  readonly longitude: number | null;
+}
+
+export const roomPlaceShape = z
+  .strictObject({
+    address: z.string().trim().min(1).max(MAX_LOCATION_ADDRESS_LENGTH).nullable(),
+    latitude: z.number().min(-MAX_LATITUDE).max(MAX_LATITUDE).nullable(),
+    longitude: z.number().min(-MAX_LONGITUDE).max(MAX_LONGITUDE).nullable(),
+  })
+  .refine(
+    (place) => (place.latitude === null) === (place.longitude === null),
+    'send both coordinates or none',
+  );
+
+/** Las columnas de la sala donde se guarda: sin lugar, es una sala del centro. */
+export interface RoomPlaceColumns {
+  readonly isOutdoor: boolean;
+  readonly placeAddress: string | null;
+  readonly placeLatitude: number | null;
+  readonly placeLongitude: number | null;
+}
+
+export function toRoomPlaceColumns(place: RoomPlace | null): RoomPlaceColumns {
+  return {
+    isOutdoor: place !== null,
+    placeAddress: place?.address ?? null,
+    placeLatitude: place?.latitude ?? null,
+    placeLongitude: place?.longitude ?? null,
+  };
+}
+
+export function toRoomPlace(columns: RoomPlaceColumns): RoomPlace | null {
+  if (!columns.isOutdoor) return null;
+  return {
+    address: columns.placeAddress,
+    latitude: columns.placeLatitude,
+    longitude: columns.placeLongitude,
+  };
+}
+
+/**
+ * Dónde se da una sesión: lo que se le haya puesto a ella (un cambio de ese día o de su horario) y,
+ * si no, el lugar de su sala cuando es exterior, con el nombre de la sala.
+ */
+export function resolveSessionLocation(
+  own: SessionLocation | null,
+  room: ({ readonly name: string } & RoomPlaceColumns) | null,
+): SessionLocation | null {
+  if (own !== null) return own;
+  if (room === null || !room.isOutdoor) return null;
+  return {
+    name: room.name,
+    address: room.placeAddress,
+    latitude: room.placeLatitude,
+    longitude: room.placeLongitude,
+  };
+}

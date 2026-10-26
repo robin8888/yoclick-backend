@@ -339,6 +339,7 @@ async function notifyScheduleChanged(
     seriesId: string;
     series: Awaited<ReturnType<typeof findSeriesView>>;
     previousStaffMembershipIds: readonly (string | null)[];
+    placeName: string | undefined;
   },
 ): Promise<void> {
   const enrollments = await client.scheduleEnrollment.findMany({
@@ -353,6 +354,7 @@ async function notifyScheduleChanged(
   await recordEnrollmentNotices(client, actor, {
     kind: 'schedule_updated',
     clientMembershipIds: [...recipients],
+    placeName: input.placeName,
     series: input.series,
   });
 }
@@ -423,6 +425,8 @@ export async function updateSeriesInTransaction(
       seriesId: request.seriesId,
       series,
       previousStaffMembershipIds: rows.map(({ staffMembershipId }) => staffMembershipId),
+      // Si cambia más que el lugar, el aviso habla del horario; si solo cambia el lugar, dice el sitio.
+      placeName: needsRebuild(patch) ? undefined : (location?.name ?? ''),
     });
   }
   return { kind: 'updated', series, skipped };

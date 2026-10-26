@@ -1,5 +1,8 @@
 import { type TenantTransactionClient } from '../../../shared/database/tenant-prisma.service';
-import { toSessionLocation } from '../../../shared/location/session-location';
+import {
+  resolveSessionLocation,
+  toSessionLocation,
+} from '../../../shared/location/session-location';
 import { findBookingsBlockedByRefund } from '../../passes/infrastructure/refund-block';
 import { requireTeacher } from './require-teacher';
 import { type Prisma } from '../../../generated/prisma/client';
@@ -19,7 +22,16 @@ export const WITH_SESSION_DETAILS = {
         },
       },
       staffMembership: { select: { id: true, user: { select: { fullName: true } } } },
-      room: { select: { id: true, name: true } },
+      room: {
+        select: {
+          id: true,
+          name: true,
+          isOutdoor: true,
+          placeAddress: true,
+          placeLatitude: true,
+          placeLongitude: true,
+        },
+      },
       // Plazas ocupadas de la sesión: toda reserva que no se haya cancelado.
       _count: { select: { bookings: { where: { status: { not: 'cancelled' } } } } },
     },
@@ -78,8 +90,11 @@ export function toBookingView(booking: BookingWithSessionDetails): BookingView {
       membershipId: requireTeacher(classSession.staffMembership).id,
       fullName: requireTeacher(classSession.staffMembership).user.fullName,
     },
-    room: classSession.room,
-    location: toSessionLocation(classSession),
+    room:
+      classSession.room === null
+        ? null
+        : { id: classSession.room.id, name: classSession.room.name },
+    location: resolveSessionLocation(toSessionLocation(classSession), classSession.room),
     session: {
       id: classSession.id,
       mode: classSession.mode,

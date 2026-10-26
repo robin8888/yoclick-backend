@@ -75,6 +75,16 @@ async function isAnyAttendeeBusy(
   return false;
 }
 
+function isTimeChanged(
+  session: { readonly startsAt: Date; readonly endsAt: Date },
+  range: TimeRange,
+): boolean {
+  return (
+    session.startsAt.getTime() !== range.startsAt.getTime() ||
+    session.endsAt.getTime() !== range.endsAt.getTime()
+  );
+}
+
 /**
  * Cambia de fecha u hora una sola sesión de una serie: las plazas se van con ella y cada persona
  * (y quien la da) recibe el aviso. El resto de la serie no se toca.
@@ -111,6 +121,8 @@ export async function moveSessionInTransaction(
   const notifiedPersonCount = await recordSessionMovedNotices(client, actor, {
     session: { ...session, startsAt: range.startsAt },
     clientMembershipIds,
+    isTimeChanged: isTimeChanged(session, range),
+    newPlaceName: move.location?.name ?? null,
   });
   return { kind: 'moved', notifiedPersonCount };
 }

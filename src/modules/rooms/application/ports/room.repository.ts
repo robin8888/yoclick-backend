@@ -1,3 +1,4 @@
+import { type RoomPlace } from '../../../../shared/location/session-location';
 import { type ActorContext } from '../../../../shared/tenancy/actor-context';
 
 /** Una sala o recurso tal y como lo ve la app. */
@@ -11,6 +12,8 @@ export interface RoomView {
   readonly fixedService: { readonly id: string; readonly name: string } | null;
   /** Los servicios que se dan en esta sala. */
   readonly services: readonly { readonly id: string; readonly name: string }[];
+  /** Dónde está si es un espacio exterior (parque, auditorio…); `null` si es una sala del centro. */
+  readonly place: RoomPlace | null;
 }
 
 export interface NewRoom {
@@ -19,6 +22,7 @@ export interface NewRoom {
   readonly staffMembershipId: string | null;
   readonly serviceId: string | null;
   readonly serviceIds: readonly string[];
+  readonly place: RoomPlace | null;
 }
 
 export interface RoomPatch {
@@ -30,6 +34,8 @@ export interface RoomPatch {
   readonly serviceId?: string | null | undefined;
   /** Los servicios que se dan en la sala; los demás dejan de darse en ella. */
   readonly serviceIds?: readonly string[] | undefined;
+  /** `null` la deja como una sala del centro; sin enviar no se toca. */
+  readonly place?: RoomPlace | null | undefined;
 }
 
 export type RoomCreationOutcome =

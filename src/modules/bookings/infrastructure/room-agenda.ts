@@ -1,5 +1,9 @@
 import { type TenantTransactionClient } from '../../../shared/database/tenant-prisma.service';
-import { toSessionLocation } from '../../../shared/location/session-location';
+import {
+  resolveSessionLocation,
+  toSessionLocation,
+  type RoomPlaceColumns,
+} from '../../../shared/location/session-location';
 import { getUtcRangeOfLocalDates, toLocalDate } from '../../../shared/time/zoned-time';
 import { listOpeningRangesOfDate, type OpeningHours } from '../../centers/domain/opening-hours';
 import { materializeSchedulesInTransaction } from '../../schedules/infrastructure/schedule-materialization';
@@ -56,7 +60,7 @@ async function listSessionsOfDay(
   });
 }
 
-function toRoomSessionView(session: StoredSession): RoomSessionView {
+function toRoomSessionView(session: StoredSession, room: StoredRoom | null): RoomSessionView {
   return {
     id: session.id,
     startsAt: session.startsAt,
@@ -73,7 +77,7 @@ function toRoomSessionView(session: StoredSession): RoomSessionView {
             fullName: session.staffMembership.user.fullName,
           },
     schedule: session.schedule,
-    location: toSessionLocation(session),
+    location: resolveSessionLocation(toSessionLocation(session), room),
     cancelledReason: session.status === 'cancelled' ? session.cancelledReason : null,
     attendees: session.bookings.map((booking) => ({
       bookingId: booking.id,
@@ -86,7 +90,7 @@ function toRoomSessionView(session: StoredSession): RoomSessionView {
   };
 }
 
-interface StoredRoom {
+interface StoredRoom extends RoomPlaceColumns {
   readonly id: string;
   readonly name: string;
   readonly capacity: number;
@@ -105,8 +109,28 @@ function toRoomDayView(room: StoredRoom, sessions: readonly StoredSession[]): Ro
             membershipId: room.staffMembership.id,
             fullName: room.staffMembership.user.fullName,
           },
-    sessions: sessions.filter((session) => session.roomId === room.id).map(toRoomSessionView),
+    sessions: sessions
+      .filter((session) => session.roomId === room.id)
+      .map((session) => toRoomSessionView(session, room)),
   };
+}
+
+/** Las salas del centro con lo necesario para pintar su día, también si son un espacio exterior. */
+async function listRoomsOfCenter(client: TenantTransactionClient) {
+  return client.room.findMany({
+    where: { archivedAt: null },
+    select: {
+      id: true,
+      name: true,
+      capacity: true,
+      isOutdoor: true,
+      placeAddress: true,
+      placeLatitude: true,
+      placeLongitude: true,
+      staffMembership: { select: { id: true, user: { select: { fullName: true } } } },
+    },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+  });
 }
 
 /** Cada sala del centro con lo que la ocupa ese día (sus clases); las citas sin sala, aparte. */
@@ -127,16 +151,7 @@ export async function listRoomAgendaInTransaction(
   );
   const range = getUtcRangeOfLocalDates(date, date, center.timezone);
   const [rooms, sessions] = await Promise.all([
-    client.room.findMany({
-      where: { archivedAt: null },
-      select: {
-        id: true,
-        name: true,
-        capacity: true,
-        staffMembership: { select: { id: true, user: { select: { fullName: true } } } },
-      },
-      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-    }),
+    listRoomsOfCenter(client),
     listSessionsOfDay(client, range),
   ]);
 
@@ -148,6 +163,6 @@ export async function listRoomAgendaInTransaction(
     rooms: rooms.map((room) => toRoomDayView(room, sessions)),
     sessionsWithoutRoom: sessions
       .filter((session) => session.roomId === null)
-      .map(toRoomSessionView),
+      .map((session) => toRoomSessionView(session, null)),
   };
 }

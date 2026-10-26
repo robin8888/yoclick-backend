@@ -67,6 +67,7 @@ describe('rooms and resources', () => {
       staff: null,
       fixedService: null,
       services: [],
+      place: null,
     });
     expect((await listRooms()).map(({ name, capacity }) => [name, capacity])).toEqual([
       ['Sala 1', 12],

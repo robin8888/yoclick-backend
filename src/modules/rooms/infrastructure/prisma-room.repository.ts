@@ -15,12 +15,22 @@ import {
   type RoomView,
 } from '../application/ports/room.repository';
 import { MAX_ROOMS_PER_CENTER } from '../domain/room-rules';
+import {
+  toRoomPlace,
+  toRoomPlaceColumns,
+  type RoomPlaceColumns,
+} from '../../../shared/location/session-location';
+import { notifyRoomPlaceChanged } from './room-place-notices';
 import { cancelSessionWithBookings } from '../../schedules/infrastructure/session-cancellation';
 
 const ROOM_VIEW_FIELDS = {
   id: true,
   name: true,
   capacity: true,
+  isOutdoor: true,
+  placeAddress: true,
+  placeLatitude: true,
+  placeLongitude: true,
   staffMembership: { select: { id: true, user: { select: { fullName: true } } } },
   fixedService: { select: { id: true, name: true } },
   services: {
@@ -30,7 +40,7 @@ const ROOM_VIEW_FIELDS = {
   },
 } satisfies Prisma.RoomSelect;
 
-interface StoredRoom {
+interface StoredRoom extends RoomPlaceColumns {
   readonly id: string;
   readonly name: string;
   readonly capacity: number;
@@ -50,6 +60,7 @@ function toRoomView(room: StoredRoom): RoomView {
         : { membershipId: room.staffMembership.id, fullName: room.staffMembership.user.fullName },
     fixedService: room.fixedService,
     services: room.services.map(({ id, name }) => ({ id, name })),
+    place: toRoomPlace(room),
   };
 }
 
@@ -248,6 +259,7 @@ export class PrismaRoomRepository implements RoomRepository {
           capacity: newRoom.capacity,
           staffMembershipId,
           serviceId: newRoom.serviceId,
+          ...toRoomPlaceColumns(newRoom.place),
         },
         select: { id: true },
       });
@@ -268,7 +280,7 @@ export class PrismaRoomRepository implements RoomRepository {
     return this.tenantPrismaService.runInTenantContext(actor, async (client) => {
       const existing = await client.room.findFirst({
         where: { id: roomId, archivedAt: null },
-        select: { id: true },
+        select: ROOM_VIEW_FIELDS,
       });
       if (!existing) return { kind: 'not_found' };
       const refusal = await findPatchRefusal(client, { roomId, patch });
@@ -282,6 +294,7 @@ export class PrismaRoomRepository implements RoomRepository {
           ...(patch.capacity !== undefined && { capacity: patch.capacity }),
           ...(staffMembershipId !== undefined && { staffMembershipId }),
           ...(patch.serviceId !== undefined && { serviceId: patch.serviceId }),
+          ...(patch.place !== undefined && toRoomPlaceColumns(patch.place)),
         },
       });
       await applyServicePatch(client, roomId, patch);
@@ -289,6 +302,13 @@ export class PrismaRoomRepository implements RoomRepository {
         where: { id: roomId },
         select: ROOM_VIEW_FIELDS,
       });
+      if (patch.place !== undefined) {
+        await notifyRoomPlaceChanged(client, actor, {
+          room: { id: roomId, name: room.name },
+          before: toRoomPlace(existing),
+          after: toRoomPlace(room),
+        });
+      }
       return { kind: 'updated', room: toRoomView(room) };
     });
   }
