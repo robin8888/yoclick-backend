@@ -48,9 +48,9 @@ describe('payments (Stripe Connect, plan Premium)', () => {
       permissions: [],
     }) as const;
 
-  async function setClientLimit(maxClients: number | null): Promise<void> {
+  async function setPlan(planId: 'basic' | 'premium'): Promise<void> {
     await world.tenantPrismaService.runInTenantContext(ownerActor(), async (prisma) => {
-      await prisma.center.update({ where: { id: centerId }, data: { maxClients } });
+      await prisma.center.update({ where: { id: centerId }, data: { planId } });
     });
   }
 
@@ -74,7 +74,7 @@ describe('payments (Stripe Connect, plan Premium)', () => {
   }
 
   async function makeCenterReadyToCharge(): Promise<void> {
-    await setClientLimit(null);
+    await setPlan('premium');
     await fillFiscalData();
     const link = await world.call('POST', url('/payments/connect/onboarding-link'), ownerUserId, {
       centerId,
@@ -148,7 +148,7 @@ describe('payments (Stripe Connect, plan Premium)', () => {
   });
 
   it('keeps online payments out of plans below Premium', async () => {
-    await setClientLimit(150);
+    await setPlan('basic');
 
     expect(await readStatus(ownerUserId)).toBe('not_included');
     const link = await world.call('POST', url('/payments/connect/onboarding-link'), ownerUserId, {
@@ -164,7 +164,7 @@ describe('payments (Stripe Connect, plan Premium)', () => {
   });
 
   it('walks a Premium center through the Stripe sign-up until it can charge', async () => {
-    await setClientLimit(null);
+    await setPlan('premium');
     await fillFiscalData();
     expect(await readStatus(ownerUserId)).toBe('not_started');
 
@@ -182,7 +182,7 @@ describe('payments (Stripe Connect, plan Premium)', () => {
   });
 
   it('asks for a contact email before opening the Stripe account', async () => {
-    await setClientLimit(null);
+    await setPlan('premium');
     await fillFiscalData();
     await world.tenantPrismaService.runInTenantContext(ownerActor(), async (prisma) => {
       await prisma.center.update({ where: { id: centerId }, data: { contactEmail: null } });
@@ -198,7 +198,7 @@ describe('payments (Stripe Connect, plan Premium)', () => {
   });
 
   it('gives the owner a link to the Stripe dashboard only once the center can charge', async () => {
-    await setClientLimit(null);
+    await setPlan('premium');
     const tooEarly = await world.call(
       'POST',
       url('/payments/connect/dashboard-link'),
@@ -485,7 +485,7 @@ describe('payments (Stripe Connect, plan Premium)', () => {
     }
 
     it('asks for the fiscal data before opening online payments', async () => {
-      await setClientLimit(null);
+      await setPlan('premium');
 
       const refused = await world.call(
         'POST',

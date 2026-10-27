@@ -19,7 +19,7 @@ export const PLAN_FEATURE_IDS = [
   'rooms',
   'customAppearance',
   'videos',
-  'ownApp',
+  'onlinePayments',
 ] as const;
 
 export type PlanFeatureId = (typeof PLAN_FEATURE_IDS)[number];
@@ -39,7 +39,7 @@ const PREMIUM_FEATURES: readonly PlanFeatureId[] = [
   ...PRO_FEATURES,
   'customAppearance',
   'videos',
-  'ownApp',
+  'onlinePayments',
 ];
 
 const FEATURES_BY_PLAN: Readonly<Record<PlanId, readonly PlanFeatureId[]>> = {

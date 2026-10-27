@@ -24,7 +24,7 @@ export class PrismaCenterBrandingRepository implements CenterBrandingRepository 
           brandColor: true,
           logoUpdatedAt: true,
           status: true,
-          maxClients: true,
+          planId: true,
           backgroundColor: true,
           backgroundColorEnd: true,
           hiveColor: true,

@@ -4,7 +4,7 @@ import {
   TenantPrismaService,
   type TenantTransactionClient,
 } from '../../../shared/database/tenant-prisma.service';
-import { isPremiumPlan } from '../../../shared/centers/center-appearance';
+import { doesPlanIncludeFeature } from '../../../shared/centers/plan-features';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
 import { computePassExpiry } from '../../passes/domain/pass-rules';
 import { buildReceiptNumber } from '../domain/receipt-rules';
@@ -202,7 +202,7 @@ export class PrismaPaymentRepository implements PaymentRepository {
         select: {
           name: true,
           contactEmail: true,
-          maxClients: true,
+          planId: true,
           stripeAccountId: true,
           stripeChargesEnabled: true,
           legalName: true,
@@ -214,7 +214,7 @@ export class PrismaPaymentRepository implements PaymentRepository {
       return {
         name: center.name,
         contactEmail: center.contactEmail,
-        isPremium: isPremiumPlan(center.maxClients),
+        isPremium: doesPlanIncludeFeature(center.planId, 'onlinePayments'),
         stripeAccountId: center.stripeAccountId,
         stripeChargesEnabled: center.stripeChargesEnabled,
         legalName: center.legalName,

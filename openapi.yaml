@@ -10950,7 +10950,7 @@ components:
               - rooms
               - customAppearance
               - videos
-              - ownApp
+              - onlinePayments
         maxClients:
           type: integer
           minimum: -9007199254740991
@@ -16372,7 +16372,7 @@ components:
                     - rooms
                     - customAppearance
                     - videos
-                    - ownApp
+                    - onlinePayments
               isAvailable:
                 type: boolean
             required:

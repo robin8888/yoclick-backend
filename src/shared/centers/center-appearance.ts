@@ -1,3 +1,5 @@
+import { doesPlanIncludeFeature } from './plan-features';
+
 /** Fondo y colmena que personaliza un centro Premium. Todo nulo = los del tema de la app. */
 export interface CenterAppearance {
   readonly backgroundColor: string | null;
@@ -7,7 +9,7 @@ export interface CenterAppearance {
 }
 
 export interface CenterAppearanceSource extends CenterAppearance {
-  readonly maxClients: number | null;
+  readonly planId: string;
 }
 
 const NO_APPEARANCE: CenterAppearance = {
@@ -16,9 +18,9 @@ const NO_APPEARANCE: CenterAppearance = {
   hiveColor: null,
 };
 
-/** El plan Premium es el único sin tope de clientes (docs/spec/00-producto.md › Planes). */
-export function isPremiumPlan(maxClients: number | null): boolean {
-  return maxClients === null;
+/** Solo los planes que incluyen `customAppearance` (el Premium) pueden personalizar el fondo y la colmena. */
+export function canPlanCustomizeAppearance(planId: string): boolean {
+  return doesPlanIncludeFeature(planId, 'customAppearance');
 }
 
 /**
@@ -26,7 +28,7 @@ export function isPremiumPlan(maxClients: number | null): boolean {
  * de aplicarse, así que al volver a Premium el propietario no tiene que elegirlo otra vez.
  */
 export function resolveVisibleAppearance(center: CenterAppearanceSource): CenterAppearance {
-  if (!isPremiumPlan(center.maxClients)) return NO_APPEARANCE;
+  if (!canPlanCustomizeAppearance(center.planId)) return NO_APPEARANCE;
   return {
     backgroundColor: center.backgroundColor,
     backgroundColorEnd: center.backgroundColorEnd,

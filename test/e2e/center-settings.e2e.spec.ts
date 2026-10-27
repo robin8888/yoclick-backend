@@ -381,7 +381,7 @@ describe('center settings (ETag / If-Match)', () => {
       return response.json<{ appearance: unknown }>().appearance;
     }
 
-    async function makeCenterBasic(): Promise<void> {
+    async function changePlanTo(planId: 'basic' | 'premium'): Promise<void> {
       const ownerContext = {
         userId: owner,
         centerId,
@@ -392,9 +392,16 @@ describe('center settings (ETag / If-Match)', () => {
       await application
         .get(TenantPrismaService)
         .runInTenantContext(ownerContext, (client) =>
-          client.center.update({ where: { id: centerId }, data: { maxClients: 150 } }),
+          client.center.update({ where: { id: centerId }, data: { planId } }),
         );
     }
+
+    const makeCenterBasic = (): Promise<void> => changePlanTo('basic');
+
+    // Un centro nuevo está en la prueba, que da lo del Pro: la personalización es del Premium.
+    beforeEach(async () => {
+      await changePlanTo('premium');
+    });
 
     it('lets a Premium center choose a gradient background and a hive color, and publishes them', async () => {
       const response = await call('PATCH', owner, {

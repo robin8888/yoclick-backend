@@ -75,7 +75,7 @@ const MEMBERSHIP_INCLUDE = {
       disabledModules: true,
       brandColor: true,
       logoUpdatedAt: true,
-      maxClients: true,
+      planId: true,
       backgroundColor: true,
       backgroundColorEnd: true,
       hiveColor: true,

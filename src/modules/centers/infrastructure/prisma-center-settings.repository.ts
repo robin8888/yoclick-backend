@@ -4,7 +4,7 @@ import {
   applyCenterModuleChanges,
   resolveCenterModules,
 } from '../../../shared/centers/center-modules';
-import { isPremiumPlan } from '../../../shared/centers/center-appearance';
+import { canPlanCustomizeAppearance } from '../../../shared/centers/center-appearance';
 import { TenantPrismaService } from '../../../shared/database/tenant-prisma.service';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
 import {
@@ -47,7 +47,7 @@ function toSettings(center: Center): CenterSettings {
     backgroundColor: center.backgroundColor,
     backgroundColorEnd: center.backgroundColorEnd,
     hiveColor: center.hiveColor,
-    canCustomizeAppearance: isPremiumPlan(center.maxClients),
+    canCustomizeAppearance: canPlanCustomizeAppearance(center.planId),
   };
 }
 
