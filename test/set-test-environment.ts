@@ -34,5 +34,7 @@ process.env['RATE_LIMITING'] = 'disabled';
 process.env['PAYMENT_PROVIDER'] = 'fake';
 // Los tests llaman al barrido de la lista de espera a mano.
 process.env['WAITLIST_SWEEP_INTERVAL_SECONDS'] = '0';
+// Y el inicio automático de citas.
+process.env['AUTO_START_INTERVAL_SECONDS'] = '0';
 // Los tests nunca llaman a Geoapify: el proveedor se sustituye por un doble.
 process.env['GEOAPIFY_API_KEY'] = 'test-geoapify-key';

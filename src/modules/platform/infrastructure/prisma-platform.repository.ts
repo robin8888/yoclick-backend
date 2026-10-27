@@ -308,6 +308,8 @@ export class PrismaPlatformRepository implements PlatformRepository {
         timezone: center.timezone,
         disabledModules: center.disabledModules,
         stripeChargesEnabled: center.stripeChargesEnabled,
+        graceEndsAt: center.graceEndsAt,
+        hasSubscription: center.stripeSubscriptionId !== null,
         documentStorageLimitBytes: Number(center.documentStorageLimitBytes),
         videoStorageLimitBytes:
           center.videoStorageLimitBytes === null ? null : Number(center.videoStorageLimitBytes),

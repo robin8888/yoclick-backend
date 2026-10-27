@@ -94,6 +94,9 @@ const roomSessionShape = z.strictObject({
   location: sessionLocationShape.nullable(),
   /** Cancelada por el centro ese día y por qué (festivo, ausencia, bloqueo…); `null` si sigue en pie. */
   cancelledReason: z.string().nullable(),
+  /** Cuándo se inició la clase (a mano o sola) y cuándo terminó; `null` si aún no. */
+  startedAt: z.iso.datetime().nullable(),
+  endedAt: z.iso.datetime().nullable(),
   attendees: z.array(
     z.strictObject({
       bookingId: z.uuid(),

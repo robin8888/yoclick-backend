@@ -39,10 +39,16 @@ export class AgendaRoomsController {
   ): Promise<Record<string, unknown>> {
     assertRouteTargetsActorCenter(actor, params.centerId);
     const agenda = await this.getRoomAgenda.execute(actor, { date: query.date });
-    const serialize = <TRange extends { startsAt: Date; endsAt: Date }>(range: TRange) => ({
+    const serialize = <
+      TRange extends { startsAt: Date; endsAt: Date; startedAt: Date | null; endedAt: Date | null },
+    >(
+      range: TRange,
+    ) => ({
       ...range,
       startsAt: range.startsAt.toISOString(),
       endsAt: range.endsAt.toISOString(),
+      startedAt: range.startedAt?.toISOString() ?? null,
+      endedAt: range.endedAt?.toISOString() ?? null,
     });
     return {
       date: query.date,

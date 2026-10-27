@@ -1,6 +1,11 @@
 import { type PlatformActorContext } from '../../../../shared/auth/authenticated-request';
 import { type Page } from '../../../../shared/pagination/build-page';
 import { type MonthlyCount } from '../../domain/monthly-series';
+import {
+  type ChargeChanges,
+  type ChargeStatus,
+  type PaymentMethod,
+} from '../../domain/charge-rules';
 import { type PlanPriceChanges } from '../../domain/plan-rules';
 
 export const PLATFORM_REPOSITORY = Symbol('PLATFORM_REPOSITORY');
@@ -52,6 +57,10 @@ export interface PlatformCenterDetail extends PlatformCenterSummary {
   readonly timezone: string;
   readonly disabledModules: readonly string[];
   readonly stripeChargesEnabled: boolean;
+  /** Fin de la gracia tras un pago fallido o una prueba sin plan; `null` si no está en gracia. */
+  readonly graceEndsAt: Date | null;
+  /** Paga el plan con una suscripción de Stripe (y no a mano). */
+  readonly hasSubscription: boolean;
   readonly documentStorageLimitBytes: number;
   readonly videoStorageLimitBytes: number | null;
   readonly photoStorageLimitBytes: number;
@@ -146,4 +155,82 @@ export interface PlatformPlanRepository {
   findPlan(actor: PlatformActorContext, planId: string): Promise<PlatformPlanSummary | null>;
   /** Cambia los importes y deja su rastro de auditoría en la misma transacción. */
   updatePlanPrices(update: PlanPriceUpdate): Promise<boolean>;
+}
+
+export const PLATFORM_CHARGE_REPOSITORY = Symbol('PLATFORM_CHARGE_REPOSITORY');
+
+/** Un cobro de plan a un centro. El día va como `YYYY-MM-DD`. */
+export interface PlatformCharge {
+  readonly id: string;
+  readonly centerId: string;
+  readonly centerName: string;
+  readonly chargedOn: string;
+  readonly concept: string;
+  readonly baseCents: number;
+  readonly vatBasisPoints: number;
+  readonly vatCents: number;
+  readonly totalCents: number;
+  readonly stripeFeeCents: number | null;
+  readonly status: ChargeStatus;
+  readonly source: 'manual' | 'stripe';
+  readonly paymentMethod: PaymentMethod;
+  readonly invoiceReference: string | null;
+  readonly stripeId: string | null;
+  readonly customerLegalName: string | null;
+  readonly customerTaxId: string | null;
+  readonly createdAt: Date;
+}
+
+export interface ChargeListQuery {
+  /** Mes natural `YYYY-MM`; sin él, todos. */
+  readonly month?: string | undefined;
+  readonly centerId?: string | undefined;
+  readonly limit: number;
+  readonly cursor?: string | undefined;
+}
+
+export interface NewCharge {
+  readonly centerId: string;
+  readonly chargedOn: string;
+  readonly concept: string;
+  readonly baseCents: number;
+  readonly vatBasisPoints: number;
+  readonly vatCents: number;
+  readonly totalCents: number;
+  readonly status: ChargeStatus;
+  readonly paymentMethod: PaymentMethod;
+  readonly invoiceReference: string | null;
+  readonly customerLegalName: string | null;
+  readonly customerTaxId: string | null;
+}
+
+export interface ChargeCreation {
+  readonly actor: PlatformActorContext;
+  readonly charge: NewCharge;
+  readonly auditEntries: readonly AuditEntryInput[];
+}
+
+export interface ChargeUpdate {
+  readonly actor: PlatformActorContext;
+  readonly chargeId: string;
+  readonly changes: ChargeChanges;
+  readonly auditEntries: readonly AuditEntryInput[];
+}
+
+/** Rango de meses `YYYY-MM`, ambos incluidos. */
+export interface ChargeReportRange {
+  readonly fromMonth: string;
+  readonly toMonth: string;
+}
+
+export interface PlatformChargeRepository {
+  listCharges(actor: PlatformActorContext, query: ChargeListQuery): Promise<Page<PlatformCharge>>;
+  findCharge(actor: PlatformActorContext, chargeId: string): Promise<PlatformCharge | null>;
+  /** Crea el cobro y deja su rastro de auditoría en la misma transacción; `null` si el centro no existe. */
+  createCharge(creation: ChargeCreation): Promise<PlatformCharge | null>;
+  updateCharge(update: ChargeUpdate): Promise<boolean>;
+  listChargesInRange(
+    actor: PlatformActorContext,
+    range: ChargeReportRange,
+  ): Promise<PlatformCharge[]>;
 }

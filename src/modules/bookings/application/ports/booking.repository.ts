@@ -269,6 +269,9 @@ export interface RoomSessionView {
   readonly location: SessionLocation | null;
   /** Cancelada por el centro ese día (festivo, profesor enfermo…) y por qué; `null` si sigue en pie. */
   readonly cancelledReason: string | null;
+  /** Cuándo se inició la clase y cuándo terminó; `null` si no ha empezado (o si sigue en curso, el fin). */
+  readonly startedAt: Date | null;
+  readonly endedAt: Date | null;
   readonly attendees: readonly {
     readonly bookingId: string;
     readonly clientMembershipId: string;

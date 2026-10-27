@@ -23,6 +23,7 @@ import { CheckInClientUseCase, IssueCheckInCodeUseCase } from './application/che
 import { CHECK_IN_REPOSITORY } from './application/ports/check-in.repository';
 import { BOOKING_REPOSITORY } from './application/ports/booking.repository';
 import { SESSION_RECORD_REPOSITORY } from './application/ports/session-record.repository';
+import { SessionAutoStarter } from './application/session-auto-starter';
 import {
   ConfirmAttendanceUseCase,
   EndSessionUseCase,
@@ -80,6 +81,7 @@ import { PrismaSessionRecordRepository } from './infrastructure/prisma-session-r
     { provide: CHECK_IN_REPOSITORY, useClass: PrismaCheckInRepository },
     { provide: BOOKING_REPOSITORY, useClass: PrismaBookingRepository },
     { provide: SESSION_RECORD_REPOSITORY, useClass: PrismaSessionRecordRepository },
+    SessionAutoStarter,
   ],
 })
 export class BookingsModule {}

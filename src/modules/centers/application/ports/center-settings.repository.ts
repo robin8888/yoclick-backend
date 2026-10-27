@@ -42,6 +42,8 @@ export interface CenterSettings {
   readonly cancelPolicy: CancelPolicy | null;
   /** Lo que el centro usa; la administración lo enciende o apaga desde los ajustes. */
   readonly modules: CenterModules;
+  /** Las clases y citas se inician solas a su hora. */
+  readonly autoStartSessions: boolean;
   readonly trialEndsAt: Date | null;
   /** Personalización Premium guardada (puede haber quedado de un plan anterior). */
   readonly backgroundColor: string | null;
@@ -72,6 +74,7 @@ export interface CenterSettingsPatch {
   readonly cancelPolicy?: CancelPolicy | undefined;
   /** Solo los módulos que cambian: `{ passes: false }` apaga los bonos y deja el resto como estaba. */
   readonly modules?: CenterModuleChanges | undefined;
+  readonly autoStartSessions?: boolean | undefined;
   readonly backgroundColor?: string | null | undefined;
   readonly backgroundColorEnd?: string | null | undefined;
   readonly hiveColor?: string | null | undefined;

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { BillingModule } from '../billing/billing.module';
 import { type Environment } from '../../shared/config/environment.schema';
 import {
   ConfirmPaymentUseCase,
@@ -46,6 +47,7 @@ function createPaymentGateway(configService: ConfigService<Environment, true>): 
 }
 
 @Module({
+  imports: [BillingModule],
   controllers: [
     PaymentsController,
     PaymentsConnectController,

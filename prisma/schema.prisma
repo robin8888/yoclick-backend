@@ -189,6 +189,8 @@ enum NotificationKind {
   waitlist_offer_expired
   pass_rejected
   schedule_updated
+  plan_subscribed
+  plan_changed
 
   @@map("notification_kind")
 }
@@ -296,15 +298,16 @@ model User {
   createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz
   updatedAt        DateTime     @updatedAt @map("updated_at") @db.Timestamptz
 
-  memberships          Membership[]
-  platformAuditEntries PlatformAuditEntry[]
-  idempotencyKeys      IdempotencyKey[]
-  consents             Consent[]
-  pushDevices          PushDevice[]
-  verificationCodes    VerificationCode[]
-  refreshTokens        RefreshToken[]
-  mfaFactor            MfaFactor?
-  mfaRecoveryCodes     MfaRecoveryCode[]
+  memberships            Membership[]
+  platformAuditEntries   PlatformAuditEntry[]
+  platformChargesCreated PlatformCharge[]
+  idempotencyKeys        IdempotencyKey[]
+  consents               Consent[]
+  pushDevices            PushDevice[]
+  verificationCodes      VerificationCode[]
+  refreshTokens          RefreshToken[]
+  mfaFactor              MfaFactor?
+  mfaRecoveryCodes       MfaRecoveryCode[]
 
   @@map("users")
 }
@@ -356,11 +359,21 @@ model Center {
   stripeAccountId           String?      @unique @map("stripe_account_id")
   /// Stripe confirma que la cuenta ya puede cobrar (KYC completo). Solo lo fija la lectura de la cuenta en Stripe.
   stripeChargesEnabled      Boolean      @default(false) @map("stripe_charges_enabled")
+  /// Cliente de Stripe Billing al que se cobra el plan (cus_...). Nulo = aún no ha pagado ni elegido plan.
+  stripeCustomerId          String?      @unique @map("stripe_customer_id")
+  /// Suscripción de Stripe Billing del plan (sub_...). Nulo = sin suscripción (en prueba o suspendido).
+  stripeSubscriptionId      String?      @unique @map("stripe_subscription_id")
+  /// `monthly` o `annual`: cada cuánto paga el plan.
+  billingPeriod             String?      @map("billing_period")
+  /// Fin de los 7 días de gracia tras un pago fallido o una prueba sin plan; pasado, se suspende.
+  graceEndsAt               DateTime?    @map("grace_ends_at") @db.Timestamptz
   /// Premium: fondo de las pantallas del centro. Solo este es liso; con `backgroundColorEnd` es un degradado de dos colores. Nulo = el del tema.
   backgroundColor           String?      @map("background_color") @db.Char(7)
   backgroundColorEnd        String?      @map("background_color_end") @db.Char(7)
   /// Premium: color de la colmena de fondo. Nulo = el color de marca.
   hiveColor                 String?      @map("hive_color") @db.Char(7)
+  /// Las citas y clases se inician solas a su hora (el equipo no tiene que pulsar «Iniciar»).
+  autoStartSessions         Boolean      @default(false) @map("auto_start_sessions")
   /// Las opiniones sobre el equipo se revisan antes de publicarse.
   reviewsNeedApproval       Boolean      @default(true) @map("reviews_need_approval")
   /// El equipo (fotos, vídeos y valoraciones) se enseña en la web de reservas.
@@ -405,6 +418,7 @@ model Center {
   guardianLinks        GuardianLink[]
   plan                 PlatformPlan         @relation(fields: [planId], references: [id])
   platformAuditEntries PlatformAuditEntry[]
+  platformCharges      PlatformCharge[]
 
   @@map("centers")
 }
@@ -995,10 +1009,10 @@ model SessionSchedule {
   status                ScheduleStatus @default(active)
   label                 String?
   /// Dónde se da cuando no es en una sala del centro (exterior, auditorio…); sin nombre no hay ubicación.
-  locationName        String?        @map("location_name")
-  locationAddress         String?        @map("location_address")
-  locationLatitude        Float?         @map("location_latitude")
-  locationLongitude       Float?         @map("location_longitude")
+  locationName          String?        @map("location_name")
+  locationAddress       String?        @map("location_address")
+  locationLatitude      Float?         @map("location_latitude")
+  locationLongitude     Float?         @map("location_longitude")
   /// Hasta qué fecha local (incluida) existen ya sus sesiones.
   materializedUntil     DateTime?      @map("materialized_until") @db.Date
   createdByMembershipId String         @map("created_by_membership_id") @db.Uuid
@@ -1606,14 +1620,15 @@ model WaitlistEntry {
 /// Lo que hace la plataforma sobre un centro (ampliar la prueba, suspender, cambiar límites). Solo se inserta.
 model PlatformAuditEntry {
   id          String   @id @db.Uuid
-  actorUserId String   @map("actor_user_id") @db.Uuid
+  /// Nulo en los cambios automáticos (avisos de Stripe, barrido de gracias).
+  actorUserId String?  @map("actor_user_id") @db.Uuid
   /// Qué se hizo (`center_suspended`, `trial_extended`…).
   action      String
   centerId    String?  @map("center_id") @db.Uuid
   details     Json     @default("{}")
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  actor  User    @relation(fields: [actorUserId], references: [id])
+  actor  User?   @relation(fields: [actorUserId], references: [id])
   center Center? @relation(fields: [centerId], references: [id])
 
   @@index([createdAt(sort: Desc)])
@@ -1637,9 +1652,60 @@ model PlatformPlan {
   /// Nulo = el plan no incluye vídeo.
   videoStorageLimitBytes    BigInt?  @map("video_storage_limit_bytes")
   sortOrder                 Int      @map("sort_order")
+  /// Ids de Stripe del plan: producto, precio mensual y anual, cuota de alta (Premium) e IVA. Los fija `billing:setup`.
+  stripeProductId           String?  @map("stripe_product_id")
+  stripeMonthlyPriceId      String?  @map("stripe_monthly_price_id")
+  stripeAnnualPriceId       String?  @map("stripe_annual_price_id")
+  stripeSetupFeePriceId     String?  @map("stripe_setup_fee_price_id")
+  stripeTaxRateId           String?  @map("stripe_tax_rate_id")
   updatedAt                 DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   centers Center[]
 
   @@map("platform_plans")
+}
+
+/// Un cobro de plan a un centro (docs/spec/17 §4): lo que el gestor necesita para la contabilidad. Importes
+/// en céntimos; el total es siempre base + cuota de IVA. Se anula (`void`), no se borra.
+model PlatformCharge {
+  id                String   @id @db.Uuid
+  centerId          String   @map("center_id") @db.Uuid
+  /// Día en que se cobró.
+  chargedOn         DateTime @map("charged_on") @db.Date
+  concept           String
+  baseCents         Int      @map("base_cents")
+  vatBasisPoints    Int      @map("vat_basis_points")
+  vatCents          Int      @map("vat_cents")
+  totalCents        Int      @map("total_cents")
+  stripeFeeCents    Int?     @map("stripe_fee_cents")
+  /// `pending`, `paid` o `void`.
+  status            String   @default("paid")
+  /// `manual` o `stripe`.
+  source            String   @default("manual")
+  /// `transfer`, `card`, `cash` u `other`.
+  paymentMethod     String   @map("payment_method")
+  invoiceReference  String?  @map("invoice_reference")
+  stripeId          String?  @map("stripe_id")
+  customerLegalName String?  @map("customer_legal_name")
+  customerTaxId     String?  @map("customer_tax_id")
+  /// Nulo en los cobros que llegan de Stripe.
+  createdByUserId   String?  @map("created_by_user_id") @db.Uuid
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  center    Center @relation(fields: [centerId], references: [id])
+  createdBy User?  @relation(fields: [createdByUserId], references: [id])
+
+  @@index([chargedOn(sort: Desc)])
+  @@index([centerId, chargedOn(sort: Desc)])
+  @@map("platform_charges")
+}
+
+/// Avisos de Stripe ya procesados (docs/spec/17 §4): Stripe reintenta, así que cada uno se atiende una vez.
+model PlatformWebhookEvent {
+  id         String   @id
+  type       String
+  receivedAt DateTime @default(now()) @map("received_at") @db.Timestamptz
+
+  @@map("platform_webhook_events")
 }

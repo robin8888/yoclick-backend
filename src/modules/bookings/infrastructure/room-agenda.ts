@@ -23,6 +23,8 @@ const SESSION_INCLUDE = {
       id: true,
       status: true,
       source: true,
+      startedAt: true,
+      endedAt: true,
       clientMembership: {
         select: { id: true, user: { select: { fullName: true, photoKey: true } } },
       },
@@ -60,6 +62,29 @@ async function listSessionsOfDay(
   });
 }
 
+/**
+ * Cuándo se inició la clase (la primera reserva iniciada) y cuándo terminó; `null` mientras no se
+ * haya iniciado o siga en curso. La agenda dibuja con esto el contador de tiempo.
+ */
+function readSessionClock(bookings: readonly { startedAt: Date | null; endedAt: Date | null }[]): {
+  startedAt: Date | null;
+  endedAt: Date | null;
+} {
+  const started = bookings.filter((booking) => booking.startedAt !== null);
+  const firstStartedAt = started.reduce<Date | null>(
+    (earliest, { startedAt }) =>
+      startedAt !== null && (earliest === null || startedAt < earliest) ? startedAt : earliest,
+    null,
+  );
+  const isOpen = started.some((booking) => booking.endedAt === null);
+  const lastEndedAt = started.reduce<Date | null>(
+    (latest, { endedAt }) =>
+      endedAt !== null && (latest === null || endedAt > latest) ? endedAt : latest,
+    null,
+  );
+  return { startedAt: firstStartedAt, endedAt: isOpen ? null : lastEndedAt };
+}
+
 function toRoomSessionView(session: StoredSession, room: StoredRoom | null): RoomSessionView {
   return {
     id: session.id,
@@ -79,6 +104,7 @@ function toRoomSessionView(session: StoredSession, room: StoredRoom | null): Roo
     schedule: session.schedule,
     location: resolveSessionLocation(toSessionLocation(session), room),
     cancelledReason: session.status === 'cancelled' ? session.cancelledReason : null,
+    ...readSessionClock(session.bookings),
     attendees: session.bookings.map((booking) => ({
       bookingId: booking.id,
       clientMembershipId: booking.clientMembership.id,

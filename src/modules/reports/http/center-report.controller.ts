@@ -9,6 +9,7 @@ import {
 } from '@nestjs/swagger';
 import { CurrentActor } from '../../../shared/auth/decorators/current-actor.decorator';
 import { Roles } from '../../../shared/auth/decorators/roles.decorator';
+import { RequiresPlanFeature } from '../../../shared/auth/decorators/requires-plan-feature.decorator';
 import { AllowStaffWithPermission } from '../../../shared/auth/decorators/staff-permission.decorator';
 import { ProblemDetailsDto } from '../../../shared/errors/problem-details.dto';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
@@ -24,6 +25,7 @@ import {
 @ApiBearerAuth('bearer')
 @ApiHeader({ name: 'X-Center-Id', required: true })
 @ApiDefaultResponse({ type: ProblemDetailsDto, description: 'Error RFC 9457' })
+@RequiresPlanFeature('reports')
 @Controller('centers/:centerId/reports')
 export class CenterReportController {
   constructor(private readonly getCenterReport: GetCenterReportUseCase) {}

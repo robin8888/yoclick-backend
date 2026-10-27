@@ -42,6 +42,7 @@ function toSettings(center: Center): CenterSettings {
     holidays: center.holidays as Holiday[] | null,
     cancelPolicy: center.cancelPolicy as CancelPolicy | null,
     modules: resolveCenterModules(center.disabledModules),
+    autoStartSessions: center.autoStartSessions,
     trialEndsAt: center.trialEndsAt,
     backgroundColor: center.backgroundColor,
     backgroundColorEnd: center.backgroundColorEnd,

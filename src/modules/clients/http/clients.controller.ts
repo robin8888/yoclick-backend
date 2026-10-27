@@ -19,6 +19,7 @@ import {
 } from '@nestjs/swagger';
 import { CurrentActor } from '../../../shared/auth/decorators/current-actor.decorator';
 import { Roles } from '../../../shared/auth/decorators/roles.decorator';
+import { RequiresPlanFeature } from '../../../shared/auth/decorators/requires-plan-feature.decorator';
 import { AllowStaffWithPermission } from '../../../shared/auth/decorators/staff-permission.decorator';
 import { ProblemDetailsDto } from '../../../shared/errors/problem-details.dto';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
@@ -95,6 +96,7 @@ export class ClientsController {
     return { ...result, clients: result.clients.map(serializeClient) };
   }
 
+  @RequiresPlanFeature('clientImport')
   @Post('import')
   @HttpCode(HttpStatus.OK)
   @Roles('owner', 'admin')

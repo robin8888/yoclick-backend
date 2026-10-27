@@ -51,6 +51,8 @@ function buildRepository(overrides: Partial<SessionRecordRepository>): SessionRe
     endSession: jest.fn(),
     confirmAttendance: jest.fn(),
     listSessionRecords: jest.fn(),
+    findCentersWithAutoStart: jest.fn(),
+    startDueSessions: jest.fn(),
     ...overrides,
   };
 }

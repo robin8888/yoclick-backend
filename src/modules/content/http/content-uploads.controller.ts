@@ -14,6 +14,7 @@ import { type FastifyRequest } from 'fastify';
 import { Throttle } from '@nestjs/throttler';
 import { CurrentActor } from '../../../shared/auth/decorators/current-actor.decorator';
 import { Roles } from '../../../shared/auth/decorators/roles.decorator';
+import { RequiresPlanFeature } from '../../../shared/auth/decorators/requires-plan-feature.decorator';
 import { DomainError } from '../../../shared/errors/domain-error';
 import { HTTP_STATUS } from '../../../shared/errors/http-status';
 import { ProblemDetailsDto } from '../../../shared/errors/problem-details.dto';
@@ -42,6 +43,7 @@ import {
 @ApiHeader({ name: 'X-Center-Id', required: true })
 @ApiDefaultResponse({ type: ProblemDetailsDto, description: 'Error RFC 9457' })
 @RequiresModule('content')
+@RequiresPlanFeature('contentLibrary')
 @Controller('centers/:centerId/content')
 export class ContentUploadsController {
   constructor(

@@ -19,6 +19,7 @@ import { HTTP_STATUS } from '../../../shared/errors/http-status';
 import { ProblemDetailsDto } from '../../../shared/errors/problem-details.dto';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
 import { assertRouteTargetsActorCenter } from '../../../shared/tenancy/assert-route-targets-actor-center';
+import { HandleBillingWebhookUseCase } from '../../billing/application/billing.use-cases';
 import {
   ConfirmPaymentUseCase,
   GetPaymentsStatusUseCase,
@@ -170,7 +171,10 @@ export class PaymentsController {
 @ApiDefaultResponse({ type: ProblemDetailsDto, description: 'Error RFC 9457' })
 @Controller('webhooks')
 export class PaymentWebhooksController {
-  constructor(private readonly handleWebhook: HandleStripeWebhookUseCase) {}
+  constructor(
+    private readonly handleWebhook: HandleStripeWebhookUseCase,
+    private readonly handleBillingWebhook: HandleBillingWebhookUseCase,
+  ) {}
 
   @Post('stripe')
   @Public()
@@ -184,9 +188,12 @@ export class PaymentWebhooksController {
   async stripe(@Req() request: FastifyRequest): Promise<void> {
     const signature = request.headers['stripe-signature'];
     if (request.rawBody === undefined) throw new DomainError('BAD_REQUEST', HTTP_STATUS.badRequest);
-    await this.handleWebhook.execute({
+    const webhook = {
       rawBody: request.rawBody,
       signatureHeader: typeof signature === 'string' ? signature : undefined,
-    });
+    };
+    // El mismo endpoint recibe los avisos del cobro de planes (suscripciones) y los de bonos (Connect).
+    await this.handleBillingWebhook.execute(webhook);
+    await this.handleWebhook.execute(webhook);
   }
 }

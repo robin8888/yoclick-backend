@@ -28,6 +28,7 @@
     "videos:check": "nest build && node scripts/check-bunny-stream.cjs",
     "keys:generate": "node scripts/generate-development-jwt-keys.cjs",
     "platform:role": "node scripts/platform-role.cjs",
+    "billing:setup": "nest build && node dist/modules/billing/cli/run-billing-setup.js",
     "db:seed": "nest build && node dist/seed/run-seed.js",
     "db:backfill-center-defaults": "nest build && node dist/seed/run-backfill-center-defaults.js"
   },

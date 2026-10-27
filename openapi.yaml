@@ -4165,6 +4165,293 @@ paths:
       summary: Cambia el precio mensual, el anual o la cuota de alta de un plan (en céntimos, sin IVA). Cada cambio queda en el registro de auditoría.
       tags:
         - platform
+  /v1/platform/charges:
+    get:
+      operationId: platform_list_charges
+      parameters:
+        - name: limit
+          required: false
+          in: query
+          schema:
+            minimum: 1
+            maximum: 100
+            default: 20
+            type: integer
+        - name: cursor
+          required: false
+          in: query
+          schema:
+            maxLength: 512
+            type: string
+        - name: month
+          required: false
+          in: query
+          schema:
+            pattern: ^\d{4}-(0[1-9]|1[0-2])$
+            type: string
+        - name: centerId
+          required: false
+          in: query
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlatformChargeListResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Los cobros de los planes, del más reciente al más antiguo, por mes o por centro.
+      tags:
+        - platform
+    post:
+      operationId: platform_record_charge
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecordPlatformChargeRequestDto"
+      responses:
+        "201":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlatformChargeResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Apunta a mano un cobro de plan a un centro. El IVA y el total los calcula el servidor a partir de la base y el tipo.
+      tags:
+        - platform
+  /v1/platform/charges/{chargeId}:
+    patch:
+      operationId: platform_update_charge
+      parameters:
+        - name: chargeId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePlatformChargeRequestDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlatformChargeResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Cambia el estado de un cobro (cobrado, pendiente, anulado) o su referencia de factura. Un cobro anulado ya no se cambia.
+      tags:
+        - platform
+  /v1/platform/reports/monthly:
+    get:
+      operationId: platform_get_charge_report
+      parameters:
+        - name: fromMonth
+          required: true
+          in: query
+          schema:
+            pattern: ^\d{4}-(0[1-9]|1[0-2])$
+            type: string
+        - name: toMonth
+          required: true
+          in: query
+          schema:
+            pattern: ^\d{4}-(0[1-9]|1[0-2])$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlatformChargeReportResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Lo cobrado mes a mes entre dos meses (base, IVA, total, comisiones y número de cobros) y el total del rango.
+      tags:
+        - platform
+  /v1/platform/reports/export.csv:
+    get:
+      operationId: platform_export_charges_csv
+      parameters:
+        - name: fromMonth
+          required: true
+          in: query
+          schema:
+            pattern: ^\d{4}-(0[1-9]|1[0-2])$
+            type: string
+        - name: toMonth
+          required: true
+          in: query
+          schema:
+            pattern: ^\d{4}-(0[1-9]|1[0-2])$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            text/csv:
+              schema:
+                type: string
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: El CSV de los cobros cobrados entre dos meses, para el gestor (separador «;» y coma decimal).
+      tags:
+        - platform
+  /v1/centers/{centerId}/subscription/plans:
+    get:
+      operationId: centers_list_subscription_plans
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanOffersResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Los planes que se pueden contratar, con su precio mensual y anual (sin IVA), la cuota de alta y lo que incluye cada uno.
+      tags:
+        - centers
+  /v1/centers/{centerId}/subscription/portal:
+    post:
+      operationId: centers_create_subscription_portal
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckoutResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Da el enlace al portal de Stripe para cambiar de plan o de periodicidad, cambiar la tarjeta, ver las facturas o cancelar. Solo si el centro ya ha pagado alguna vez; se abre en el navegador.
+      tags:
+        - centers
+  /v1/centers/{centerId}/subscription/checkout:
+    post:
+      operationId: centers_create_subscription_checkout
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckoutRequestDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckoutResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Da la página de pago de Stripe para contratar un plan. Si la prueba sigue en marcha, el primer cobro se aplaza hasta que acabe. El pago se hace en la web, no en la app.
+      tags:
+        - centers
   /v1/centers/{centerId}/payments/status:
     get:
       operationId: payments_get_status
@@ -10280,6 +10567,8 @@ components:
             - waitlist
             - rooms
           additionalProperties: false
+        autoStartSessions:
+          type: boolean
         trialEndsAt:
           type: string
           format: date-time
@@ -10321,6 +10610,7 @@ components:
         - holidays
         - cancelPolicy
         - modules
+        - autoStartSessions
         - trialEndsAt
         - backgroundColor
         - backgroundColorEnd
@@ -10552,6 +10842,8 @@ components:
             rooms:
               type: boolean
           additionalProperties: false
+        autoStartSessions:
+          type: boolean
         backgroundColor:
           type: string
           pattern: ^#[0-9A-Fa-f]{6}$
@@ -10621,6 +10913,44 @@ components:
           format: date-time
           pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
           nullable: true
+        planId:
+          type: string
+          enum:
+            - basic
+            - pro
+            - premium
+        billingPeriod:
+          type: string
+          enum:
+            - monthly
+            - annual
+            - null
+          nullable: true
+        graceEndsAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+          nullable: true
+        hasSubscription:
+          type: boolean
+        isPlanRequired:
+          type: boolean
+        features:
+          type: array
+          items:
+            type: string
+            enum:
+              - reports
+              - clientImport
+              - routines
+              - contentLibrary
+              - groups
+              - families
+              - waitlist
+              - rooms
+              - customAppearance
+              - videos
+              - ownApp
         maxClients:
           type: integer
           minimum: -9007199254740991
@@ -10657,6 +10987,12 @@ components:
       required:
         - status
         - trialEndsAt
+        - planId
+        - billingPeriod
+        - graceEndsAt
+        - hasSubscription
+        - isPlanRequired
+        - features
         - maxClients
         - activeClientCount
         - videoStorageLimitBytes
@@ -12624,6 +12960,16 @@ components:
                     cancelledReason:
                       type: string
                       nullable: true
+                    startedAt:
+                      type: string
+                      format: date-time
+                      pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                      nullable: true
+                    endedAt:
+                      type: string
+                      format: date-time
+                      pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                      nullable: true
                     attendees:
                       type: array
                       items:
@@ -12674,6 +13020,8 @@ components:
                     - schedule
                     - location
                     - cancelledReason
+                    - startedAt
+                    - endedAt
                     - attendees
                   additionalProperties: false
             required:
@@ -12791,6 +13139,16 @@ components:
               cancelledReason:
                 type: string
                 nullable: true
+              startedAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                nullable: true
+              endedAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                nullable: true
               attendees:
                 type: array
                 items:
@@ -12841,6 +13199,8 @@ components:
               - schedule
               - location
               - cancelledReason
+              - startedAt
+              - endedAt
               - attendees
             additionalProperties: false
       required:
@@ -15321,6 +15681,13 @@ components:
             type: string
         stripeChargesEnabled:
           type: boolean
+        graceEndsAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+          nullable: true
+        hasSubscription:
+          type: boolean
         documentStorageLimitBytes:
           type: integer
           minimum: -9007199254740991
@@ -15353,6 +15720,8 @@ components:
         - timezone
         - disabledModules
         - stripeChargesEnabled
+        - graceEndsAt
+        - hasSubscription
         - documentStorageLimitBytes
         - videoStorageLimitBytes
         - photoStorageLimitBytes
@@ -15598,6 +15967,455 @@ components:
         - documentStorageLimitBytes
         - videoStorageLimitBytes
         - centerCountByStatus
+      additionalProperties: false
+    PlatformChargeListResponseDto:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              centerId:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              centerName:
+                type: string
+              chargedOn:
+                type: string
+                format: date
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+              concept:
+                type: string
+              baseCents:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+              vatBasisPoints:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+              vatCents:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+              totalCents:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+              stripeFeeCents:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+                nullable: true
+              status:
+                type: string
+                enum:
+                  - pending
+                  - paid
+                  - void
+              source:
+                type: string
+                enum:
+                  - manual
+                  - stripe
+              paymentMethod:
+                type: string
+                enum:
+                  - transfer
+                  - card
+                  - cash
+                  - other
+              invoiceReference:
+                type: string
+                nullable: true
+              stripeId:
+                type: string
+                nullable: true
+              customerLegalName:
+                type: string
+                nullable: true
+              customerTaxId:
+                type: string
+                nullable: true
+              createdAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+            required:
+              - id
+              - centerId
+              - centerName
+              - chargedOn
+              - concept
+              - baseCents
+              - vatBasisPoints
+              - vatCents
+              - totalCents
+              - stripeFeeCents
+              - status
+              - source
+              - paymentMethod
+              - invoiceReference
+              - stripeId
+              - customerLegalName
+              - customerTaxId
+              - createdAt
+            additionalProperties: false
+        nextCursor:
+          type: string
+          nullable: true
+      required:
+        - data
+        - nextCursor
+      additionalProperties: false
+    RecordPlatformChargeRequestDto:
+      type: object
+      properties:
+        centerId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        chargedOn:
+          type: string
+          format: date
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+        concept:
+          type: string
+          minLength: 1
+          maxLength: 200
+        baseCents:
+          type: integer
+          minimum: 0
+          maximum: 100000000
+        vatBasisPoints:
+          type: integer
+          minimum: 0
+          maximum: 10000
+        status:
+          default: paid
+          type: string
+          enum:
+            - pending
+            - paid
+            - void
+        paymentMethod:
+          type: string
+          enum:
+            - transfer
+            - card
+            - cash
+            - other
+        invoiceReference:
+          type: string
+          minLength: 1
+          maxLength: 60
+          nullable: true
+        customerLegalName:
+          type: string
+          minLength: 1
+          maxLength: 200
+          nullable: true
+        customerTaxId:
+          type: string
+          minLength: 1
+          maxLength: 20
+          nullable: true
+      required:
+        - centerId
+        - chargedOn
+        - concept
+        - baseCents
+        - vatBasisPoints
+        - paymentMethod
+      additionalProperties: false
+    PlatformChargeResponseDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        centerId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        centerName:
+          type: string
+        chargedOn:
+          type: string
+          format: date
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+        concept:
+          type: string
+        baseCents:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        vatBasisPoints:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        vatCents:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        totalCents:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        stripeFeeCents:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+          nullable: true
+        status:
+          type: string
+          enum:
+            - pending
+            - paid
+            - void
+        source:
+          type: string
+          enum:
+            - manual
+            - stripe
+        paymentMethod:
+          type: string
+          enum:
+            - transfer
+            - card
+            - cash
+            - other
+        invoiceReference:
+          type: string
+          nullable: true
+        stripeId:
+          type: string
+          nullable: true
+        customerLegalName:
+          type: string
+          nullable: true
+        customerTaxId:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+      required:
+        - id
+        - centerId
+        - centerName
+        - chargedOn
+        - concept
+        - baseCents
+        - vatBasisPoints
+        - vatCents
+        - totalCents
+        - stripeFeeCents
+        - status
+        - source
+        - paymentMethod
+        - invoiceReference
+        - stripeId
+        - customerLegalName
+        - customerTaxId
+        - createdAt
+      additionalProperties: false
+    UpdatePlatformChargeRequestDto:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - pending
+            - paid
+            - void
+        invoiceReference:
+          type: string
+          minLength: 1
+          maxLength: 60
+          nullable: true
+      additionalProperties: false
+    PlatformChargeReportResponseDto:
+      type: object
+      properties:
+        months:
+          type: array
+          items:
+            type: object
+            properties:
+              month:
+                type: string
+              baseCents:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+              vatCents:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+              totalCents:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+              chargeCount:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+              stripeFeeCents:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+            required:
+              - month
+              - baseCents
+              - vatCents
+              - totalCents
+              - chargeCount
+              - stripeFeeCents
+            additionalProperties: false
+        totals:
+          type: object
+          properties:
+            baseCents:
+              type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+            vatCents:
+              type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+            totalCents:
+              type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+            chargeCount:
+              type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+            stripeFeeCents:
+              type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+          required:
+            - baseCents
+            - vatCents
+            - totalCents
+            - chargeCount
+            - stripeFeeCents
+          additionalProperties: false
+      required:
+        - months
+        - totals
+      additionalProperties: false
+    PlanOffersResponseDto:
+      type: object
+      properties:
+        plans:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                enum:
+                  - basic
+                  - pro
+                  - premium
+              name:
+                type: string
+              monthlyPriceCents:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+              annualMonthlyPriceCents:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+              setupFeeCents:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+              maxClients:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+                nullable: true
+              documentStorageLimitBytes:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+              videoStorageLimitBytes:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+                nullable: true
+              features:
+                type: array
+                items:
+                  type: string
+                  enum:
+                    - reports
+                    - clientImport
+                    - routines
+                    - contentLibrary
+                    - groups
+                    - families
+                    - waitlist
+                    - rooms
+                    - customAppearance
+                    - videos
+                    - ownApp
+              isAvailable:
+                type: boolean
+            required:
+              - id
+              - name
+              - monthlyPriceCents
+              - annualMonthlyPriceCents
+              - setupFeeCents
+              - maxClients
+              - documentStorageLimitBytes
+              - videoStorageLimitBytes
+              - features
+              - isAvailable
+            additionalProperties: false
+      required:
+        - plans
+      additionalProperties: false
+    CheckoutResponseDto:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+      required:
+        - url
+      additionalProperties: false
+    CheckoutRequestDto:
+      type: object
+      properties:
+        planId:
+          type: string
+          enum:
+            - basic
+            - pro
+            - premium
+        period:
+          type: string
+          enum:
+            - monthly
+            - annual
+      required:
+        - planId
+        - period
       additionalProperties: false
     PaymentsStatusResponseDto:
       type: object
@@ -17081,6 +17899,8 @@ components:
                   - waitlist_offer_expired
                   - pass_rejected
                   - schedule_updated
+                  - plan_subscribed
+                  - plan_changed
               data:
                 type: object
                 additionalProperties:

@@ -65,6 +65,10 @@ export interface SessionRecordRepository {
     command: { bookingId: string; now: Date },
   ): Promise<ConfirmAttendanceOutcome>;
   listSessionRecords(actor: ActorContext, query: SessionRecordsQuery): Promise<SessionRecordsFound>;
+  /** Los centros que tienen activado el inicio automático de sus clases y citas. */
+  findCentersWithAutoStart(): Promise<string[]>;
+  /** Inicia las citas y clases del centro que ya han llegado a su hora; devuelve cuántas. */
+  startDueSessions(actor: ActorContext, command: { now: Date }): Promise<number>;
 }
 
 export const SESSION_RECORD_REPOSITORY = Symbol('SESSION_RECORD_REPOSITORY');

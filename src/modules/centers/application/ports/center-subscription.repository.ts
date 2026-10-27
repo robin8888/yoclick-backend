@@ -3,6 +3,14 @@ import { type ActorContext } from '../../../../shared/tenancy/actor-context';
 export interface CenterSubscriptionFacts {
   readonly status: 'trial' | 'active' | 'past_due' | 'suspended';
   readonly trialEndsAt: Date | null;
+  /** Plan contratado: `basic`, `pro` o `premium` (en la prueba es Pro). */
+  readonly planId: string;
+  /** Cada cuánto paga; `null` si todavía no ha contratado el plan. */
+  readonly billingPeriod: 'monthly' | 'annual' | null;
+  /** Fin de los 7 días de gracia; `null` si no está en gracia. */
+  readonly graceEndsAt: Date | null;
+  /** Ya paga con una suscripción de Stripe. */
+  readonly hasSubscription: boolean;
   /** Tope de clientes activos del plan; `null` si no tiene. */
   readonly maxClients: number | null;
   readonly activeClientCount: number;

@@ -23,6 +23,8 @@ import {
   WITH_SESSION_DETAILS,
   type BookingWithSessionDetails,
 } from './booking-view.mapper';
+import { startDueBookings } from './session-auto-start';
+import { lockStaffSessions } from './staff-session-lock';
 import { consumePassForBooking } from '../../passes/infrastructure/pass-consumption';
 import { findBookingsBlockedByRefund } from '../../passes/infrastructure/refund-block';
 
@@ -66,14 +68,6 @@ async function isBlockedUntilNewPass(
   return blockedIds.has(input.booking.id);
 }
 
-/** Un cerrojo por persona del equipo y transacción: dos «iniciar» suyos a la vez se atienden de uno en uno. */
-async function lockStaffSessions(
-  client: TenantTransactionClient,
-  staffMembershipId: string,
-): Promise<void> {
-  await client.$executeRaw`select pg_advisory_xact_lock(hashtextextended(${staffMembershipId}, 0))`;
-}
-
 @Injectable()
 export class PrismaSessionRecordRepository implements SessionRecordRepository {
   constructor(private readonly tenantPrismaService: TenantPrismaService) {}
@@ -110,6 +104,22 @@ export class PrismaSessionRecordRepository implements SessionRecordRepository {
       const started = toBookingView(await reloadBooking(client, command.bookingId));
       return { kind: 'started', booking: started };
     });
+  }
+
+  async findCentersWithAutoStart(): Promise<string[]> {
+    return this.tenantPrismaService.runInAutoStartSweepContext(async (client) => {
+      const centers = await client.center.findMany({
+        where: { autoStartSessions: true },
+        select: { id: true },
+      });
+      return centers.map(({ id }) => id);
+    });
+  }
+
+  async startDueSessions(actor: ActorContext, command: { now: Date }): Promise<number> {
+    return this.tenantPrismaService.runInTenantContext(actor, (client) =>
+      startDueBookings(client, command.now),
+    );
   }
 
   async endSession(

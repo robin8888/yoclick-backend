@@ -35,12 +35,16 @@ import {
   UpdatePlatformCenterRequestDto,
 } from './platform.dto';
 
-function serializeCenter(center: PlatformCenterSummary): Record<string, unknown> {
+function serializeCenter(
+  center: PlatformCenterSummary & { readonly graceEndsAt?: Date | null },
+): Record<string, unknown> {
   return {
     ...center,
     createdAt: center.createdAt.toISOString(),
     trialEndsAt: center.trialEndsAt?.toISOString() ?? null,
     lastBookingAt: center.lastBookingAt?.toISOString() ?? null,
+    // Solo la ficha de un centro lleva la gracia; la lista no.
+    ...('graceEndsAt' in center && { graceEndsAt: center.graceEndsAt?.toISOString() ?? null }),
   };
 }
 

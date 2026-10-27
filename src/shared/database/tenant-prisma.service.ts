@@ -23,6 +23,8 @@ interface RequestContextSettings {
   readonly lookupInvitationHash?: string;
   /** El barrido de ofertas de la lista de espera caducadas: solo ve esas filas. */
   readonly isWaitlistSweep?: boolean;
+  /** El barrido que inicia las citas solas: solo ve los centros que lo tienen activado. */
+  readonly isAutoStartSweep?: boolean;
   /** Administración de la plataforma (`admin`): lectura agregada de todos los centros. */
   readonly platformRole?: string;
 }
@@ -95,6 +97,16 @@ export class TenantPrismaService {
     return this.runWithSettings({ ...NO_CENTER_SETTINGS, userId: '', isWaitlistSweep: true }, work);
   }
 
+  /** Para el inicio automático de citas: qué centros lo tienen activado, sin sesión ni centro. */
+  async runInAutoStartSweepContext<TResult>(
+    work: (transactionClient: TenantTransactionClient) => Promise<TResult>,
+  ): Promise<TResult> {
+    return this.runWithSettings(
+      { ...NO_CENTER_SETTINGS, userId: '', isAutoStartSweep: true },
+      work,
+    );
+  }
+
   /**
    * Para la administración de la plataforma: el guard ya comprobó el rol de plataforma y el segundo factor.
    * Sin centro: las políticas de plataforma dejan leer todos, y el código solo debe ejecutar agregados.
@@ -105,6 +117,19 @@ export class TenantPrismaService {
   ): Promise<TResult> {
     return this.runWithSettings(
       { ...NO_CENTER_SETTINGS, userId: actor.userId, platformRole: actor.role },
+      work,
+    );
+  }
+
+  /**
+   * Para el cobro de los planes (docs/spec/17 §6): los avisos de Stripe y el barrido de gracias no tienen
+   * sesión ni centro. Solo lo usa el código del servidor; alcanza lo que fijan las políticas `billing`.
+   */
+  async runInBillingContext<TResult>(
+    work: (transactionClient: TenantTransactionClient) => Promise<TResult>,
+  ): Promise<TResult> {
+    return this.runWithSettings(
+      { ...NO_CENTER_SETTINGS, userId: '', platformRole: 'billing' },
       work,
     );
   }
@@ -153,6 +178,7 @@ export class TenantPrismaService {
         set_config('app.lookup_invitation_hash', ${settings.lookupInvitationHash ?? ''}, true),
         set_config('app.lookup_directory', ${settings.isDirectoryLookup ? 'on' : ''}, true),
         set_config('app.lookup_waitlist_sweep', ${settings.isWaitlistSweep ? 'on' : ''}, true),
+        set_config('app.lookup_auto_start_sweep', ${settings.isAutoStartSweep ? 'on' : ''}, true),
         set_config('app.platform_role', ${settings.platformRole ?? ''}, true),
         set_config('statement_timeout', ${String(STATEMENT_TIMEOUT_MS)}, true)`;
   }

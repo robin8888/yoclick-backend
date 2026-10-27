@@ -12,6 +12,7 @@ import { UserScoped } from '../../../shared/auth/decorators/user-scoped.decorato
 import { TenantPrismaService } from '../../../shared/database/tenant-prisma.service';
 import { ProblemDetailsDto } from '../../../shared/errors/problem-details.dto';
 import { RegisterPushDeviceRequestDto, UnregisterPushDeviceRequestDto } from './push-devices.dto';
+import { AllowWithoutPlan } from '../../../shared/auth/decorators/requires-plan-feature.decorator';
 
 /** Un móvil que se registra, un móvil que se da de baja: así la persona recibe (o deja de recibir) avisos. */
 const MAX_DEVICES_PER_USER = 10;
@@ -19,6 +20,7 @@ const MAX_DEVICES_PER_USER = 10;
 @ApiTags('me')
 @ApiBearerAuth('bearer')
 @ApiDefaultResponse({ type: ProblemDetailsDto, description: 'Error RFC 9457' })
+@AllowWithoutPlan()
 @Controller('me/push-token')
 @UserScoped()
 export class PushDevicesController {

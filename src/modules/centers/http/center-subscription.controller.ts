@@ -7,9 +7,11 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
+import { PLAN_FEATURE_IDS } from '../../../shared/centers/plan-features';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import { CurrentActor } from '../../../shared/auth/decorators/current-actor.decorator';
+import { AllowWithoutPlan } from '../../../shared/auth/decorators/requires-plan-feature.decorator';
 import { Roles } from '../../../shared/auth/decorators/roles.decorator';
 import { ProblemDetailsDto } from '../../../shared/errors/problem-details.dto';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
@@ -22,6 +24,18 @@ class CenterSubscriptionResponseDto extends createZodDto(
     status: z.enum(['trial', 'active', 'past_due', 'suspended']),
     /** Fin de la prueba gratuita; `null` si no hay prueba en curso. */
     trialEndsAt: z.iso.datetime().nullable(),
+    /** Plan contratado (en la prueba es Pro). */
+    planId: z.enum(['basic', 'pro', 'premium']),
+    /** Cada cuánto paga; `null` si todavía no ha contratado el plan. */
+    billingPeriod: z.enum(['monthly', 'annual']).nullable(),
+    /** Fin de los 7 días de gracia tras un pago fallido; `null` si no está en gracia. */
+    graceEndsAt: z.iso.datetime().nullable(),
+    /** Ya paga con una suscripción de Stripe. */
+    hasSubscription: z.boolean(),
+    /** Debe contratar un plan para seguir gestionando el centro: prueba acabada, impago sin gracia o suspendido. */
+    isPlanRequired: z.boolean(),
+    /** Funciones que da el plan además de los topes. */
+    features: z.array(z.enum(PLAN_FEATURE_IDS)),
     /** Tope de clientes activos del plan; `null` si no tiene. */
     maxClients: z.number().int().nullable(),
     activeClientCount: z.number().int(),
@@ -40,6 +54,7 @@ class CenterSubscriptionResponseDto extends createZodDto(
 @ApiBearerAuth('bearer')
 @ApiHeader({ name: 'X-Center-Id', required: true })
 @ApiDefaultResponse({ type: ProblemDetailsDto, description: 'Error RFC 9457' })
+@AllowWithoutPlan()
 @Controller('centers/:centerId/subscription')
 export class CenterSubscriptionController {
   constructor(private readonly getSubscription: GetCenterSubscriptionUseCase) {}
@@ -58,6 +73,10 @@ export class CenterSubscriptionController {
   ): Promise<Record<string, unknown>> {
     assertRouteTargetsActorCenter(actor, params.centerId);
     const subscription = await this.getSubscription.execute(actor);
-    return { ...subscription, trialEndsAt: subscription.trialEndsAt?.toISOString() ?? null };
+    return {
+      ...subscription,
+      trialEndsAt: subscription.trialEndsAt?.toISOString() ?? null,
+      graceEndsAt: subscription.graceEndsAt?.toISOString() ?? null,
+    };
   }
 }

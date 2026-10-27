@@ -10,6 +10,7 @@ import {
 } from '@nestjs/swagger';
 import { CurrentActor } from '../../../shared/auth/decorators/current-actor.decorator';
 import { Roles } from '../../../shared/auth/decorators/roles.decorator';
+import { RequiresPlanFeature } from '../../../shared/auth/decorators/requires-plan-feature.decorator';
 import { ProblemDetailsDto } from '../../../shared/errors/problem-details.dto';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
 import { assertRouteTargetsActorCenter } from '../../../shared/tenancy/assert-route-targets-actor-center';
@@ -28,6 +29,7 @@ import {
 @ApiHeader({ name: 'X-Center-Id', required: true })
 @ApiDefaultResponse({ type: ProblemDetailsDto, description: 'Error RFC 9457' })
 @RequiresModule('content')
+@RequiresPlanFeature('contentLibrary')
 @Controller('centers/:centerId/my-content')
 export class MyContentController {
   constructor(

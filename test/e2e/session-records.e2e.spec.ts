@@ -2,6 +2,7 @@ import { type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { v7 as generateUuidV7 } from 'uuid';
 import { BookingWorld, localDateOf, type CreatedTestCenter } from '../support/booking-world';
 import { resetTestDatabase } from '../support/test-database';
+import { SessionAutoStarter } from '../../src/modules/bookings/application/session-auto-starter';
 import { createTestApplication } from './create-test-application';
 
 const MILLISECONDS_PER_MINUTE = 60_000;
@@ -645,6 +646,114 @@ describe('class session records', () => {
 
       expect(peeking.statusCode).toBe(404);
       expect(own.json<RecordsBody>().records).toEqual([]);
+    });
+  });
+  describe('automatic start', () => {
+    async function setAutoStart(isOn: boolean): Promise<void> {
+      const current = await world.call('GET', `/v1/centers/${centerId}`, ownerUserId, { centerId });
+      const response = await world.call('PATCH', `/v1/centers/${centerId}`, ownerUserId, {
+        centerId,
+        headers: { 'if-match': String(current.headers['etag']) },
+        body: { autoStartSessions: isOn },
+      });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({ autoStartSessions: isOn });
+    }
+
+    async function startedAtOf(bookingId: string): Promise<string | null> {
+      const records = await world.call('GET', recordsUrl(todayRange()), ownerUserId, { centerId });
+      const record = records
+        .json<RecordsBody>()
+        .records.find((item) => item.booking.id === bookingId);
+      return record?.booking.startedAt ?? null;
+    }
+
+    it('starts the classes that reached their time when the center turned it on', async () => {
+      const bookingId = await insertBooking({
+        clientMembershipId: ana.membershipId,
+        staffMembershipId: staff.membershipId,
+        startsInMinutes: -5,
+      });
+      await setAutoStart(true);
+
+      await application.get(SessionAutoStarter).startDueSessions();
+
+      expect(await startedAtOf(bookingId)).toEqual(expect.stringMatching(/Z$/));
+    });
+
+    it('does nothing while the center keeps it off', async () => {
+      const bookingId = await insertBooking({
+        clientMembershipId: ana.membershipId,
+        staffMembershipId: staff.membershipId,
+        startsInMinutes: -5,
+      });
+
+      await application.get(SessionAutoStarter).startDueSessions();
+
+      expect(await startedAtOf(bookingId)).toBeNull();
+    });
+
+    it('leaves alone what has not reached its time or already finished', async () => {
+      const upcoming = await insertBooking({
+        clientMembershipId: ana.membershipId,
+        staffMembershipId: staff.membershipId,
+        startsInMinutes: 10,
+      });
+      const finished = await insertBooking({
+        clientMembershipId: ana.membershipId,
+        staffMembershipId: otherStaff.membershipId,
+        startsInMinutes: -120,
+      });
+      await setAutoStart(true);
+
+      await application.get(SessionAutoStarter).startDueSessions();
+
+      expect(await startedAtOf(upcoming)).toBeNull();
+      expect(await startedAtOf(finished)).toBeNull();
+    });
+
+    it('shows the start time of a running class in the agenda of the center', async () => {
+      await insertBooking({
+        clientMembershipId: ana.membershipId,
+        staffMembershipId: staff.membershipId,
+        startsInMinutes: -5,
+      });
+      await setAutoStart(true);
+      await application.get(SessionAutoStarter).startDueSessions();
+      const today = localDateOf(new Date().toISOString());
+
+      const response = await world.call(
+        'GET',
+        `/v1/centers/${centerId}/agenda/rooms?date=${today}`,
+        ownerUserId,
+        { centerId },
+      );
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json<{
+        sessionsWithoutRoom: { startedAt: string | null; endedAt: string | null }[];
+      }>();
+      expect(body.sessionsWithoutRoom[0]).toMatchObject({
+        startedAt: expect.stringMatching(/Z$/) as string,
+        endedAt: null,
+      });
+    });
+
+    it('never starts the same class twice', async () => {
+      const bookingId = await insertBooking({
+        clientMembershipId: ana.membershipId,
+        staffMembershipId: staff.membershipId,
+        startsInMinutes: -10,
+      });
+      await setAutoStart(true);
+      const autoStarter = application.get(SessionAutoStarter);
+
+      await autoStarter.startDueSessions();
+      const firstStartedAt = await startedAtOf(bookingId);
+      await autoStarter.startDueSessions();
+
+      expect(firstStartedAt).not.toBeNull();
+      expect(await startedAtOf(bookingId)).toBe(firstStartedAt);
     });
   });
 });

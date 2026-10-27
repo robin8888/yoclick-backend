@@ -102,6 +102,8 @@ export class PlatformCenterDetailResponseDto extends createZodDto(
     timezone: z.string(),
     disabledModules: z.array(z.string()),
     stripeChargesEnabled: z.boolean(),
+    graceEndsAt: z.iso.datetime().nullable(),
+    hasSubscription: z.boolean(),
     documentStorageLimitBytes: z.number().int(),
     videoStorageLimitBytes: z.number().int().nullable(),
     photoStorageLimitBytes: z.number().int(),

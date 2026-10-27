@@ -32,6 +32,8 @@ export const NOTIFICATION_KINDS = [
   'waitlist_offer_expired',
   'pass_rejected',
   'schedule_updated',
+  'plan_subscribed',
+  'plan_changed',
 ] as const;
 export type NotificationKindName = (typeof NOTIFICATION_KINDS)[number];
 

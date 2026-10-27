@@ -70,6 +70,8 @@ const centerSettingsShape = {
   holidays: holidaysSchema.nullable(),
   cancelPolicy: cancelPolicySchema.nullable(),
   modules: centerModulesSchema,
+  /** Las clases y citas se inician solas a su hora. */
+  autoStartSessions: z.boolean(),
   trialEndsAt: z.iso.datetime().nullable(),
   /** Premium: fondo (liso, o degradado con el segundo color) y colmena. Nulo = los del tema. */
   backgroundColor: z.string().nullable(),
@@ -125,6 +127,7 @@ export class UpdateCenterSettingsRequestDto extends createZodDto(
       cancelPolicy: cancelPolicySchema.optional(),
       /** Enciende o apaga módulos; solo los enviados cambian. */
       modules: centerModuleChangesSchema.optional(),
+      autoStartSessions: z.boolean().optional(),
       /** Premium. `null` quita el color y vuelve al del tema. */
       backgroundColor: hexColorSchema.nullable().optional(),
       backgroundColorEnd: hexColorSchema.nullable().optional(),

@@ -4,6 +4,7 @@ const MIN_TCP_PORT = 1;
 const MAX_TCP_PORT = 65_535;
 const DEFAULT_PORT = 3000;
 const DEFAULT_WAITLIST_SWEEP_INTERVAL_SECONDS = 60;
+const DEFAULT_AUTO_START_INTERVAL_SECONDS = 30;
 const DEVELOPMENT_KEY_ID = 'dev-1';
 const MIN_PEPPER_BYTES = 32;
 const MFA_KEY_BYTES = 32;
@@ -99,6 +100,12 @@ const baseEnvironmentSchema = z.object({
     .int()
     .min(0)
     .default(DEFAULT_WAITLIST_SWEEP_INTERVAL_SECONDS),
+  // Cada cuántos segundos se inician solas las clases y citas que han llegado a su hora (centros que lo activan); 0 lo apaga.
+  AUTO_START_INTERVAL_SECONDS: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .default(DEFAULT_AUTO_START_INTERVAL_SECONDS),
   // Cobros de bonos y alquileres (plan Premium): `stripe` usa Stripe Connect; `fake` no llama a nadie.
   PAYMENT_PROVIDER: z.enum(['fake', 'stripe']).default('fake'),
   // Solo hacen falta con PAYMENT_PROVIDER=stripe (se exigen en ese caso, ver más abajo).
@@ -112,6 +119,14 @@ const baseEnvironmentSchema = z.object({
   // A dónde vuelve el navegador tras el alta de cobros del centro en Stripe (Stripe pide https).
   STRIPE_CONNECT_RETURN_URL: z.url().default('https://yoclick.app/stripe/return'),
   STRIPE_CONNECT_REFRESH_URL: z.url().default('https://yoclick.app/stripe/refresh'),
+  // A dónde vuelve el navegador tras pagar el plan del centro en Stripe Checkout (Stripe pide https).
+  BILLING_SUCCESS_URL: z.url().default('https://yoclick.app/billing/success'),
+  BILLING_CANCEL_URL: z.url().default('https://yoclick.app/billing/cancel'),
+  // A dónde vuelve el navegador al salir del portal de cliente de Stripe.
+  BILLING_PORTAL_RETURN_URL: z.url().default('https://yoclick.app/billing/return'),
+  // Cada cuántos segundos se abre la gracia de las pruebas acabadas sin plan y se suspende a quien agota
+  // la gracia; 0 (por defecto) lo apaga, para no suspender centros de pruebas sin querer.
+  BILLING_SWEEP_INTERVAL_SECONDS: z.coerce.number().int().min(0).default(0),
   EMAIL_PROVIDER: z.enum(['console', 'brevo']).default('console'),
   // Solo hacen falta con EMAIL_PROVIDER=brevo (se exigen en ese caso, ver más abajo).
   BREVO_API_KEY: z.string().min(1).optional(),

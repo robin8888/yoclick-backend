@@ -80,6 +80,13 @@ export const ERROR_CATALOG = {
   MODULE_DISABLED: {
     title: 'Tu centro no usa esta función. Puede activarla desde Módulos del centro',
   },
+  PLAN_REQUIRED: {
+    title:
+      'Tu prueba gratuita ha terminado. Elige un plan en Suscripción para seguir gestionando tu centro',
+  },
+  PLAN_FEATURE_NOT_INCLUDED: {
+    title: 'Tu plan no incluye esta función. Cambia a un plan superior en Suscripción',
+  },
   CLIENT_HAS_NO_PASS: {
     title:
       'Esa persona no tiene un bono en vigor con clases. Dale un bono desde su ficha para apuntarla',
