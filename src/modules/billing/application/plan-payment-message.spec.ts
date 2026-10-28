@@ -18,7 +18,7 @@ const PLANS: PlanPaymentOption[] = [
   },
 ];
 
-function build(reason: PlanPaymentEmailReason) {
+function build(reason: PlanPaymentEmailReason, isVoiceAddonOffered = false) {
   return buildPlanPaymentMessage({
     to: 'owner@example.com',
     fullName: 'Ana',
@@ -26,10 +26,23 @@ function build(reason: PlanPaymentEmailReason) {
     reason,
     plans: PLANS,
     linkValidForDays: 14,
+    isVoiceAddonOffered,
   });
 }
 
 describe('buildPlanPaymentMessage', () => {
+  it('mentions the AI answering service without prices when the payment page offers it', () => {
+    const { textBody } = build({ type: 'trial_started' }, true);
+
+    expect(textBody).toContain('podrás añadir también, si quieres, el Contestador IA');
+    expect(textBody).toContain('Verás el precio total antes de pagar');
+    expect(textBody).not.toMatch(/49|69|89/);
+  });
+
+  it('says nothing about the AI answering service when the payment page does not offer it', () => {
+    expect(build({ type: 'trial_started' }).textBody).not.toContain('Contestador IA');
+  });
+
   it.each<{ name: string; reason: PlanPaymentEmailReason; subject: string; mention: string }>([
     {
       name: 'a trial that starts',

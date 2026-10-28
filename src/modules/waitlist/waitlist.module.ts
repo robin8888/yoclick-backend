@@ -27,6 +27,6 @@ import { PrismaWaitlistRepository } from './infrastructure/prisma-waitlist.repos
     WaitlistSweeper,
     { provide: WAITLIST_REPOSITORY, useClass: PrismaWaitlistRepository },
   ],
-  exports: [WaitlistAdvancer],
+  exports: [WaitlistAdvancer, JoinWaitlistUseCase],
 })
 export class WaitlistModule {}

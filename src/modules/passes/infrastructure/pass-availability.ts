@@ -66,6 +66,25 @@ async function isPassRequiredFor(
 export type OwnPassCheck = 'ok' | 'pass_required' | 'pass_fully_booked';
 
 /**
+ * La única excepción a exigir bono: el invitado que el contestador IA dio de alta por teléfono puede reservar
+ * un servicio que el centro marca como cita de prueba (`allowsTrialBookings`). Solo ellos y solo esos servicios:
+ * cualquier otra persona o servicio sigue exactamente las reglas de siempre.
+ */
+async function isTrialBookingOfVoiceGuest(
+  client: TenantTransactionClient,
+  input: { clientMembershipId: string; serviceId: string },
+): Promise<boolean> {
+  const guests = await client.membership.count({
+    where: { id: input.clientMembershipId, joinSource: 'voice_guest' },
+  });
+  if (guests === 0) return false;
+  const trialServices = await client.service.count({
+    where: { id: input.serviceId, allowsTrialBookings: true },
+  });
+  return trialServices > 0;
+}
+
+/**
  * Lo que dice el bono cuando la propia persona reserva:
  * - con bono en vigor para el servicio: solo tantas clases como le queden menos las ya agendadas;
  * - sin bono: si el centro vende alguno para ese servicio, primero tiene que adquirirlo; si no
@@ -75,6 +94,7 @@ export async function checkOwnPass(
   client: TenantTransactionClient,
   input: { clientMembershipId: string; serviceId: string; now: Date },
 ): Promise<OwnPassCheck> {
+  if (await isTrialBookingOfVoiceGuest(client, input)) return 'ok';
   const bookable = await countBookableClasses(client, input);
   if (bookable === null)
     return (await isPassRequiredFor(client, input.serviceId)) ? 'pass_required' : 'ok';

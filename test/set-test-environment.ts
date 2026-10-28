@@ -36,5 +36,10 @@ process.env['PAYMENT_PROVIDER'] = 'fake';
 process.env['WAITLIST_SWEEP_INTERVAL_SECONDS'] = '0';
 // Y el inicio automático de citas.
 process.env['AUTO_START_INTERVAL_SECONDS'] = '0';
+// El contestador IA usa el proveedor falso y el borrado de transcripciones se lanza a mano.
+process.env['VOICE_PROVIDER'] = 'fake';
+process.env['VOICE_TRANSCRIPT_SWEEP_INTERVAL_SECONDS'] = '0';
+// Y el reintento de los excesos de minutos pendientes de comunicar a Stripe.
+process.env['VOICE_OVERAGE_REPORT_INTERVAL_SECONDS'] = '0';
 // Los tests nunca llaman a Geoapify: el proveedor se sustituye por un doble.
 process.env['GEOAPIFY_API_KEY'] = 'test-geoapify-key';

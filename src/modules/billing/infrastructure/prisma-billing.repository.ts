@@ -14,12 +14,20 @@ import {
 } from '../domain/plan-payment-reminders';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
 import { type ClientLoad } from '../domain/client-limit';
-import { type PlanPriceSpec, type SyncedPlan } from '../application/ports/billing-gateway';
+import {
+  type PlanPriceSpec,
+  type SyncedPlan,
+  type SyncedVoiceAddonPlan,
+  type VoiceAddonPriceSpec,
+} from '../application/ports/billing-gateway';
 import {
   type BillingCenter,
+  type BillingVoiceSubscription,
+  type BillingVoiceSubscriptionChanges,
   type BillingRepository,
   type BillingTransaction,
   type CheckoutFacts,
+  type NewBillingVoiceSubscription,
   type StripeChargeInput,
   type BillingCenterChanges,
   type CenterClosedNotificationInput,
@@ -28,8 +36,10 @@ import {
   type OwnedCenterRef,
   type PlanNotificationInput,
   type PlanOffer,
+  type PlanOwnerContact,
   type PlanStripePrices,
   type TrialReminderCandidate,
+  type VoiceAddonTier,
 } from '../application/ports/billing.repository';
 
 type CenterRow = Prisma.CenterGetPayload<object>;
@@ -90,6 +100,19 @@ function toPlanOffer(plan: Prisma.PlatformPlanGetPayload<object>): PlanOffer {
     features: listPlanFeatures(plan.id),
     isAvailable: toPlanPrices(plan) !== null,
   };
+}
+
+/** El precio fijo del add-on del escalón de ese plan; `null` si `billing:setup` aún no lo ha creado. */
+async function findVoiceAddonPriceId(
+  client: TenantTransactionClient,
+  planId: string,
+): Promise<string | null> {
+  const tier = await client.voiceAddonPlan.findUnique({
+    where: { planId },
+    select: { stripeMonthlyPriceId: true, stripeOveragePriceId: true },
+  });
+  // Sin el precio del exceso, el add-on no se puede completar después: no se ofrece a medias.
+  return tier?.stripeOveragePriceId == null ? null : (tier.stripeMonthlyPriceId ?? null);
 }
 
 class PrismaBillingTransaction implements BillingTransaction {
@@ -175,27 +198,106 @@ class PrismaBillingTransaction implements BillingTransaction {
   }
 
   async notifyOwners(input: PlanNotificationInput): Promise<ActorContext[]> {
-    const owners = await this.client.membership.findMany({
-      where: { centerId: input.centerId, role: 'owner', status: 'active' },
-      select: { id: true, userId: true },
+    const recipients = await this.client.membership.findMany({
+      where: {
+        centerId: input.centerId,
+        role: { in: input.includeAdmins === true ? ['owner', 'admin'] : ['owner'] },
+        status: 'active',
+      },
+      select: { id: true, userId: true, role: true },
     });
     // `createMany` porque el contexto de cobro puede escribir avisos pero no leerlos.
     await this.client.notification.createMany({
-      data: owners.map((owner) => ({
+      data: recipients.map((recipient) => ({
         id: generateUuidV7(),
         centerId: input.centerId,
-        recipientMembershipId: owner.id,
+        recipientMembershipId: recipient.id,
         kind: input.kind,
         data: input.data,
       })),
     });
-    return owners.map((owner) => ({
-      userId: owner.userId,
+    return recipients.map((recipient) => ({
+      userId: recipient.userId,
       centerId: input.centerId,
-      membershipId: owner.id,
-      role: 'owner',
+      membershipId: recipient.id,
+      role: recipient.role,
       permissions: [],
     }));
+  }
+
+  async listOwnerContacts(centerId: string): Promise<PlanOwnerContact[]> {
+    const owners = await this.client.membership.findMany({
+      where: { centerId, role: 'owner', status: 'active' },
+      orderBy: { createdAt: 'asc' },
+      select: { user: { select: { email: true, fullName: true } } },
+    });
+    return owners.map((owner) => owner.user);
+  }
+
+  async findVoiceSubscription(centerId: string): Promise<BillingVoiceSubscription | null> {
+    const row = await this.client.voiceReceptionistSubscription.findUnique({ where: { centerId } });
+    if (row === null) return null;
+    return {
+      status: row.status,
+      includedMinutes: row.includedMinutes,
+      periodStart: row.periodStart,
+      periodEnd: row.periodEnd,
+      stripeItemId: row.stripeSubscriptionItemId,
+      stripeOverageItemId: row.stripeOverageItemId,
+    };
+  }
+
+  async updateVoiceSubscription(
+    centerId: string,
+    changes: BillingVoiceSubscriptionChanges,
+  ): Promise<void> {
+    await this.client.voiceReceptionistSubscription.update({ where: { centerId }, data: changes });
+  }
+
+  async findVoiceAddonTier(planId: string): Promise<VoiceAddonTier | null> {
+    const row = await this.client.voiceAddonPlan.findUnique({ where: { planId } });
+    if (row === null) return null;
+    return {
+      planId: row.planId,
+      includedMinutes: row.includedMinutes,
+      monthlyPriceId: row.stripeMonthlyPriceId,
+      overagePriceId: row.stripeOveragePriceId,
+    };
+  }
+
+  async saveChosenVoiceSubscription(
+    centerId: string,
+    subscription: NewBillingVoiceSubscription,
+  ): Promise<void> {
+    const fields = {
+      status: 'active' as const,
+      includedMinutes: subscription.includedMinutes,
+      periodStart: subscription.periodStart,
+      periodEnd: subscription.periodEnd,
+      stripeSubscriptionItemId: subscription.stripeItemId,
+      stripeOverageItemId: subscription.stripeOverageItemId,
+    };
+    await this.client.voiceReceptionistSubscription.upsert({
+      where: { centerId },
+      create: { id: generateUuidV7(), centerId, ...fields },
+      update: fields,
+    });
+  }
+
+  async findPlanTaxRateId(planId: string): Promise<string | null> {
+    const plan = await this.client.platformPlan.findUnique({
+      where: { id: planId },
+      select: { stripeTaxRateId: true },
+    });
+    return plan?.stripeTaxRateId ?? null;
+  }
+
+  async isVoiceAddonOffered(): Promise<boolean> {
+    const offeredTier = await this.client.voiceAddonPlan.findFirst({
+      where: { stripeMonthlyPriceId: { not: null }, stripeOveragePriceId: { not: null } },
+      select: { planId: true },
+    });
+    return offeredTier !== null;
   }
 
   async listCentersToSweep(now: Date): Promise<BillingCenter[]> {
@@ -335,6 +437,7 @@ class PrismaBillingTransaction implements BillingTransaction {
       center: toBillingCenter(center),
       ownerEmail: owner?.user.email ?? null,
       planPrices: toPlanPrices(plan),
+      voiceAddonPriceId: await findVoiceAddonPriceId(this.client, planId),
     };
   }
 
@@ -395,6 +498,31 @@ export class PrismaBillingRepository implements BillingRepository {
     });
   }
 
+  async listVoiceAddonSpecs(): Promise<VoiceAddonPriceSpec[]> {
+    return this.tenantPrismaService.runInBillingContext(async (client) => {
+      const tiers = await client.voiceAddonPlan.findMany({ orderBy: { planId: 'asc' } });
+      return tiers.map((tier) => ({
+        planId: tier.planId,
+        monthlyPriceCents: tier.monthlyPriceCents,
+        overageCentsPerMinute: tier.overageCentsPerMinute,
+      }));
+    });
+  }
+
+  async saveVoiceAddonStripeIds(plans: readonly SyncedVoiceAddonPlan[]): Promise<void> {
+    await this.tenantPrismaService.runInBillingContext(async (client) => {
+      for (const plan of plans) {
+        await client.voiceAddonPlan.update({
+          where: { planId: plan.planId },
+          data: {
+            stripeMonthlyPriceId: plan.monthlyPriceId,
+            stripeOveragePriceId: plan.overagePriceId,
+          },
+        });
+      }
+    });
+  }
+
   async findCheckoutFacts(actor: ActorContext, planId: string): Promise<CheckoutFacts | null> {
     return this.tenantPrismaService.runInTenantContext(actor, async (client) => {
       const [center, owner, plan] = await Promise.all([
@@ -407,6 +535,7 @@ export class PrismaBillingRepository implements BillingRepository {
         center: toBillingCenter(center),
         ownerEmail: owner?.email ?? null,
         planPrices: toPlanPrices(plan),
+        voiceAddonPriceId: await findVoiceAddonPriceId(client, planId),
       };
     });
   }

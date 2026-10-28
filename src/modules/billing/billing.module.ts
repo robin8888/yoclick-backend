@@ -65,6 +65,7 @@ function createBillingGateway(configService: ConfigService<Environment, true>): 
     HandleBillingWebhookUseCase,
     SweepSubscriptionsUseCase,
     BILLING_GATEWAY,
+    BILLING_REPOSITORY,
     CloseCenterUseCase,
   ],
 })

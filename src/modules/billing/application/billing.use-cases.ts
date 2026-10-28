@@ -16,6 +16,10 @@ import {
 } from '../domain/subscription-rules';
 import { openCheckoutSession, type CheckoutChoice } from './open-checkout-session';
 import {
+  activateVoiceAddonChosenAtCheckout,
+  syncVoiceAddonWithSubscription,
+} from './voice-addon-sync';
+import {
   BILLING_GATEWAY,
   type BillingEvent,
   type BillingGateway,
@@ -98,20 +102,26 @@ export class CreatePortalSessionUseCase {
   }
 }
 
+interface BillingEventContext {
+  readonly transaction: BillingTransaction;
+  readonly gateway: BillingGateway;
+  readonly now: Date;
+}
+
 /** Atiende un aviso de Stripe ya verificado. Cada aviso se procesa una sola vez. */
 async function handleBillingEvent(
-  transaction: BillingTransaction,
+  context: BillingEventContext,
   event: BillingEvent,
-  now: Date,
 ): Promise<ActorContext[]> {
+  const { transaction, now } = context;
   if (!(await transaction.markEventAsNew(event.eventId, event.type))) return [];
   if (event.type === 'checkout_completed') {
-    return handleCheckoutCompleted(transaction, event);
+    return handleCheckoutCompleted(context, event);
   }
   const center = await transaction.findCenterByCustomerId(event.customerId);
   if (center === null) return [];
   if (event.type === 'subscription_changed') {
-    return handleSubscriptionChanged(transaction, center, event, now);
+    return handleSubscriptionChanged(context, center, event);
   }
   if (event.type === 'invoice_paid') {
     await handleInvoicePaid(transaction, center, event);
@@ -149,11 +159,11 @@ async function notifyIfOverClientLimit(
 }
 
 async function handleSubscriptionChanged(
-  transaction: BillingTransaction,
+  context: BillingEventContext,
   center: BillingCenter,
   event: Extract<BillingEvent, { type: 'subscription_changed' }>,
-  now: Date,
 ): Promise<ActorContext[]> {
+  const { transaction, now } = context;
   let notifiedOwners: ActorContext[] = [];
   // El cliente puede cambiar de plan o de periodicidad desde el portal: se copia al centro lo que dice Stripe.
   if (event.planId !== null && event.planId !== center.planId) {
@@ -181,13 +191,20 @@ async function handleSubscriptionChanged(
   }
   const next = applySubscriptionStatus(toBillingState(center), event.status, now);
   await moveCenterTo(transaction, center, next, `subscription_${event.status}`);
+  await syncVoiceAddonWithSubscription({
+    transaction,
+    gateway: context.gateway,
+    centerBeforeEvent: center,
+    event,
+  });
   return notifiedOwners;
 }
 
 async function handleCheckoutCompleted(
-  transaction: BillingTransaction,
+  context: BillingEventContext,
   event: Extract<BillingEvent, { type: 'checkout_completed' }>,
 ): Promise<ActorContext[]> {
+  const { transaction } = context;
   const center = await transaction.findCenterById(event.centerId);
   if (center === null) return [];
   await transaction.updateCenter(center.id, {
@@ -206,6 +223,7 @@ async function handleCheckoutCompleted(
     kind: 'plan_subscribed',
     data: { planId: event.planId },
   });
+  await activateVoiceAddonChosenAtCheckout(context, event);
   const overLimitOwners = await notifyIfOverClientLimit(transaction, center, event.planId);
   return [...subscribedOwners, ...overLimitOwners];
 }
@@ -253,7 +271,7 @@ export class HandleBillingWebhookUseCase {
     if (!result.isSignatureValid || result.event === null) return;
     const { event } = result;
     const notifiedOwners = await this.billing.runInTransaction((transaction) =>
-      handleBillingEvent(transaction, event, now),
+      handleBillingEvent({ transaction, gateway: this.gateway, now }, event),
     );
     // Tras confirmar: el push es el aviso al móvil y nunca debe deshacer el cambio de plan.
     const [firstOwner] = notifiedOwners;
@@ -314,6 +332,10 @@ export class SyncStripePlansUseCase {
     const synced = await this.gateway.syncPlans(specs);
     await this.billing.savePlanStripeIds(synced);
     await this.gateway.configurePortal(synced);
+    // El add-on del Contestador IA comparte producto de IVA y cliente con los planes, pero tiene su producto,
+    // su medidor de minutos y sus precios por escalón. Sus importes salen de `voice_addon_plans`.
+    const voiceAddonSpecs = await this.billing.listVoiceAddonSpecs();
+    await this.billing.saveVoiceAddonStripeIds(await this.gateway.syncVoiceAddon(voiceAddonSpecs));
     return synced;
   }
 }

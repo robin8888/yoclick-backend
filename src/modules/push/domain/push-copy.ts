@@ -59,6 +59,12 @@ const COPY_BY_KIND: Readonly<Record<string, PushCopy>> = {
   center_closed: { title: 'Un centro tuyo se ha cerrado', body: OPEN_APP_BODY },
   // Genérico a propósito: ni el motivo ni el texto denunciado viajan en el push.
   message_reported: { title: 'Han denunciado un mensaje', body: OPEN_APP_BODY },
+  // Genéricos a propósito: los minutos y el precio van en el correo al propietario, no en el push (Apple 3.1.1).
+  voice_minutes_80: {
+    title: 'El contestador ha usado el 80 % de sus minutos',
+    body: OPEN_APP_BODY,
+  },
+  voice_minutes_100: { title: 'El contestador ha usado todos sus minutos', body: OPEN_APP_BODY },
 };
 
 const FALLBACK_COPY: PushCopy = { title: 'Tienes un aviso nuevo', body: OPEN_APP_BODY };

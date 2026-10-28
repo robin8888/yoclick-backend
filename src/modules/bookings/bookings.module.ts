@@ -83,5 +83,14 @@ import { PrismaSessionRecordRepository } from './infrastructure/prisma-session-r
     { provide: SESSION_RECORD_REPOSITORY, useClass: PrismaSessionRecordRepository },
     SessionAutoStarter,
   ],
+  // El contestador IA reserva, cancela y cambia citas con estos mismos casos de uso.
+  exports: [
+    CreateBookingUseCase,
+    JoinGroupSessionUseCase,
+    CancelBookingUseCase,
+    RescheduleBookingUseCase,
+    ListMyBookingsUseCase,
+    ListServiceSessionsUseCase,
+  ],
 })
 export class BookingsModule {}

@@ -56,4 +56,11 @@ export const RATE_LIMITS = {
   /** Sugerencias de dirección: cada una llama a un tercero gratuito; la app pregunta al teclear, con espera. */
   searchAddress: { limit: 40, ttl: ONE_MINUTE },
   accountSecurity: { limit: 5, ttl: ONE_MINUTE },
+  /**
+   * Avisos del proveedor de voz (llegan todos desde las mismas IP de Vapi, y una llamada hace varias órdenes):
+   * un tope alto que solo frena un bucle. La puerta de verdad es el secreto compartido.
+   */
+  voiceWebhook: { limit: 300, ttl: ONE_MINUTE },
+  /** Pedir el propio código de alumno: la app lo pide al abrir el inicio. */
+  myStudentCode: { limit: 30, ttl: ONE_MINUTE },
 } as const satisfies Record<string, RateLimitPolicy>;

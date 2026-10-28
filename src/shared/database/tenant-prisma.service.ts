@@ -27,6 +27,10 @@ interface RequestContextSettings {
   readonly isAutoStartSweep?: boolean;
   /** Administración de la plataforma (`admin`): lectura agregada de todos los centros. */
   readonly platformRole?: string;
+  /** Una llamada del contestador IA: localiza el centro por el número puente al que se llamó, y solo esa fila. */
+  readonly lookupVoiceNumber?: string;
+  /** El barrido que borra las transcripciones vencidas del contestador IA. */
+  readonly isVoiceRetentionSweep?: boolean;
 }
 
 /** Qué centro(s) puede ver quien aún no pertenece a ninguno: uno por código, uno por id, o los listados. */
@@ -107,6 +111,27 @@ export class TenantPrismaService {
     );
   }
 
+  /** Para una llamada del contestador IA: busca el número puente al que se llamó, sin sesión ni centro. */
+  async runInVoiceLineLookupContext<TResult>(
+    voiceNumber: string,
+    work: (transactionClient: TenantTransactionClient) => Promise<TResult>,
+  ): Promise<TResult> {
+    return this.runWithSettings(
+      { ...NO_CENTER_SETTINGS, userId: '', lookupVoiceNumber: voiceNumber },
+      work,
+    );
+  }
+
+  /** Para borrar las transcripciones del contestador IA que han cumplido su retención, sin sesión ni centro. */
+  async runInVoiceRetentionSweepContext<TResult>(
+    work: (transactionClient: TenantTransactionClient) => Promise<TResult>,
+  ): Promise<TResult> {
+    return this.runWithSettings(
+      { ...NO_CENTER_SETTINGS, userId: '', isVoiceRetentionSweep: true },
+      work,
+    );
+  }
+
   /**
    * Para la administración de la plataforma: el guard ya comprobó el rol de plataforma y el segundo factor.
    * Sin centro: las políticas de plataforma dejan leer todos, y el código solo debe ejecutar agregados.
@@ -179,6 +204,8 @@ export class TenantPrismaService {
         set_config('app.lookup_directory', ${settings.isDirectoryLookup ? 'on' : ''}, true),
         set_config('app.lookup_waitlist_sweep', ${settings.isWaitlistSweep ? 'on' : ''}, true),
         set_config('app.lookup_auto_start_sweep', ${settings.isAutoStartSweep ? 'on' : ''}, true),
+        set_config('app.lookup_voice_number', ${settings.lookupVoiceNumber ?? ''}, true),
+        set_config('app.lookup_voice_retention_sweep', ${settings.isVoiceRetentionSweep ? 'on' : ''}, true),
         set_config('app.platform_role', ${settings.platformRole ?? ''}, true),
         set_config('statement_timeout', ${String(STATEMENT_TIMEOUT_MS)}, true)`;
   }

@@ -1,6 +1,11 @@
 import { z } from 'zod';
-import { type BillingEvent, type BillingPeriod } from '../application/ports/billing-gateway';
+import {
+  type BillingEvent,
+  type BillingPeriod,
+  type VoiceAddonSubscriptionFacts,
+} from '../application/ports/billing-gateway';
 import { type SubscriptionStatus } from '../domain/subscription-rules';
+import { VOICE_ADDON_PRODUCT_ID } from '../domain/voice-addon-catalog';
 
 const MILLISECONDS_PER_SECOND = 1000;
 
@@ -38,14 +43,22 @@ const INTERVAL_TO_PERIOD: Readonly<Record<string, BillingPeriod>> = {
   year: 'annual',
 };
 
+// El periodo de cobro va en la suscripción o, en las versiones nuevas de la API de Stripe, en cada línea.
+const periodSecondsSchema = {
+  current_period_start: z.number().int().optional(),
+  current_period_end: z.number().int().optional(),
+};
+
 const subscriptionSchema = z.object({
   id: z.string(),
   customer: z.string(),
   status: z.enum(SUBSCRIPTION_STATUSES),
+  ...periodSecondsSchema,
   items: z
     .object({
       data: z.array(
         z.object({
+          ...periodSecondsSchema,
           price: z.object({
             product: z.string(),
             recurring: z.object({ interval: z.string() }).nullish(),
@@ -68,6 +81,25 @@ function readSubscribedPlan(items: z.infer<typeof subscriptionSchema>['items']):
   return {
     planId: PLAN_IDS.includes(planId) ? planId : null,
     period: INTERVAL_TO_PERIOD[interval ?? ''] ?? null,
+  };
+}
+
+/** Si el add-on del Contestador IA sigue en la suscripción y en qué periodo de cobro está. */
+function readVoiceAddon(
+  subscription: z.infer<typeof subscriptionSchema>,
+): VoiceAddonSubscriptionFacts | null {
+  if (subscription.items === undefined) return null;
+  const addonItem = subscription.items.data.find(
+    (item) => item.price.product === VOICE_ADDON_PRODUCT_ID,
+  );
+  if (addonItem === undefined) return { isPresent: false, periodStart: null, periodEnd: null };
+  const startSeconds = subscription.current_period_start ?? addonItem.current_period_start;
+  const endSeconds = subscription.current_period_end ?? addonItem.current_period_end;
+  const hasPeriod = startSeconds !== undefined && endSeconds !== undefined;
+  return {
+    isPresent: true,
+    periodStart: hasPeriod ? new Date(startSeconds * MILLISECONDS_PER_SECOND) : null,
+    periodEnd: hasPeriod ? new Date(endSeconds * MILLISECONDS_PER_SECOND) : null,
   };
 }
 
@@ -114,6 +146,7 @@ function toSubscriptionChanged(
     subscriptionId: parsed.data.id,
     status: forcedStatus ?? parsed.data.status,
     ...readSubscribedPlan(parsed.data.items),
+    voiceAddon: readVoiceAddon(parsed.data),
   };
 }
 

@@ -57,5 +57,7 @@ export async function openCheckoutSession(
     setupFeePriceId: planPrices.setupFeePriceId,
     taxRateId: planPrices.taxRateId,
     firstChargeAt: isTrialRunning ? center.trialEndsAt : null,
+    // Las líneas del add-on son mensuales: con pago anual no se ofrece.
+    voiceAddonPriceId: choice.period === 'monthly' ? facts.voiceAddonPriceId : null,
   });
 }

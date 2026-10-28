@@ -60,6 +60,13 @@ class InMemoryBillingRepository implements BillingRepository {
   private buildTransaction(): BillingTransaction {
     return {
       markEventAsNew: notUsed,
+      listOwnerContacts: notUsed,
+      findVoiceSubscription: notUsed,
+      updateVoiceSubscription: notUsed,
+      findVoiceAddonTier: notUsed,
+      saveChosenVoiceSubscription: notUsed,
+      findPlanTaxRateId: notUsed,
+      isVoiceAddonOffered: notUsed,
       findCenterById: notUsed,
       findCenterByCustomerId: notUsed,
       updateCenter: notUsed,
@@ -98,6 +105,8 @@ class InMemoryBillingRepository implements BillingRepository {
   listPlanOffers = notUsed;
   listPlanSpecs = notUsed;
   savePlanStripeIds = notUsed;
+  listVoiceAddonSpecs = notUsed;
+  saveVoiceAddonStripeIds = notUsed;
   findCheckoutFacts = notUsed;
   saveCustomerId = notUsed;
   findCustomerId = notUsed;

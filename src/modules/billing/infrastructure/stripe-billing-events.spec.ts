@@ -167,3 +167,89 @@ describe('parseBillingEvent', () => {
     expect(event).toBeNull();
   });
 });
+
+describe('parseBillingEvent: the voice add-on in the subscription', () => {
+  const PLAN_ITEM = { price: { product: 'yoclick_plan_pro', recurring: { interval: 'month' } } };
+  const ADDON_ITEM = {
+    price: { product: 'yoclick_voice_addon', recurring: { interval: 'month' } },
+  };
+  const subscription = (extra: Record<string, unknown>) =>
+    buildEvent('customer.subscription.updated', {
+      id: 'sub_1',
+      customer: 'cus_1',
+      status: 'active',
+      ...extra,
+    });
+
+  it('says the add-on is there and reads the billing period from the subscription', () => {
+    const event = parseBillingEvent(
+      subscription({
+        current_period_start: 1_760_000_000,
+        current_period_end: 1_762_592_000,
+        items: { data: [PLAN_ITEM, ADDON_ITEM] },
+      }),
+    );
+
+    expect(event).toMatchObject({
+      voiceAddon: {
+        isPresent: true,
+        periodStart: new Date(1_760_000_000_000),
+        periodEnd: new Date(1_762_592_000_000),
+      },
+    });
+  });
+
+  it('reads the billing period from the line when the API version puts it there', () => {
+    const event = parseBillingEvent(
+      subscription({
+        items: {
+          data: [
+            PLAN_ITEM,
+            {
+              ...ADDON_ITEM,
+              current_period_start: 1_760_000_000,
+              current_period_end: 1_762_592_000,
+            },
+          ],
+        },
+      }),
+    );
+
+    expect(event).toMatchObject({
+      voiceAddon: { isPresent: true, periodStart: new Date(1_760_000_000_000) },
+    });
+  });
+
+  it('says the add-on is gone when the lines do not include it', () => {
+    const event = parseBillingEvent(subscription({ items: { data: [PLAN_ITEM] } }));
+
+    expect(event).toMatchObject({
+      voiceAddon: { isPresent: false, periodStart: null, periodEnd: null },
+    });
+  });
+
+  it('says nothing about the add-on when the notice does not carry the lines', () => {
+    const event = parseBillingEvent(subscription({}));
+
+    expect(event).toMatchObject({ voiceAddon: null });
+  });
+
+  it('does not take the add-on for a plan: its product is not one of the plans', () => {
+    const event = parseBillingEvent(subscription({ items: { data: [ADDON_ITEM, PLAN_ITEM] } }));
+
+    expect(event).toMatchObject({ planId: 'pro', period: 'monthly' });
+  });
+
+  it('does not mistake a cancelled subscription for one that kept its add-on', () => {
+    const event = parseBillingEvent(
+      buildEvent('customer.subscription.deleted', {
+        id: 'sub_1',
+        customer: 'cus_1',
+        status: 'active',
+        items: { data: [PLAN_ITEM, ADDON_ITEM] },
+      }),
+    );
+
+    expect(event).toMatchObject({ status: 'canceled', voiceAddon: { isPresent: true } });
+  });
+});

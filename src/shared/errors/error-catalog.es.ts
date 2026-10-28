@@ -136,6 +136,20 @@ export const ERROR_CATALOG = {
     title: 'A los menores solo se les escribe a través de su tutor',
   },
   CHAT_BLOCK_NOT_ALLOWED: { title: 'No puedes bloquear a esta persona' },
+  VOICE_ADDON_NOT_CONTRACTED: { title: 'Tu centro aún no tiene contratado el Contestador IA' },
+  VOICE_LINE_NOT_ASSIGNED: {
+    title: 'Todavía no tienes un número puente asignado. Escríbenos y te lo damos de alta',
+  },
+  VOICE_ADDON_BILLING_NOT_READY: {
+    title:
+      'El centro no tiene una suscripción de Stripe activa o los precios del add-on aún no están creados (npm run billing:setup)',
+  },
+  VOICE_ADDON_ANNUAL_PLAN_NOT_SUPPORTED: {
+    title: 'El Contestador IA aún no se puede añadir a un centro que paga el plan por años',
+  },
+  VOICE_TRANSFER_PHONE_INVALID: {
+    title: 'El teléfono para pasar la llamada no es válido o es el del propio centro',
+  },
   CHAT_CANNOT_REPORT_OWN_MESSAGE: { title: 'No puedes denunciar un mensaje tuyo' },
   CHAT_ATTACHMENT_UNSUPPORTED: { title: 'Solo se pueden enviar imágenes (JPEG, PNG, WebP) o PDF' },
   CHAT_ATTACHMENT_TOO_LARGE: {

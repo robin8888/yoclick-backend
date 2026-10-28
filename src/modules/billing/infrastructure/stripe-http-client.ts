@@ -47,6 +47,8 @@ export class StripeHttpClient {
     fields: StripeFields;
     schema: TSchema;
     idempotencyKey?: string;
+    /** Fija la versión de la API solo para esta llamada (la de la cuenta puede ser anterior a lo que se usa). */
+    apiVersion?: string;
   }): Promise<z.infer<TSchema>> {
     return this.call({ method: 'POST', ...input });
   }
@@ -57,6 +59,7 @@ export class StripeHttpClient {
     schema: TSchema;
     fields?: StripeFields;
     idempotencyKey?: string;
+    apiVersion?: string;
   }): Promise<z.infer<TSchema>> {
     const response = await fetch(`${STRIPE_API_ORIGIN}${input.path}`, {
       method: input.method,
@@ -66,6 +69,7 @@ export class StripeHttpClient {
           ? {}
           : { 'content-type': 'application/x-www-form-urlencoded' }),
         ...(input.idempotencyKey === undefined ? {} : { 'idempotency-key': input.idempotencyKey }),
+        ...(input.apiVersion === undefined ? {} : { 'stripe-version': input.apiVersion }),
       },
       ...(input.fields === undefined
         ? {}

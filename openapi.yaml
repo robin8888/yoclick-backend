@@ -4035,6 +4035,597 @@ paths:
       summary: "Quita un bono asignado (por error o dado de baja): deja de salir y de poder usarse. No se borra del libro. 404 si no existe o ya estaba quitado."
       tags:
         - passes
+  /v1/webhooks/voice/available-sessions:
+    post:
+      operationId: voice_tool_get_available_sessions
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoiceWebhookBodyDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoiceWebhookResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      summary: "Herramienta del agente: servicios que se pueden reservar y, de uno, sus horas libres o clases con plaza."
+      tags:
+        - voice-receptionist
+  /v1/webhooks/voice/identify-caller:
+    post:
+      operationId: voice_tool_identify_caller
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoiceWebhookBodyDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoiceWebhookResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      summary: "Herramienta del agente: identifica a quien llama por su código de 6 cifras. Tras 3 fallos pide pasar a una persona."
+      tags:
+        - voice-receptionist
+  /v1/webhooks/voice/caller-bookings:
+    post:
+      operationId: voice_tool_get_caller_bookings
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoiceWebhookBodyDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoiceWebhookResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      summary: "Herramienta del agente: las próximas citas de quien llama."
+      tags:
+        - voice-receptionist
+  /v1/webhooks/voice/bookings:
+    post:
+      operationId: voice_tool_create_booking
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoiceWebhookBodyDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoiceWebhookResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      summary: "Herramienta del agente: reserva con las mismas reglas que la app. Quien no es alumno ni cliente queda como invitado. Idempotente por llamada y orden."
+      tags:
+        - voice-receptionist
+  /v1/webhooks/voice/bookings/cancel:
+    post:
+      operationId: voice_tool_cancel_booking
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoiceWebhookBodyDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoiceWebhookResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      summary: "Herramienta del agente: cancela una cita de quien llama."
+      tags:
+        - voice-receptionist
+  /v1/webhooks/voice/bookings/reschedule:
+    post:
+      operationId: voice_tool_reschedule_booking
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoiceWebhookBodyDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoiceWebhookResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      summary: "Herramienta del agente: cambia de hora una cita de quien llama."
+      tags:
+        - voice-receptionist
+  /v1/webhooks/voice/waitlist:
+    post:
+      operationId: voice_tool_add_to_waitlist
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoiceWebhookBodyDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoiceWebhookResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      summary: "Herramienta del agente: apunta a quien llama a la lista de espera de una clase llena (planes Pro y Premium)."
+      tags:
+        - voice-receptionist
+  /v1/webhooks/voice/transfer:
+    post:
+      operationId: voice_tool_transfer_call
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoiceWebhookBodyDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoiceWebhookResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      summary: "Herramienta del agente: pasa la llamada a una persona del centro."
+      tags:
+        - voice-receptionist
+  /v1/webhooks/voice/transfer-destination:
+    post:
+      operationId: voice_transfer_destination
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoiceWebhookBodyDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoiceWebhookResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      summary: "Petición del proveedor para saber a quién pasar la llamada (herramienta nativa de transferencia sin destino fijo): responde con el teléfono de la persona del centro o con un rechazo."
+      tags:
+        - voice-receptionist
+  /v1/webhooks/voice/events:
+    post:
+      operationId: voice_server_events
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoiceWebhookBodyDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoiceWebhookResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      summary: "URL única del servidor del asistente: reparte por tipo de aviso entre el informe de fin de llamada y la petición de destino de una transferencia. Cualquier otro tipo se ignora con 200."
+      tags:
+        - voice-receptionist
+  /v1/webhooks/voice/end-of-call:
+    post:
+      operationId: voice_end_of_call
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoiceWebhookBodyDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoiceWebhookResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      summary: "Informe de fin de llamada: guarda duración, resumen y transcripción y suma los minutos del periodo."
+      tags:
+        - voice-receptionist
+  /v1/centers/{centerId}/voice-receptionist:
+    get:
+      operationId: voice_get_overview
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoiceOverviewResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: "Estado del Contestador IA del centro: si está contratado y activo, número puente, ajustes, lo que puede hacer según el plan, precio del add-on y consumo."
+      tags:
+        - voice-receptionist
+  /v1/centers/{centerId}/voice-receptionist/config:
+    put:
+      operationId: voice_update_config
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateVoiceConfigRequestDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoiceConfigResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Cambia los ajustes del asistente. Saludo, nombre y voz propios son del plan Premium (402 PLAN_FEATURE_NOT_INCLUDED); el teléfono de transferencia no puede ser el del centro (422 VOICE_TRANSFER_PHONE_INVALID).
+      tags:
+        - voice-receptionist
+  /v1/centers/{centerId}/voice-receptionist/enable:
+    post:
+      operationId: voice_enable
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "204":
+          description: ""
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Activa el contestador. 402 VOICE_ADDON_NOT_CONTRACTED sin add-on contratado; 409 VOICE_LINE_NOT_ASSIGNED sin número puente.
+      tags:
+        - voice-receptionist
+  /v1/centers/{centerId}/voice-receptionist/disable:
+    post:
+      operationId: voice_disable
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "204":
+          description: ""
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: "Apaga el contestador: la línea del centro sigue como antes de contratarlo."
+      tags:
+        - voice-receptionist
+  /v1/centers/{centerId}/voice-receptionist/calls:
+    get:
+      operationId: voice_list_calls
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: limit
+          required: false
+          in: query
+          schema:
+            minimum: 1
+            maximum: 100
+            default: 20
+            type: integer
+        - name: cursor
+          required: false
+          in: query
+          schema:
+            maxLength: 512
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoiceCallsResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Historial de llamadas atendidas, de la más reciente a la más antigua, con su resultado. No incluye la transcripción.
+      tags:
+        - voice-receptionist
+  /v1/centers/{centerId}/voice-receptionist/usage:
+    get:
+      operationId: voice_get_usage
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoiceUsageResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Minutos usados en el periodo actual frente a los incluidos.
+      tags:
+        - voice-receptionist
+  /v1/centers/{centerId}/me/student-code:
+    get:
+      operationId: voice_get_my_student_code
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudentCodeResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: "El código de 6 cifras de la persona en este centro: con él se identifica al llamar al contestador. Se crea la primera vez que se pide."
+      tags:
+        - voice-receptionist
+  /v1/platform/centers/{centerId}/voice-receptionist:
+    put:
+      operationId: platform_provision_voice_receptionist
+      parameters:
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProvisionVoiceRequestDto"
+      responses:
+        "204":
+          description: ""
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: "Da de alta el add-on de un centro: asigna su número puente y crea su suscripción con los minutos de su plan. Con `shouldBillWithStripe` añade además el add-on como líneas de la suscripción de Stripe del centro (409 VOICE_ADDON_BILLING_NOT_READY si el centro no tiene suscripción o falta `billing:setup`). No lo activa: lo activa el centro."
+      tags:
+        - voice-receptionist
+    delete:
+      operationId: platform_deprovision_voice_receptionist
+      parameters:
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "204":
+          description: ""
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: "Da de baja el add-on de un centro: quita sus líneas de la suscripción de Stripe, cancela su suscripción del add-on y apaga el contestador."
+      tags:
+        - voice-receptionist
   /v1/platform/overview:
     get:
       operationId: platform_get_overview
@@ -15769,6 +16360,423 @@ components:
         - rateId
         - clientMembershipId
       additionalProperties: false
+    VoiceWebhookBodyDto:
+      type: object
+      properties: {}
+      additionalProperties: {}
+    VoiceWebhookResponseDto:
+      type: object
+      properties: {}
+      additionalProperties: {}
+    VoiceOverviewResponseDto:
+      type: object
+      properties:
+        planId:
+          type: string
+        isEnabled:
+          type: boolean
+        line:
+          type: object
+          properties:
+            phoneNumber:
+              type: string
+            provider:
+              type: string
+            isActive:
+              type: boolean
+          required:
+            - phoneNumber
+            - provider
+            - isActive
+          additionalProperties: false
+          nullable: true
+        subscription:
+          type: object
+          properties:
+            status:
+              type: string
+              enum:
+                - active
+                - paused
+                - cancelled
+            includedMinutes:
+              type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+            periodStart:
+              type: string
+              format: date-time
+              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+            periodEnd:
+              type: string
+              format: date-time
+              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+          required:
+            - status
+            - includedMinutes
+            - periodStart
+            - periodEnd
+          additionalProperties: false
+          nullable: true
+        config:
+          type: object
+          properties:
+            greeting:
+              type: string
+              nullable: true
+            assistantName:
+              type: string
+              nullable: true
+            voice:
+              type: string
+              nullable: true
+            language:
+              type: string
+            forwardingMode:
+              type: string
+              enum:
+                - always
+                - no_answer
+                - busy
+                - outside_hours
+            humanTransferPhone:
+              type: string
+              nullable: true
+            legalNotice:
+              type: string
+              nullable: true
+            transcriptRetentionDays:
+              type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+            overagePolicy:
+              type: string
+              enum:
+                - continue_and_charge
+                - disable_bot
+          required:
+            - greeting
+            - assistantName
+            - voice
+            - language
+            - forwardingMode
+            - humanTransferPhone
+            - legalNotice
+            - transcriptRetentionDays
+            - overagePolicy
+          additionalProperties: false
+          nullable: true
+        addonPlan:
+          type: object
+          properties:
+            monthlyPriceCents:
+              type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+            includedMinutes:
+              type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+            overageCentsPerMinute:
+              type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+          required:
+            - monthlyPriceCents
+            - includedMinutes
+            - overageCentsPerMinute
+          additionalProperties: false
+          nullable: true
+        capabilities:
+          type: object
+          properties:
+            canJoinWaitlist:
+              type: boolean
+            canBookGroupSessions:
+              type: boolean
+            canBookForChildren:
+              type: boolean
+            canCustomizeAssistant:
+              type: boolean
+            canSendPaymentLink:
+              type: boolean
+          required:
+            - canJoinWaitlist
+            - canBookGroupSessions
+            - canBookForChildren
+            - canCustomizeAssistant
+            - canSendPaymentLink
+          additionalProperties: false
+        usage:
+          type: object
+          properties:
+            includedMinutes:
+              type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+            usedMinutes:
+              type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+            remainingMinutes:
+              type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+            overageMinutes:
+              type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+            usedPercent:
+              type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+          required:
+            - includedMinutes
+            - usedMinutes
+            - remainingMinutes
+            - overageMinutes
+            - usedPercent
+          additionalProperties: false
+          nullable: true
+      required:
+        - planId
+        - isEnabled
+        - line
+        - subscription
+        - config
+        - addonPlan
+        - capabilities
+        - usage
+      additionalProperties: false
+    UpdateVoiceConfigRequestDto:
+      type: object
+      properties:
+        greeting:
+          type: string
+          minLength: 1
+          maxLength: 500
+          nullable: true
+        assistantName:
+          type: string
+          minLength: 1
+          maxLength: 80
+          nullable: true
+        voice:
+          type: string
+          minLength: 1
+          maxLength: 80
+          nullable: true
+        forwardingMode:
+          type: string
+          enum:
+            - always
+            - no_answer
+            - busy
+            - outside_hours
+        humanTransferPhone:
+          type: string
+          minLength: 6
+          maxLength: 30
+          nullable: true
+        legalNotice:
+          type: string
+          minLength: 1
+          maxLength: 500
+          nullable: true
+        transcriptRetentionDays:
+          type: integer
+          minimum: 1
+          maximum: 365
+        overagePolicy:
+          type: string
+          enum:
+            - continue_and_charge
+            - disable_bot
+      additionalProperties: false
+    VoiceConfigResponseDto:
+      type: object
+      properties:
+        greeting:
+          type: string
+          nullable: true
+        assistantName:
+          type: string
+          nullable: true
+        voice:
+          type: string
+          nullable: true
+        language:
+          type: string
+        forwardingMode:
+          type: string
+          enum:
+            - always
+            - no_answer
+            - busy
+            - outside_hours
+        humanTransferPhone:
+          type: string
+          nullable: true
+        legalNotice:
+          type: string
+          nullable: true
+        transcriptRetentionDays:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+        overagePolicy:
+          type: string
+          enum:
+            - continue_and_charge
+            - disable_bot
+      required:
+        - greeting
+        - assistantName
+        - voice
+        - language
+        - forwardingMode
+        - humanTransferPhone
+        - legalNotice
+        - transcriptRetentionDays
+        - overagePolicy
+      additionalProperties: false
+    VoiceCallsResponseDto:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              callerPhone:
+                type: string
+              callerName:
+                type: string
+                nullable: true
+              startedAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+              durationSeconds:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+                nullable: true
+              outcome:
+                type: string
+                enum:
+                  - booking
+                  - cancellation
+                  - reschedule
+                  - transfer
+                  - no_action
+                  - waitlist
+                  - null
+                nullable: true
+              summary:
+                type: string
+                nullable: true
+              estimatedCostCents:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+                nullable: true
+              hasTranscript:
+                type: boolean
+            required:
+              - id
+              - callerPhone
+              - callerName
+              - startedAt
+              - durationSeconds
+              - outcome
+              - summary
+              - estimatedCostCents
+              - hasTranscript
+            additionalProperties: false
+        nextCursor:
+          type: string
+          nullable: true
+      required:
+        - data
+        - nextCursor
+      additionalProperties: false
+    VoiceUsageResponseDto:
+      type: object
+      properties:
+        periodStart:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+        usage:
+          type: object
+          properties:
+            includedMinutes:
+              type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+            usedMinutes:
+              type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+            remainingMinutes:
+              type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+            overageMinutes:
+              type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+            usedPercent:
+              type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+          required:
+            - includedMinutes
+            - usedMinutes
+            - remainingMinutes
+            - overageMinutes
+            - usedPercent
+          additionalProperties: false
+      required:
+        - periodStart
+        - usage
+      additionalProperties: false
+    StudentCodeResponseDto:
+      type: object
+      properties:
+        code:
+          type: string
+      required:
+        - code
+      additionalProperties: false
+    ProvisionVoiceRequestDto:
+      type: object
+      properties:
+        bridgeNumber:
+          type: string
+          minLength: 6
+          maxLength: 30
+        provider:
+          type: string
+          enum:
+            - vapi
+            - fake
+        includedMinutes:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        shouldBillWithStripe:
+          default: false
+          type: boolean
+      required:
+        - bridgeNumber
+        - provider
+      additionalProperties: false
     PlatformOverviewResponseDto:
       type: object
       properties:
@@ -18197,6 +19205,8 @@ components:
                   - plan_over_limit
                   - center_closed
                   - message_reported
+                  - voice_minutes_80
+                  - voice_minutes_100
               data:
                 type: object
                 additionalProperties:

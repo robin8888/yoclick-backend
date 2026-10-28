@@ -87,17 +87,20 @@ export class SendPlanPaymentEmailsUseCase {
   ) {}
 
   async execute(now: Date): Promise<PlanPaymentEmailSummary> {
-    const { candidates, offers } = await this.billing.runInTransaction(async (transaction) => ({
-      candidates: await transaction.listTrialReminderCandidates(now),
-      offers: await transaction.listAvailablePlanOffers(),
-    }));
+    const { candidates, offers, isVoiceAddonOffered } = await this.billing.runInTransaction(
+      async (transaction) => ({
+        candidates: await transaction.listTrialReminderCandidates(now),
+        offers: await transaction.listAvailablePlanOffers(),
+        isVoiceAddonOffered: await transaction.isVoiceAddonOffered(),
+      }),
+    );
     let emailsSent = 0;
     let centersFailed = 0;
     for (const candidate of candidates) {
       const kind = this.findDueKind(candidate, now);
       if (kind === null || offers.length === 0) continue;
       try {
-        emailsSent += await this.sendReminder({ candidate, kind, offers });
+        emailsSent += await this.sendReminder({ candidate, kind, offers, isVoiceAddonOffered });
       } catch (error: unknown) {
         centersFailed += 1;
         this.logger.error(`The plan payment email failed for center ${candidate.center.id}`, error);
@@ -117,8 +120,9 @@ export class SendPlanPaymentEmailsUseCase {
     candidate: TrialReminderCandidate;
     kind: PlanPaymentEmailKind;
     offers: readonly PlanOffer[];
+    isVoiceAddonOffered: boolean;
   }): Promise<number> {
-    const { candidate, kind, offers } = input;
+    const { candidate, kind, offers, isVoiceAddonOffered } = input;
     const plans = await buildPlanOptions(this.paymentLinks, candidate.center.id, offers);
     return this.billing.runInTransaction(async (transaction) => {
       if (!(await transaction.claimPlanPaymentEmail(candidate.center.id, kind))) return 0;
@@ -131,6 +135,7 @@ export class SendPlanPaymentEmailsUseCase {
             reason: describeReminderReason(kind),
             plans,
             linkValidForDays: PLAN_PAYMENT_LINK_LIFETIME_DAYS,
+            isVoiceAddonOffered,
           }),
         );
       }

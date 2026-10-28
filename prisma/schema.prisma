@@ -194,6 +194,8 @@ enum NotificationKind {
   plan_over_limit
   center_closed
   message_reported
+  voice_minutes_80
+  voice_minutes_100
 
   @@map("notification_kind")
 }
@@ -264,6 +266,8 @@ enum JoinSource {
   link
   code
   search
+  /// Invitado que dio el contestador IA al reservar una cita de prueba por teléfono.
+  voice_guest
 
   @@map("join_source")
 }
@@ -317,75 +321,77 @@ model User {
 
 /// Tenant raíz: un centro (gimnasio, academia...).
 model Center {
-  id                        String       @id @db.Uuid
-  slug                      String       @unique
-  name                      String
-  sectorId                  String       @map("sector_id")
-  brandColor                String       @map("brand_color") @db.Char(7)
-  timezone                  String       @default("Europe/Madrid")
-  joinCode                  String       @unique @map("join_code") @db.Char(6)
-  status                    CenterStatus @default(trial)
+  id                         String       @id @db.Uuid
+  slug                       String       @unique
+  name                       String
+  sectorId                   String       @map("sector_id")
+  brandColor                 String       @map("brand_color") @db.Char(7)
+  timezone                   String       @default("Europe/Madrid")
+  joinCode                   String       @unique @map("join_code") @db.Char(6)
+  status                     CenterStatus @default(trial)
   /// Aparece en la búsqueda pública. Por defecto un centro es privado: solo se entra con su código.
-  isListed                  Boolean      @default(false) @map("is_listed")
-  city                      String?
-  latitude                  Float?
-  longitude                 Float?
+  isListed                   Boolean      @default(false) @map("is_listed")
+  city                       String?
+  latitude                   Float?
+  longitude                  Float?
   /// Plan que tiene contratado (o que prueba): de él salen el precio y los límites. Solo lo cambia Yoclick.
-  planId                    String       @default("pro") @map("plan_id")
+  planId                     String       @default("pro") @map("plan_id")
   /// Tope de clientes activos del plan. Nulo = sin tope.
-  maxClients                Int?         @map("max_clients")
-  trialEndsAt               DateTime?    @map("trial_ends_at") @db.Timestamptz
-  address                   String?
+  maxClients                 Int?         @map("max_clients")
+  trialEndsAt                DateTime?    @map("trial_ends_at") @db.Timestamptz
+  address                    String?
   /// Contacto que ve la clientela y datos fiscales para facturar (solo los ve la administración).
-  phone                     String?
-  contactEmail              String?      @map("contact_email")
-  legalName                 String?      @map("legal_name")
-  taxId                     String?      @map("tax_id")
-  taxAddress                String?      @map("tax_address")
+  phone                      String?
+  contactEmail               String?      @map("contact_email")
+  legalName                  String?      @map("legal_name")
+  taxId                      String?      @map("tax_id")
+  taxAddress                 String?      @map("tax_address")
   /// Horario semanal por día: { mon: [{ opensAt: "09:00", closesAt: "14:00" }], ... }
-  openingHours              Json?        @map("opening_hours")
+  openingHours               Json?        @map("opening_hours")
   /// Días de cierre: [{ date: "2026-12-25", label: "Navidad" }]
-  holidays                  Json?
+  holidays                   Json?
   /// Política de cancelación: { freeCancellationHours, lateCancellationConsumesCredit }
-  cancelPolicy              Json?        @map("cancel_policy")
+  cancelPolicy               Json?        @map("cancel_policy")
   /// Módulos que el centro no usa (content, attendance, passes, waitlist, rooms). Vacío = todo encendido.
-  disabledModules           String[]     @default([]) @map("disabled_modules")
+  disabledModules            String[]     @default([]) @map("disabled_modules")
   /// Cu�ndo se subi� el logo vigente; nulo = sin logo. Sirve de versi�n de cach� sin leer los bytes.
-  logoUpdatedAt             DateTime?    @map("logo_updated_at") @db.Timestamptz
+  logoUpdatedAt              DateTime?    @map("logo_updated_at") @db.Timestamptz
   /// Cierre definitivo del centro (su propietario eliminó la cuenta). Nulo = abierto. Los datos se conservan
   /// (facturas y recibos tienen plazo legal de conservación); lo que cambia es que nadie puede entrar, unirse ni verlo.
-  closedAt                  DateTime?    @map("closed_at") @db.Timestamptz
+  closedAt                   DateTime?    @map("closed_at") @db.Timestamptz
+  /// Contestador IA de citas (add-on): con false el centro funciona exactamente igual que sin él.
+  isVoiceReceptionistEnabled Boolean      @default(false) @map("is_voice_receptionist_enabled")
   /// Espacio de vídeo contratado (plan Premium). Nulo = el plan no incluye vídeo. Solo lo cambia Yoclick.
-  videoStorageLimitBytes    BigInt?      @map("video_storage_limit_bytes")
+  videoStorageLimitBytes     BigInt?      @map("video_storage_limit_bytes")
   /// Espacio de documentos (PDF) del plan. Todos los planes incluyen PDF; solo cambia el tope. Solo lo cambia Yoclick.
-  documentStorageLimitBytes BigInt       @default(1073741824) @map("document_storage_limit_bytes")
+  documentStorageLimitBytes  BigInt       @default(1073741824) @map("document_storage_limit_bytes")
   /// Espacio de fotos de la galería del equipo (100 MiB por defecto). Las fotos de perfil no cuentan: hay una por persona. Solo lo cambia Yoclick.
-  photoStorageLimitBytes    BigInt       @default(104857600) @map("photo_storage_limit_bytes")
+  photoStorageLimitBytes     BigInt       @default(104857600) @map("photo_storage_limit_bytes")
   /// Cuenta Express de Stripe Connect del centro (acct_...). Nulo = aún no ha empezado el alta de cobros.
-  stripeAccountId           String?      @unique @map("stripe_account_id")
+  stripeAccountId            String?      @unique @map("stripe_account_id")
   /// Stripe confirma que la cuenta ya puede cobrar (KYC completo). Solo lo fija la lectura de la cuenta en Stripe.
-  stripeChargesEnabled      Boolean      @default(false) @map("stripe_charges_enabled")
+  stripeChargesEnabled       Boolean      @default(false) @map("stripe_charges_enabled")
   /// Cliente de Stripe Billing al que se cobra el plan (cus_...). Nulo = aún no ha pagado ni elegido plan.
-  stripeCustomerId          String?      @unique @map("stripe_customer_id")
+  stripeCustomerId           String?      @unique @map("stripe_customer_id")
   /// Suscripción de Stripe Billing del plan (sub_...). Nulo = sin suscripción (en prueba o suspendido).
-  stripeSubscriptionId      String?      @unique @map("stripe_subscription_id")
+  stripeSubscriptionId       String?      @unique @map("stripe_subscription_id")
   /// `monthly` o `annual`: cada cuánto paga el plan.
-  billingPeriod             String?      @map("billing_period")
+  billingPeriod              String?      @map("billing_period")
   /// Fin de los 7 días de gracia tras un pago fallido o una prueba sin plan; pasado, se suspende.
-  graceEndsAt               DateTime?    @map("grace_ends_at") @db.Timestamptz
+  graceEndsAt                DateTime?    @map("grace_ends_at") @db.Timestamptz
   /// Premium: fondo de las pantallas del centro. Solo este es liso; con `backgroundColorEnd` es un degradado de dos colores. Nulo = el del tema.
-  backgroundColor           String?      @map("background_color") @db.Char(7)
-  backgroundColorEnd        String?      @map("background_color_end") @db.Char(7)
+  backgroundColor            String?      @map("background_color") @db.Char(7)
+  backgroundColorEnd         String?      @map("background_color_end") @db.Char(7)
   /// Premium: color de la colmena de fondo. Nulo = el color de marca.
-  hiveColor                 String?      @map("hive_color") @db.Char(7)
+  hiveColor                  String?      @map("hive_color") @db.Char(7)
   /// Las citas y clases se inician solas a su hora (el equipo no tiene que pulsar «Iniciar»).
-  autoStartSessions         Boolean      @default(false) @map("auto_start_sessions")
+  autoStartSessions          Boolean      @default(false) @map("auto_start_sessions")
   /// Las opiniones sobre el equipo se revisan antes de publicarse.
-  reviewsNeedApproval       Boolean      @default(true) @map("reviews_need_approval")
+  reviewsNeedApproval        Boolean      @default(true) @map("reviews_need_approval")
   /// El equipo (fotos, vídeos y valoraciones) se enseña en la web de reservas.
-  showTeamOnWeb             Boolean      @default(true) @map("show_team_on_web")
-  createdAt                 DateTime     @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt                 DateTime     @updatedAt @map("updated_at") @db.Timestamptz
+  showTeamOnWeb              Boolean      @default(true) @map("show_team_on_web")
+  createdAt                  DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                  DateTime     @updatedAt @map("updated_at") @db.Timestamptz
 
   videos               Video[]
   contentItems         ContentItem[]
@@ -424,10 +430,18 @@ model Center {
   messageReports       MessageReport[]
   chatBlocks           ChatBlock[]
   guardianLinks        GuardianLink[]
-  plan                 PlatformPlan         @relation(fields: [planId], references: [id])
+  plan                 PlatformPlan                   @relation(fields: [planId], references: [id])
   platformAuditEntries PlatformAuditEntry[]
   planPaymentEmails    PlanPaymentEmail[]
   platformCharges      PlatformCharge[]
+  voicePhoneLine       VoicePhoneLine?
+  voiceAgentConfig     VoiceAgentConfig?
+  voiceSubscription    VoiceReceptionistSubscription?
+  voiceCallLogs        VoiceCallLog[]
+  voiceUsagePeriods    VoiceUsagePeriod[]
+  voiceCodeAttempts    VoiceCodeAttempt[]
+  voiceCodeFailures    VoiceCodeFailureWindow[]
+  voiceToolCalls       VoiceToolCall[]
 
   @@map("centers")
 }
@@ -464,6 +478,8 @@ model Membership {
   groupId        String?          @map("group_id") @db.Uuid
   /// Solo clientes: cómo se unió. Nulo si entró antes de que se registrara o por invitación.
   joinSource     JoinSource?      @map("join_source")
+  /// Solo clientes: código de 6 cifras que dicen por teléfono al contestador IA. Único en el centro.
+  studentCode    String?          @map("student_code") @db.Char(6)
   /// Permisos extra del equipo, p. ej. ["health:read"]. Un array de cadenas validado por la API.
   permissions    Json             @default("[]")
   /// Solo equipo: su vídeo de presentación (lo ven los clientes cuando el centro lo ha aprobado).
@@ -532,6 +548,7 @@ model Membership {
   cancelledClassSessions     ClassSession[]       @relation("ClassSessionCancelledBy")
 
   @@unique([centerId, userId])
+  @@unique([centerId, studentCode])
   @@index([centerId, role])
   @@index([userId])
   @@map("memberships")
@@ -701,6 +718,8 @@ model Service {
   sortOrder           Int         @default(0) @map("sort_order")
   /// Alquiler de sala: sus clases se crean sin profesor.
   isRental            Boolean     @default(false) @map("is_rental")
+  /// Admite citas de prueba para quien no es alumno (las reserva el contestador IA sin exigir bono).
+  allowsTrialBookings Boolean     @default(false) @map("allows_trial_bookings")
   /// Sala o recurso donde se da; nulo = sin sala fija.
   roomId              String?     @map("room_id") @db.Uuid
   archivedAt          DateTime?   @map("archived_at") @db.Timestamptz
@@ -1738,7 +1757,8 @@ model PlatformPlan {
   stripeTaxRateId           String?  @map("stripe_tax_rate_id")
   updatedAt                 DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  centers Center[]
+  centers     Center[]
+  voiceAddons VoiceAddonPlan[]
 
   @@map("platform_plans")
 }
@@ -1799,4 +1819,206 @@ model PlatformWebhookEvent {
   receivedAt DateTime @default(now()) @map("received_at") @db.Timestamptz
 
   @@map("platform_webhook_events")
+}
+
+// ============================================================================
+// Contestador IA de citas (add-on). Docs: docs/spec/07-contestador-ia.md
+// ============================================================================
+
+enum VoiceLineStatus {
+  active
+  suspended
+
+  @@map("voice_line_status")
+}
+
+enum VoiceSubscriptionStatus {
+  active
+  paused
+  cancelled
+
+  @@map("voice_subscription_status")
+}
+
+enum VoiceForwardingMode {
+  always
+  no_answer
+  busy
+  outside_hours
+
+  @@map("voice_forwarding_mode")
+}
+
+/// Qué hace el contestador al llegar el centro al 100 % de sus minutos incluidos.
+enum VoiceOveragePolicy {
+  continue_and_charge
+  disable_bot
+
+  @@map("voice_overage_policy")
+}
+
+enum VoiceCallOutcome {
+  booking
+  cancellation
+  reschedule
+  transfer
+  no_action
+  waitlist
+
+  @@map("voice_call_outcome")
+}
+
+/// Número puente que Yoclick asigna a un centro: el centro desvía sus llamadas a él.
+model VoicePhoneLine {
+  id          String          @id @db.Uuid
+  centerId    String          @unique @map("center_id") @db.Uuid
+  /// Formato E.164 (+34910000000). Único en toda la plataforma: por él se reconoce el centro.
+  phoneNumber String          @unique @map("phone_number")
+  provider    String
+  status      VoiceLineStatus @default(active)
+  createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamptz
+
+  center Center @relation(fields: [centerId], references: [id])
+
+  @@map("voice_phone_lines")
+}
+
+model VoiceAgentConfig {
+  centerId                String              @id @map("center_id") @db.Uuid
+  /// Solo Premium lo personaliza; nulo = saludo por defecto.
+  greeting                String?
+  assistantName           String?             @map("assistant_name")
+  voice                   String?
+  language                String              @default("es-ES")
+  forwardingMode          VoiceForwardingMode @default(no_answer) @map("forwarding_mode")
+  /// Teléfono de una persona del centro a la que pasar la llamada. Nunca el del centro (sería un bucle).
+  humanTransferPhone      String?             @map("human_transfer_phone")
+  legalNotice             String?             @map("legal_notice")
+  transcriptRetentionDays Int                 @default(30) @map("transcript_retention_days")
+  /// Al agotar los minutos incluidos: seguir y cobrar el exceso, o apagar el bot y dejar sonar la línea.
+  overagePolicy           VoiceOveragePolicy  @default(continue_and_charge) @map("overage_policy")
+  updatedAt               DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  center Center @relation(fields: [centerId], references: [id])
+
+  @@map("voice_agent_configs")
+}
+
+model VoiceReceptionistSubscription {
+  id                       String                  @id @db.Uuid
+  centerId                 String                  @unique @map("center_id") @db.Uuid
+  status                   VoiceSubscriptionStatus @default(active)
+  includedMinutes          Int                     @map("included_minutes")
+  periodStart              DateTime                @map("period_start") @db.Timestamptz
+  periodEnd                DateTime                @map("period_end") @db.Timestamptz
+  /// Línea fija del add-on en la suscripción de Stripe del centro.
+  stripeSubscriptionItemId String?                 @map("stripe_subscription_item_id")
+  /// Línea de uso medido (minutos de exceso) en esa misma suscripción.
+  stripeOverageItemId      String?                 @map("stripe_overage_item_id")
+  createdAt                DateTime                @default(now()) @map("created_at") @db.Timestamptz
+
+  center Center @relation(fields: [centerId], references: [id])
+
+  @@map("voice_receptionist_subscriptions")
+}
+
+/// Precio y minutos del add-on por plan. Son datos, no constantes: se cambian sin desplegar.
+model VoiceAddonPlan {
+  planId                String  @id @map("plan_id")
+  monthlyPriceCents     Int     @map("monthly_price_cents")
+  includedMinutes       Int     @map("included_minutes")
+  overageCentsPerMinute Int     @map("overage_cents_per_minute")
+  /// Precios de Stripe de este escalón; los crea `npm run billing:setup`.
+  stripeMonthlyPriceId  String? @map("stripe_monthly_price_id")
+  stripeOveragePriceId  String? @map("stripe_overage_price_id")
+
+  plan PlatformPlan @relation(fields: [planId], references: [id])
+
+  @@map("voice_addon_plans")
+}
+
+/// Una llamada atendida. Guarda también con quién se identificó quien llamó: la identidad va ligada a la
+/// llamada (id que pone el proveedor), nunca a un dato que envíe el modelo de lenguaje.
+model VoiceCallLog {
+  id                 String            @id @db.Uuid
+  centerId           String            @map("center_id") @db.Uuid
+  providerCallId     String            @unique @map("provider_call_id")
+  callerPhone        String            @map("caller_phone")
+  callerMembershipId String?           @map("caller_membership_id") @db.Uuid
+  startedAt          DateTime          @map("started_at") @db.Timestamptz
+  endedAt            DateTime?         @map("ended_at") @db.Timestamptz
+  durationSeconds    Int?              @map("duration_seconds")
+  outcome            VoiceCallOutcome?
+  summary            String?
+  /// Se borra solo al cumplirse la retención configurada del centro.
+  transcript         String?
+  estimatedCostCents Int?              @map("estimated_cost_cents")
+  /// Minutos facturables de la llamada (cada minuto empezado cuenta).
+  billedMinutes      Int?              @map("billed_minutes")
+  /// De esos minutos, los que pasaron de lo incluido en el periodo: lo que se factura como exceso.
+  overageMinutes     Int               @default(0) @map("overage_minutes")
+  /// Cuándo se comunicó el exceso de esta llamada a Stripe; nulo = pendiente.
+  overageReportedAt  DateTime?         @map("overage_reported_at") @db.Timestamptz
+  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz
+
+  center Center @relation(fields: [centerId], references: [id])
+
+  @@index([centerId, startedAt])
+  @@map("voice_call_logs")
+}
+
+/// Minutos usados por centro y periodo, para facturar el exceso.
+model VoiceUsagePeriod {
+  centerId     String    @map("center_id") @db.Uuid
+  periodStart  DateTime  @map("period_start") @db.Timestamptz
+  minutesUsed  Int       @default(0) @map("minutes_used")
+  /// Cuándo se avisó al centro de haber usado el 80 % y el 100 % de sus minutos: una vez por periodo.
+  alerted80At  DateTime? @map("alerted_80_at") @db.Timestamptz
+  alerted100At DateTime? @map("alerted_100_at") @db.Timestamptz
+
+  center Center @relation(fields: [centerId], references: [id])
+
+  @@id([centerId, periodStart])
+  @@map("voice_usage_periods")
+}
+
+/// Códigos fallidos por número que llama: tras 3 se pasa a una persona y se bloquea un rato.
+model VoiceCodeAttempt {
+  centerId    String    @map("center_id") @db.Uuid
+  callerPhone String    @map("caller_phone")
+  failedCount Int       @default(0) @map("failed_count")
+  lockedUntil DateTime? @map("locked_until") @db.Timestamptz
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  center Center @relation(fields: [centerId], references: [id])
+
+  @@id([centerId, callerPhone])
+  @@map("voice_code_attempts")
+}
+
+/// Códigos fallidos de todo el centro en una hora, con cualquier número: tope contra quien prueba códigos
+/// llamando desde muchos números distintos.
+model VoiceCodeFailureWindow {
+  centerId    String   @map("center_id") @db.Uuid
+  windowStart DateTime @map("window_start") @db.Timestamptz
+  failedCount Int      @default(0) @map("failed_count")
+
+  center Center @relation(fields: [centerId], references: [id])
+
+  @@id([centerId, windowStart])
+  @@map("voice_code_failure_windows")
+}
+
+/// Resultado de cada herramienta ya ejecutada: si el proveedor reintenta, se devuelve lo mismo sin repetir el efecto.
+model VoiceToolCall {
+  providerCallId String   @map("provider_call_id")
+  toolCallId     String   @map("tool_call_id")
+  centerId       String   @map("center_id") @db.Uuid
+  result         Json
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  center Center @relation(fields: [centerId], references: [id])
+
+  @@id([providerCallId, toolCallId])
+  @@map("voice_tool_calls")
 }

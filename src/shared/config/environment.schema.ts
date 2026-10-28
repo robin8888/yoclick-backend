@@ -5,6 +5,9 @@ const MAX_TCP_PORT = 65_535;
 const DEFAULT_PORT = 3000;
 const DEFAULT_WAITLIST_SWEEP_INTERVAL_SECONDS = 60;
 const DEFAULT_AUTO_START_INTERVAL_SECONDS = 30;
+const DEFAULT_VOICE_TRANSCRIPT_SWEEP_INTERVAL_SECONDS = 3600;
+const DEFAULT_VOICE_OVERAGE_REPORT_INTERVAL_SECONDS = 300;
+const DEFAULT_VOICE_CENTER_CODE_FAILURES_PER_HOUR = 20;
 const DEVELOPMENT_KEY_ID = 'dev-1';
 const MIN_PEPPER_BYTES = 32;
 const MFA_KEY_BYTES = 32;
@@ -106,6 +109,30 @@ const baseEnvironmentSchema = z.object({
     .int()
     .min(0)
     .default(DEFAULT_AUTO_START_INTERVAL_SECONDS),
+  // Contestador IA de citas (add-on): `vapi` atiende de verdad; `fake` es para desarrollo y tests.
+  VOICE_PROVIDER: z.enum(['fake', 'vapi']).default('fake'),
+  // Secreto compartido con Vapi: viaja en la cabecera X-Vapi-Secret de cada aviso. Obligatorio con VOICE_PROVIDER=vapi.
+  VOICE_WEBHOOK_SECRET: optionalSetting,
+  // Cada cuántos segundos se borran las transcripciones que han cumplido la retención de su centro; 0 lo apaga.
+  VOICE_TRANSCRIPT_SWEEP_INTERVAL_SECONDS: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .default(DEFAULT_VOICE_TRANSCRIPT_SWEEP_INTERVAL_SECONDS),
+  // Cada cuántos segundos se reintenta comunicar a Stripe el exceso de minutos que no llegó a comunicarse al
+  // terminar la llamada; 0 lo apaga.
+  VOICE_OVERAGE_REPORT_INTERVAL_SECONDS: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .default(DEFAULT_VOICE_OVERAGE_REPORT_INTERVAL_SECONDS),
+  // Códigos de alumno erróneos que admite todo un centro en una hora (con cualquier número) antes de que el
+  // contestador pase a una persona sin probar más códigos.
+  VOICE_CENTER_CODE_FAILURES_PER_HOUR: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .default(DEFAULT_VOICE_CENTER_CODE_FAILURES_PER_HOUR),
   // Cobros de bonos y alquileres (plan Premium): `stripe` usa Stripe Connect; `fake` no llama a nadie.
   PAYMENT_PROVIDER: z.enum(['fake', 'stripe']).default('fake'),
   // Solo hacen falta con PAYMENT_PROVIDER=stripe (se exigen en ese caso, ver más abajo).
@@ -306,11 +333,24 @@ function listPaymentProviderRequirements(environment: ParsedEnvironment): Produc
   }));
 }
 
+/** Con Vapi hace falta el secreto de los avisos; con `fake` no. */
+function listVoiceProviderRequirements(environment: ParsedEnvironment): ProductionRequirement[] {
+  if (environment.VOICE_PROVIDER !== 'vapi') return [];
+  return [
+    {
+      isMet: environment.VOICE_WEBHOOK_SECRET !== undefined,
+      path: 'VOICE_WEBHOOK_SECRET',
+      message: 'is required when VOICE_PROVIDER=vapi',
+    },
+  ];
+}
+
 export const environmentSchema = baseEnvironmentSchema.superRefine((environment, context) => {
   const isProduction = environment.NODE_ENV === 'production';
   const requirements = [
     ...listEmailProviderRequirements(environment),
     ...listPaymentProviderRequirements(environment),
+    ...listVoiceProviderRequirements(environment),
     ...listVideoProviderRequirements(environment),
     ...listFileStorageRequirements(environment),
     ...(isProduction ? listProductionRequirements(environment) : []),

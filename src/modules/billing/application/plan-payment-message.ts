@@ -23,6 +23,8 @@ interface PlanPaymentMessageDetails {
   readonly reason: PlanPaymentEmailReason;
   readonly plans: readonly PlanPaymentOption[];
   readonly linkValidForDays: number;
+  /** La página de pago mensual deja añadir el Contestador IA: se avisa, sin precios (los muestra Stripe). */
+  readonly isVoiceAddonOffered: boolean;
 }
 
 function formatEuros(cents: number): string {
@@ -59,6 +61,9 @@ function buildIntroduction(reason: PlanPaymentEmailReason, centerName: string): 
   }
 }
 
+const VOICE_ADDON_NOTE =
+  'Al pagar mes a mes, en la página de pago podrás añadir también, si quieres, el Contestador IA (un asistente virtual que atiende las llamadas de tu centro). Verás el precio total antes de pagar.';
+
 function describePlan(plan: PlanPaymentOption): string[] {
   const annualTotalCents = plan.annualMonthlyPriceCents * MONTHS_PER_YEAR;
   return [
@@ -89,6 +94,7 @@ export function buildPlanPaymentMessage(details: PlanPaymentMessageDetails): Ema
       'Precios sin IVA. El pago se hace en la página segura de Stripe, desde el navegador:',
       '',
       ...details.plans.flatMap(describePlan),
+      ...(details.isVoiceAddonOffered ? [VOICE_ADDON_NOTE, ''] : []),
       `Los enlaces caducan en ${String(details.linkValidForDays)} días. Si ya has contratado un plan, ignora este mensaje.`,
       'Yoclick nunca te pedirá tu contraseña ni los datos de tu tarjeta por correo.',
     ].join('\n'),

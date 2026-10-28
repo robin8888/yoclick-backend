@@ -10,5 +10,6 @@ import { PrismaSchedulingFactsRepository } from './infrastructure/prisma-schedul
     GetAvailabilityUseCase,
     { provide: SCHEDULING_FACTS_REPOSITORY, useClass: PrismaSchedulingFactsRepository },
   ],
+  exports: [GetAvailabilityUseCase],
 })
 export class SchedulingModule {}

@@ -6,7 +6,13 @@ import { type PlanFeatureId } from '../../../../shared/centers/plan-features';
 import { type PlanPaymentEmailKind } from '../../domain/plan-payment-reminders';
 import { type ClientLoad } from '../../domain/client-limit';
 import { type CenterStatus } from '../../domain/subscription-rules';
-import { type BillingPeriod, type PlanPriceSpec, type SyncedPlan } from './billing-gateway';
+import {
+  type BillingPeriod,
+  type PlanPriceSpec,
+  type SyncedPlan,
+  type SyncedVoiceAddonPlan,
+  type VoiceAddonPriceSpec,
+} from './billing-gateway';
 
 export const BILLING_REPOSITORY = Symbol('BILLING_REPOSITORY');
 
@@ -30,6 +36,8 @@ export interface BillingCenterChanges {
   readonly stripeCustomerId?: string;
   readonly stripeSubscriptionId?: string;
   readonly billingPeriod?: BillingPeriod;
+  /** Se apaga solo cuando el add-on del Contestador IA se cancela. */
+  readonly isVoiceReceptionistEnabled?: boolean;
 }
 
 export interface StripeChargeInput {
@@ -46,14 +54,57 @@ export interface StripeChargeInput {
 
 export interface PlanNotificationInput {
   readonly centerId: string;
-  readonly kind: 'plan_subscribed' | 'plan_changed' | 'plan_over_limit';
+  readonly kind:
+    | 'plan_subscribed'
+    | 'plan_changed'
+    | 'plan_over_limit'
+    | 'voice_minutes_80'
+    | 'voice_minutes_100';
   readonly data: Readonly<Record<string, string>>;
+  /** Además de los propietarios, avisa a la administración del centro (que también ve el Contestador IA). */
+  readonly includeAdmins?: boolean;
 }
 
 /** Quién recibe los correos de pago de un centro: sus propietarios activos. */
 export interface PlanOwnerContact {
   readonly email: string;
   readonly fullName: string;
+}
+
+export type VoiceSubscriptionStatusName = 'active' | 'paused' | 'cancelled';
+
+/** El add-on del Contestador IA de un centro, visto desde el cobro: estado, minutos, periodo y líneas de Stripe. */
+export interface BillingVoiceSubscription {
+  readonly status: VoiceSubscriptionStatusName;
+  readonly includedMinutes: number;
+  readonly periodStart: Date;
+  readonly periodEnd: Date;
+  readonly stripeItemId: string | null;
+  readonly stripeOverageItemId: string | null;
+}
+
+/** El add-on que se acaba de contratar en la página de pago. */
+export interface NewBillingVoiceSubscription {
+  readonly includedMinutes: number;
+  readonly periodStart: Date;
+  readonly periodEnd: Date;
+  readonly stripeItemId: string;
+  readonly stripeOverageItemId: string;
+}
+
+export interface BillingVoiceSubscriptionChanges {
+  readonly status?: VoiceSubscriptionStatusName;
+  readonly includedMinutes?: number;
+  readonly periodStart?: Date;
+  readonly periodEnd?: Date;
+}
+
+/** Lo que el add-on da y cuesta en un escalón de plan, y sus precios de Stripe (`null` sin `billing:setup`). */
+export interface VoiceAddonTier {
+  readonly planId: string;
+  readonly includedMinutes: number;
+  readonly monthlyPriceId: string | null;
+  readonly overagePriceId: string | null;
 }
 
 /** Un centro en prueba, sus propietarios y qué correos de pago ya se le enviaron. */
@@ -103,8 +154,25 @@ export interface BillingTransaction {
   }): Promise<void>;
   /** Cuántos clientes activos tiene el centro y el tope de su plan actual. */
   readClientLoad(centerId: string): Promise<ClientLoad>;
-  /** Deja un aviso a cada propietario del centro y devuelve quiénes son, para enviarles el push. */
+  /** Deja un aviso a cada propietario (y, si se pide, a la administración) y devuelve quiénes son, para el push. */
   notifyOwners(input: PlanNotificationInput): Promise<ActorContext[]>;
+  /** Los propietarios activos del centro con su correo, para los avisos que también van por email. */
+  listOwnerContacts(centerId: string): Promise<PlanOwnerContact[]>;
+  findVoiceSubscription(centerId: string): Promise<BillingVoiceSubscription | null>;
+  updateVoiceSubscription(
+    centerId: string,
+    changes: BillingVoiceSubscriptionChanges,
+  ): Promise<void>;
+  findVoiceAddonTier(planId: string): Promise<VoiceAddonTier | null>;
+  /** Crea el add-on del centro, o lo reactiva si estuvo cancelado. Repetirlo no duplica nada. */
+  saveChosenVoiceSubscription(
+    centerId: string,
+    subscription: NewBillingVoiceSubscription,
+  ): Promise<void>;
+  /** El IVA de Stripe del plan; `null` si `billing:setup` aún no lo ha creado. */
+  findPlanTaxRateId(planId: string): Promise<string | null>;
+  /** Si algún escalón del add-on tiene ya sus precios en Stripe, es decir, si la página de pago puede ofrecerlo. */
+  isVoiceAddonOffered(): Promise<boolean>;
   /** Pruebas acabadas sin plan y gracias agotadas: los candidatos a cambiar de estado. */
   listCentersToSweep(now: Date): Promise<BillingCenter[]>;
   /** Los centros cuyo único propietario activo es esta persona y que siguen abiertos. */
@@ -139,6 +207,8 @@ export interface PlanStripePrices {
 export interface CheckoutFacts {
   readonly center: BillingCenter;
   readonly ownerEmail: string | null;
+  /** El precio fijo del add-on del Contestador IA para el plan elegido; `null` si aún no existe en Stripe. */
+  readonly voiceAddonPriceId: string | null;
   /** `null` si `billing:setup` aún no ha creado los precios de ese plan en Stripe. */
   readonly planPrices: PlanStripePrices | null;
 }
@@ -167,6 +237,8 @@ export interface BillingRepository {
   ): Promise<TResult>;
   listPlanSpecs(): Promise<PlanPriceSpec[]>;
   savePlanStripeIds(plans: readonly SyncedPlan[]): Promise<void>;
+  listVoiceAddonSpecs(): Promise<VoiceAddonPriceSpec[]>;
+  saveVoiceAddonStripeIds(plans: readonly SyncedVoiceAddonPlan[]): Promise<void>;
   findCheckoutFacts(actor: ActorContext, planId: string): Promise<CheckoutFacts | null>;
   saveCustomerId(actor: ActorContext, customerId: string): Promise<void>;
   /** El cliente de Stripe del centro; `null` si todavía no ha contratado nada. */

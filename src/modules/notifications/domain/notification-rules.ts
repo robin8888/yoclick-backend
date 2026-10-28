@@ -37,6 +37,8 @@ export const NOTIFICATION_KINDS = [
   'plan_over_limit',
   'center_closed',
   'message_reported',
+  'voice_minutes_80',
+  'voice_minutes_100',
 ] as const;
 export type NotificationKindName = (typeof NOTIFICATION_KINDS)[number];
 

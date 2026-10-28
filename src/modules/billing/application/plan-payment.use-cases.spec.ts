@@ -68,6 +68,7 @@ class InMemoryBillingRepository implements BillingRepository {
   candidates: TrialReminderCandidate[] = [];
   offers: PlanOffer[] = [buildOffer('basic', 'Básico'), buildOffer('pro', 'Pro')];
   checkoutFacts: CheckoutFacts | null = null;
+  isVoiceAddonOffered = false;
 
   async runInTransaction<TResult>(
     work: (transaction: BillingTransaction) => Promise<TResult>,
@@ -84,6 +85,12 @@ class InMemoryBillingRepository implements BillingRepository {
   private buildTransaction(): BillingTransaction {
     return {
       markEventAsNew: notUsed,
+      listOwnerContacts: notUsed,
+      findVoiceSubscription: notUsed,
+      updateVoiceSubscription: notUsed,
+      findVoiceAddonTier: notUsed,
+      saveChosenVoiceSubscription: notUsed,
+      findPlanTaxRateId: notUsed,
       findCenterById: notUsed,
       findCenterByCustomerId: notUsed,
       updateCenter: notUsed,
@@ -100,6 +107,7 @@ class InMemoryBillingRepository implements BillingRepository {
       endAllMemberships: notUsed,
       listTrialReminderCandidates: () => Promise.resolve(this.candidates),
       listAvailablePlanOffers: () => Promise.resolve(this.offers),
+      isVoiceAddonOffered: () => Promise.resolve(this.isVoiceAddonOffered),
       claimPlanPaymentEmail: (centerId: string, kind: PlanPaymentEmailKind) => {
         const key = `${centerId}:${kind}`;
         const isNew = !this.claimedEmails.has(key);
@@ -117,6 +125,8 @@ class InMemoryBillingRepository implements BillingRepository {
   listPlanOffers = notUsed;
   listPlanSpecs = notUsed;
   savePlanStripeIds = notUsed;
+  listVoiceAddonSpecs = notUsed;
+  saveVoiceAddonStripeIds = notUsed;
   findCheckoutFacts = notUsed;
   saveCustomerId = notUsed;
   findCustomerId = notUsed;
@@ -266,6 +276,7 @@ describe('OpenPlanPaymentLinkUseCase', () => {
         setupFeePriceId: null,
         taxRateId: 'txr_1',
       },
+      voiceAddonPriceId: 'price_voice_m',
     };
     gateway = new FakeBillingGateway();
     links = buildLinks();
@@ -288,6 +299,27 @@ describe('OpenPlanPaymentLinkUseCase', () => {
       period: 'annual',
       priceId: 'price_a',
     });
+  });
+
+  it('offers the AI answering service as an optional item only when paying month by month', async () => {
+    await useCase.execute(await buildToken('monthly'));
+    await useCase.execute(await buildToken('annual'));
+
+    expect(gateway.checkoutRequests.map((request) => request.voiceAddonPriceId)).toEqual([
+      'price_voice_m',
+      null,
+    ]);
+  });
+
+  it('does not offer the add-on while its Stripe price does not exist yet', async () => {
+    repository.checkoutFacts = {
+      ...(repository.checkoutFacts as CheckoutFacts),
+      voiceAddonPriceId: null,
+    };
+
+    await useCase.execute(await buildToken('monthly'));
+
+    expect(gateway.checkoutRequests[0]?.voiceAddonPriceId).toBeNull();
   });
 
   it('creates and saves the Stripe customer when the center has none', async () => {

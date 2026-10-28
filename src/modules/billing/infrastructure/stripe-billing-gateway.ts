@@ -4,6 +4,7 @@ import {
   MILLISECONDS_PER_HOUR,
   MILLISECONDS_PER_SECOND,
 } from '../../../shared/time/time-units';
+import { addMonthsToInstant } from '../../../shared/time/add-months';
 import { isValidStripeSignature } from '../../payments/infrastructure/stripe-signature';
 import {
   type BillingGateway,
@@ -11,7 +12,11 @@ import {
   type CheckoutRequest,
   type PlanPriceSpec,
   type SyncedPlan,
+  type SyncedVoiceAddonPlan,
+  type VoiceAddonAttachment,
+  type VoiceAddonPriceSpec,
 } from '../application/ports/billing-gateway';
+import { VOICE_ADDON_PRODUCT_ID, VOICE_METER_EVENT_NAME } from '../domain/voice-addon-catalog';
 import { parseBillingEvent } from './stripe-billing-events';
 import { StripeHttpClient, StripeRequestError } from './stripe-http-client';
 
@@ -22,6 +27,8 @@ const VAT_PERCENTAGE = '21';
 const VAT_TAG = 'yoclick_vat';
 const LIST_LIMIT = '100';
 /** Stripe Checkout no admite aplazar el primer cobro menos de 48 horas; una hora más de margen. */
+/** La primera versión de la API de Stripe con `optional_items` en las páginas de pago. */
+const OPTIONAL_ITEMS_API_VERSION = '2025-03-31.basil';
 const MIN_TRIAL_DAYS = 2;
 const MIN_TRIAL_END_MS = MIN_TRIAL_DAYS * MILLISECONDS_PER_DAY + MILLISECONDS_PER_HOUR;
 
@@ -41,6 +48,33 @@ const listSchema = z.object({
   ),
 });
 const sessionSchema = z.object({ url: z.url() });
+const meterListSchema = z.object({
+  data: z.array(z.object({ id: z.string(), event_name: z.string() })),
+});
+const anyObjectSchema = z.looseObject({});
+const periodFieldsSchema = {
+  current_period_start: z.number().int().optional(),
+  current_period_end: z.number().int().optional(),
+};
+/** La suscripción con sus líneas: de ahí se sabe qué parte del add-on ya está puesta y en qué periodo está. */
+const subscriptionWithItemsSchema = z.object({
+  id: z.string(),
+  ...periodFieldsSchema,
+  items: z.object({
+    data: z.array(
+      z.object({
+        id: z.string(),
+        ...periodFieldsSchema,
+        price: z.object({
+          id: z.string(),
+          product: z.string(),
+          recurring: z.object({ usage_type: z.string().optional() }).nullish(),
+        }),
+      }),
+    ),
+  }),
+});
+type SubscriptionWithItems = z.infer<typeof subscriptionWithItemsSchema>;
 const PORTAL_TAG = 'yoclick_portal';
 const PORTAL_TAG_VALUE = 'plans';
 
@@ -136,8 +170,20 @@ export class StripeBillingGateway implements BillingGateway {
     return created.id;
   }
 
-  private async ensureProduct(plan: PlanPriceSpec): Promise<string> {
-    const productId = `yoclick_plan_${plan.planId}`;
+  private ensureProduct(plan: PlanPriceSpec): Promise<string> {
+    return this.ensureProductWithId({
+      productId: `yoclick_plan_${plan.planId}`,
+      name: `Yoclick ${plan.name}`,
+      metadata: { planId: plan.planId },
+    });
+  }
+
+  private async ensureProductWithId(input: {
+    productId: string;
+    name: string;
+    metadata: Readonly<Record<string, string>>;
+  }): Promise<string> {
+    const { productId } = input;
     try {
       await this.stripe.get(`/products/${productId}`, idSchema);
       return productId;
@@ -147,7 +193,13 @@ export class StripeBillingGateway implements BillingGateway {
     const created = await this.stripe.post({
       path: '/products',
       schema: idSchema,
-      fields: { id: productId, name: `Yoclick ${plan.name}`, 'metadata[planId]': plan.planId },
+      fields: {
+        id: productId,
+        name: input.name,
+        ...Object.fromEntries(
+          Object.entries(input.metadata).map(([key, value]) => [`metadata[${key}]`, value]),
+        ),
+      },
     });
     return created.id;
   }
@@ -158,6 +210,8 @@ export class StripeBillingGateway implements BillingGateway {
     productId: string;
     amountCents: number;
     interval: 'month' | 'year' | null;
+    /** Campos propios de un precio medido (medidor y tipo de uso). */
+    extraFields?: Readonly<Record<string, string>>;
   }): Promise<string> {
     const found = await this.stripe.get(
       `/prices?active=true&lookup_keys[]=${input.lookupKey}`,
@@ -176,6 +230,7 @@ export class StripeBillingGateway implements BillingGateway {
         transfer_lookup_key: 'true',
         tax_behavior: 'exclusive',
         ...(input.interval === null ? {} : { 'recurring[interval]': input.interval }),
+        ...input.extraFields,
       },
     });
     return created.id;
@@ -234,6 +289,8 @@ export class StripeBillingGateway implements BillingGateway {
       path: '/checkout/sessions',
       schema: sessionSchema,
       fields: this.buildCheckoutFields(input),
+      // `optional_items` existe desde 2025-03-31.basil: se fija para no depender de la versión de la cuenta.
+      ...(input.voiceAddonPriceId === null ? {} : { apiVersion: OPTIONAL_ITEMS_API_VERSION }),
     });
     return { url: session.url };
   }
@@ -264,7 +321,21 @@ export class StripeBillingGateway implements BillingGateway {
           [`subscription_data[metadata][${key}]`, value],
         ]),
       ),
+      ...this.buildVoiceAddonOption(input),
       ...this.buildTrialField(input.firstChargeAt),
+    };
+  }
+
+  /**
+   * El add-on como línea opcional de la página de pago. Las líneas opcionales no llevan IVA propio, así que el
+   * de la suscripción se pone como IVA por defecto de las líneas que no lo traen.
+   */
+  private buildVoiceAddonOption(input: CheckoutRequest): Record<string, string> {
+    if (input.voiceAddonPriceId === null) return {};
+    return {
+      'optional_items[0][price]': input.voiceAddonPriceId,
+      'optional_items[0][quantity]': '1',
+      'subscription_data[default_tax_rates][0]': input.taxRateId,
     };
   }
 
@@ -323,6 +394,194 @@ export class StripeBillingGateway implements BillingGateway {
       // Ya no existe o ya estaba cancelada: el objetivo (que no se cobre más) está cumplido.
       if (!(error instanceof StripeRequestError) || !error.isMissingResource) throw error;
     }
+  }
+
+  async syncVoiceAddon(specs: readonly VoiceAddonPriceSpec[]): Promise<SyncedVoiceAddonPlan[]> {
+    const productId = await this.ensureProductWithId({
+      productId: VOICE_ADDON_PRODUCT_ID,
+      name: 'Yoclick Contestador IA',
+      metadata: { addon: 'voice_receptionist' },
+    });
+    const meterId = await this.ensureVoiceMeter();
+    const synced: SyncedVoiceAddonPlan[] = [];
+    for (const spec of specs) {
+      synced.push({
+        planId: spec.planId,
+        monthlyPriceId: await this.ensurePrice({
+          lookupKey: `yoclick_voice_${spec.planId}_monthly_${String(spec.monthlyPriceCents)}`,
+          productId,
+          amountCents: spec.monthlyPriceCents,
+          interval: 'month',
+        }),
+        overagePriceId: await this.ensurePrice({
+          lookupKey: `yoclick_voice_${spec.planId}_overage_${String(spec.overageCentsPerMinute)}`,
+          productId,
+          amountCents: spec.overageCentsPerMinute,
+          interval: 'month',
+          extraFields: {
+            billing_scheme: 'per_unit',
+            'recurring[usage_type]': 'metered',
+            'recurring[meter]': meterId,
+          },
+        }),
+      });
+    }
+    return synced;
+  }
+
+  /** Un solo medidor de minutos para toda la plataforma; se reconoce por el nombre de su evento. */
+  private async ensureVoiceMeter(): Promise<string> {
+    const meters = await this.stripe.get(
+      `/billing/meters?status=active&limit=${LIST_LIMIT}`,
+      meterListSchema,
+    );
+    const found = meters.data.find((meter) => meter.event_name === VOICE_METER_EVENT_NAME);
+    if (found !== undefined) return found.id;
+    const created = await this.stripe.post({
+      path: '/billing/meters',
+      schema: idSchema,
+      fields: {
+        display_name: 'Minutos del Contestador IA',
+        event_name: VOICE_METER_EVENT_NAME,
+        'default_aggregation[formula]': 'sum',
+        'customer_mapping[event_payload_key]': 'stripe_customer_id',
+        'customer_mapping[type]': 'by_id',
+        'value_settings[event_payload_key]': 'value',
+      },
+    });
+    return created.id;
+  }
+
+  async attachVoiceAddon(input: {
+    subscriptionId: string;
+    monthlyPriceId: string;
+    overagePriceId: string;
+    taxRateId: string;
+  }): Promise<VoiceAddonAttachment> {
+    const subscription = await this.stripe.get(
+      `/subscriptions/${input.subscriptionId}`,
+      subscriptionWithItemsSchema,
+    );
+    const addonItems = subscription.items.data.filter(
+      (item) => item.price.product === VOICE_ADDON_PRODUCT_ID,
+    );
+    const fixedItemId =
+      addonItems.find((item) => item.price.recurring?.usage_type !== 'metered')?.id ??
+      (await this.addSubscriptionItem(input, input.monthlyPriceId, { quantity: '1' }));
+    const overageItemId =
+      addonItems.find((item) => item.price.recurring?.usage_type === 'metered')?.id ??
+      (await this.addSubscriptionItem(input, input.overagePriceId, {}));
+    return { itemId: fixedItemId, overageItemId, ...this.readBillingPeriod(subscription) };
+  }
+
+  async hasVoiceAddonLine(subscriptionId: string): Promise<boolean> {
+    const subscription = await this.stripe.get(
+      `/subscriptions/${subscriptionId}`,
+      subscriptionWithItemsSchema,
+    );
+    return subscription.items.data.some(
+      (item) =>
+        item.price.product === VOICE_ADDON_PRODUCT_ID &&
+        item.price.recurring?.usage_type !== 'metered',
+    );
+  }
+
+  /** Si un corte deja la línea puesta, `attachVoiceAddon` la encuentra al reintentar y no la añade otra vez. */
+  private async addSubscriptionItem(
+    input: { subscriptionId: string; taxRateId: string },
+    priceId: string,
+    extraFields: Readonly<Record<string, string>>,
+  ): Promise<string> {
+    const created = await this.stripe.post({
+      path: '/subscription_items',
+      schema: idSchema,
+      fields: {
+        subscription: input.subscriptionId,
+        price: priceId,
+        'tax_rates[0]': input.taxRateId,
+        proration_behavior: 'create_prorations',
+        ...extraFields,
+      },
+    });
+    return created.id;
+  }
+
+  /**
+   * El periodo de cobro: Stripe lo da en la suscripción o, en las versiones nuevas de su API, en cada línea.
+   * Si no lo trae, se supone un mes desde ahora (la renovación real llega después en un aviso).
+   */
+  private readBillingPeriod(subscription: SubscriptionWithItems): {
+    periodStart: Date;
+    periodEnd: Date;
+  } {
+    const firstItem = subscription.items.data[0];
+    const startSeconds = subscription.current_period_start ?? firstItem?.current_period_start;
+    const endSeconds = subscription.current_period_end ?? firstItem?.current_period_end;
+    if (startSeconds === undefined || endSeconds === undefined) {
+      const now = new Date();
+      return { periodStart: now, periodEnd: addMonthsToInstant(now, 1) };
+    }
+    return {
+      periodStart: new Date(startSeconds * MILLISECONDS_PER_SECOND),
+      periodEnd: new Date(endSeconds * MILLISECONDS_PER_SECOND),
+    };
+  }
+
+  async changeVoiceAddonTier(input: {
+    itemId: string;
+    overageItemId: string;
+    monthlyPriceId: string;
+    overagePriceId: string;
+  }): Promise<void> {
+    await this.stripe.post({
+      path: `/subscription_items/${input.itemId}`,
+      schema: anyObjectSchema,
+      fields: { price: input.monthlyPriceId, proration_behavior: 'create_prorations' },
+    });
+    // El minuto de exceso no se prorratea: se factura por lo medido al cerrar el periodo.
+    await this.stripe.post({
+      path: `/subscription_items/${input.overageItemId}`,
+      schema: anyObjectSchema,
+      fields: { price: input.overagePriceId, proration_behavior: 'none' },
+    });
+  }
+
+  async detachVoiceAddon(input: { itemId: string; overageItemId: string | null }): Promise<void> {
+    await this.deleteSubscriptionItem(`/subscription_items/${input.itemId}`);
+    if (input.overageItemId !== null) {
+      await this.deleteSubscriptionItem(
+        `/subscription_items/${input.overageItemId}?proration_behavior=none&clear_usage=true`,
+      );
+    }
+  }
+
+  private async deleteSubscriptionItem(path: string): Promise<void> {
+    try {
+      await this.stripe.delete(path, anyObjectSchema);
+    } catch (error) {
+      // Ya no existe: lo que se quiere (que no se cobre más) está cumplido.
+      if (!(error instanceof StripeRequestError) || !error.isMissingResource) throw error;
+    }
+  }
+
+  async reportVoiceOverage(input: {
+    customerId: string;
+    minutes: number;
+    identifier: string;
+    occurredAt: Date;
+  }): Promise<void> {
+    await this.stripe.post({
+      path: '/billing/meter_events',
+      schema: anyObjectSchema,
+      idempotencyKey: input.identifier,
+      fields: {
+        event_name: VOICE_METER_EVENT_NAME,
+        identifier: input.identifier,
+        'payload[stripe_customer_id]': input.customerId,
+        'payload[value]': String(input.minutes),
+        timestamp: String(Math.floor(input.occurredAt.getTime() / MILLISECONDS_PER_SECOND)),
+      },
+    });
   }
 
   verifyWebhook(input: {

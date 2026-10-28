@@ -47,6 +47,8 @@ export async function resetTestDatabase(): Promise<void> {
     await client.query(`
       update "platform_plans" set "stripe_product_id" = null, "stripe_monthly_price_id" = null,
         "stripe_annual_price_id" = null, "stripe_setup_fee_price_id" = null, "stripe_tax_rate_id" = null`);
+    await client.query(`
+      update "voice_addon_plans" set "stripe_monthly_price_id" = null, "stripe_overage_price_id" = null`);
     await client.query('TRUNCATE TABLE "platform_webhook_events"');
   } finally {
     await client.end();
