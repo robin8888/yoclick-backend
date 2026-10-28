@@ -191,6 +191,9 @@ enum NotificationKind {
   schedule_updated
   plan_subscribed
   plan_changed
+  plan_over_limit
+  center_closed
+  message_reported
 
   @@map("notification_kind")
 }
@@ -349,6 +352,9 @@ model Center {
   disabledModules           String[]     @default([]) @map("disabled_modules")
   /// Cu�ndo se subi� el logo vigente; nulo = sin logo. Sirve de versi�n de cach� sin leer los bytes.
   logoUpdatedAt             DateTime?    @map("logo_updated_at") @db.Timestamptz
+  /// Cierre definitivo del centro (su propietario eliminó la cuenta). Nulo = abierto. Los datos se conservan
+  /// (facturas y recibos tienen plazo legal de conservación); lo que cambia es que nadie puede entrar, unirse ni verlo.
+  closedAt                  DateTime?    @map("closed_at") @db.Timestamptz
   /// Espacio de vídeo contratado (plan Premium). Nulo = el plan no incluye vídeo. Solo lo cambia Yoclick.
   videoStorageLimitBytes    BigInt?      @map("video_storage_limit_bytes")
   /// Espacio de documentos (PDF) del plan. Todos los planes incluyen PDF; solo cambia el tope. Solo lo cambia Yoclick.
@@ -415,9 +421,12 @@ model Center {
   roomBlocks           RoomBlock[]
   conversations        Conversation[]
   messages             Message[]
+  messageReports       MessageReport[]
+  chatBlocks           ChatBlock[]
   guardianLinks        GuardianLink[]
   plan                 PlatformPlan         @relation(fields: [planId], references: [id])
   platformAuditEntries PlatformAuditEntry[]
+  planPaymentEmails    PlanPaymentEmail[]
   platformCharges      PlatformCharge[]
 
   @@map("centers")
@@ -485,6 +494,11 @@ model Membership {
   conversationsAsMember      Conversation[]       @relation("ConversationMember")
   conversationsAsCounterpart Conversation[]       @relation("ConversationCounterpart")
   sentMessages               Message[]            @relation("MessageSender")
+  messageReportsMade         MessageReport[]      @relation("MessageReportReporter")
+  messageReportsAbout        MessageReport[]      @relation("MessageReportSubject")
+  messageReportsReviewed     MessageReport[]      @relation("MessageReportReviewer")
+  chatBlocksMade             ChatBlock[]          @relation("ChatBlocker")
+  chatBlocksReceived         ChatBlock[]          @relation("ChatBlocked")
   guardianLinksAsGuardian    GuardianLink[]       @relation("GuardianOfChild")
   guardianLinksAsChild       GuardianLink[]       @relation("ChildOfGuardian")
   createdGuardianLinks       GuardianLink[]       @relation("GuardianLinkCreator")
@@ -1558,12 +1572,76 @@ model Message {
   attachmentSizeBytes Int?                   @map("attachment_size_bytes")
   createdAt           DateTime               @default(now()) @map("created_at") @db.Timestamptz
 
-  center       Center       @relation(fields: [centerId], references: [id])
-  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender       Membership   @relation("MessageSender", fields: [senderMembershipId], references: [id])
+  center       Center          @relation(fields: [centerId], references: [id])
+  conversation Conversation    @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       Membership      @relation("MessageSender", fields: [senderMembershipId], references: [id])
+  reports      MessageReport[]
 
   @@index([conversationId, createdAt])
   @@map("messages")
+}
+
+enum MessageReportReason {
+  spam
+  harassment
+  inappropriate
+  other
+
+  @@map("message_report_reason")
+}
+
+enum MessageReportStatus {
+  open
+  reviewed
+
+  @@map("message_report_status")
+}
+
+/// Una denuncia de un mensaje del chat (Apple 1.2). Guarda una copia del texto denunciado: las conversaciones
+/// entre dos personas no las lee ni el dueño, y la persona que denuncia comparte solo ese mensaje con la
+/// administración. No se borra; lo único que cambia después es su revisión.
+model MessageReport {
+  id                         String              @id @db.Uuid
+  centerId                   String              @map("center_id") @db.Uuid
+  messageId                  String              @map("message_id") @db.Uuid
+  reporterMembershipId       String              @map("reporter_membership_id") @db.Uuid
+  reportedSenderMembershipId String              @map("reported_sender_membership_id") @db.Uuid
+  reason                     MessageReportReason
+  details                    String?
+  reportedBody               String?             @map("reported_body")
+  reportedAttachmentName     String?             @map("reported_attachment_name")
+  status                     MessageReportStatus @default(open)
+  reviewedByMembershipId     String?             @map("reviewed_by_membership_id") @db.Uuid
+  reviewedAt                 DateTime?           @map("reviewed_at") @db.Timestamptz
+  createdAt                  DateTime            @default(now()) @map("created_at") @db.Timestamptz
+
+  center         Center      @relation(fields: [centerId], references: [id])
+  message        Message     @relation(fields: [messageId], references: [id])
+  reporter       Membership  @relation("MessageReportReporter", fields: [reporterMembershipId], references: [id])
+  reportedSender Membership  @relation("MessageReportSubject", fields: [reportedSenderMembershipId], references: [id])
+  reviewedBy     Membership? @relation("MessageReportReviewer", fields: [reviewedByMembershipId], references: [id])
+
+  @@unique([messageId, reporterMembershipId])
+  @@index([centerId, status, createdAt])
+  @@map("message_reports")
+}
+
+/// Quien bloquea deja de ver y de recibir a la persona bloqueada, que no puede escribirle. Solo entre alumno
+/// y profesor: la administración habla en nombre del centro.
+model ChatBlock {
+  centerId            String   @map("center_id") @db.Uuid
+  blockerMembershipId String   @map("blocker_membership_id") @db.Uuid
+  blockedMembershipId String   @map("blocked_membership_id") @db.Uuid
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  center  Center     @relation(fields: [centerId], references: [id])
+  blocker Membership @relation("ChatBlocker", fields: [blockerMembershipId], references: [id], onDelete: Cascade)
+  blocked Membership @relation("ChatBlocked", fields: [blockedMembershipId], references: [id], onDelete: Cascade)
+
+  @@id([blockerMembershipId, blockedMembershipId])
+  @@index([centerId])
+  @@index([blockedMembershipId])
+  @@map("chat_blocks")
 }
 
 /// Una persona adulta del centro responsable de un menor: escribe y reserva por él.
@@ -1702,6 +1780,19 @@ model PlatformCharge {
 }
 
 /// Avisos de Stripe ya procesados (docs/spec/17 §4): Stripe reintenta, así que cada uno se atiende una vez.
+/// Un correo de pago del plan ya enviado a un centro (aviso de fin de prueba): cada tipo se manda una sola vez.
+model PlanPaymentEmail {
+  centerId String   @map("center_id") @db.Uuid
+  /// `trial_ending_7`, `trial_ending_3`, `trial_ending_1` o `trial_ended`.
+  kind     String
+  sentAt   DateTime @default(now()) @map("sent_at") @db.Timestamptz
+
+  center Center @relation(fields: [centerId], references: [id], onDelete: Cascade)
+
+  @@id([centerId, kind])
+  @@map("plan_payment_emails_sent")
+}
+
 model PlatformWebhookEvent {
   id         String   @id
   type       String

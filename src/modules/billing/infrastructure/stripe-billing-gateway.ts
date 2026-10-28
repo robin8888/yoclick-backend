@@ -44,6 +44,50 @@ const sessionSchema = z.object({ url: z.url() });
 const PORTAL_TAG = 'yoclick_portal';
 const PORTAL_TAG_VALUE = 'plans';
 
+/**
+ * Cambios de plan que Stripe aplica al terminar el periodo ya pagado y no al momento: bajar a un plan más
+ * barato y pasar de anual a mensual. Se entrega lo que se cobró hasta su último día (consumo) y no hay
+ * reembolsos a medias. Subir de plan sigue siendo inmediato, con prorrateo.
+ */
+const DEFERRED_UPDATE_CONDITIONS = ['decreasing_item_amount', 'shortening_interval'] as const;
+
+/**
+ * Los campos del portal de cliente: cambiar entre nuestros planes (mensual o anual), cambiar la tarjeta,
+ * ver las facturas y cancelar al final del periodo. El portal ya creado no se entera solo: tras cambiar
+ * esto hay que volver a ejecutar `npm run billing:setup`.
+ */
+export function buildPortalFields(input: {
+  plans: readonly SyncedPlan[];
+  returnUrl: string;
+}): Record<string, string> {
+  const productFields = input.plans.flatMap((plan, index): [string, string][] => {
+    const prefix = `features[subscription_update][products][${String(index)}]`;
+    return [
+      [`${prefix}[product]`, plan.productId],
+      [`${prefix}[prices][0]`, plan.monthlyPriceId],
+      [`${prefix}[prices][1]`, plan.annualPriceId],
+    ];
+  });
+  const deferredFields = DEFERRED_UPDATE_CONDITIONS.map((condition, index): [string, string] => [
+    `features[subscription_update][schedule_at_period_end][conditions][${String(index)}][type]`,
+    condition,
+  ]);
+  return {
+    [`metadata[${PORTAL_TAG}]`]: PORTAL_TAG_VALUE,
+    'business_profile[headline]': 'Gestiona tu suscripción de Yoclick',
+    default_return_url: input.returnUrl,
+    'features[subscription_update][enabled]': 'true',
+    'features[subscription_update][default_allowed_updates][0]': 'price',
+    'features[subscription_update][proration_behavior]': 'create_prorations',
+    'features[payment_method_update][enabled]': 'true',
+    'features[invoice_history][enabled]': 'true',
+    'features[subscription_cancel][enabled]': 'true',
+    'features[subscription_cancel][mode]': 'at_period_end',
+    ...Object.fromEntries(deferredFields),
+    ...Object.fromEntries(productFields),
+  };
+}
+
 /** Stripe Billing sobre su API HTTP: productos, precios, clientes y páginas de pago de los planes. */
 export class StripeBillingGateway implements BillingGateway {
   private readonly stripe: StripeHttpClient;
@@ -234,10 +278,7 @@ export class StripeBillingGateway implements BillingGateway {
     };
   }
 
-  /**
-   * Deja el portal con lo que importa: cambiar entre nuestros planes (mensual o anual, con prorrateo),
-   * cambiar la tarjeta, ver las facturas y cancelar al final del periodo. Se recrea sin duplicar.
-   */
+  /** Deja el portal como dice `buildPortalFields`. Se recrea sin duplicar. */
   async configurePortal(plans: readonly SyncedPlan[]): Promise<void> {
     const existingId = await this.findPortalConfigurationId();
     await this.stripe.post({
@@ -246,32 +287,8 @@ export class StripeBillingGateway implements BillingGateway {
           ? '/billing_portal/configurations'
           : `/billing_portal/configurations/${existingId}`,
       schema: idSchema,
-      fields: this.buildPortalFields(plans),
+      fields: buildPortalFields({ plans, returnUrl: this.config.portalReturnUrl }),
     });
-  }
-
-  private buildPortalFields(plans: readonly SyncedPlan[]): Record<string, string> {
-    const productFields = plans.flatMap((plan, index): [string, string][] => {
-      const prefix = `features[subscription_update][products][${String(index)}]`;
-      return [
-        [`${prefix}[product]`, plan.productId],
-        [`${prefix}[prices][0]`, plan.monthlyPriceId],
-        [`${prefix}[prices][1]`, plan.annualPriceId],
-      ];
-    });
-    return {
-      [`metadata[${PORTAL_TAG}]`]: PORTAL_TAG_VALUE,
-      'business_profile[headline]': 'Gestiona tu suscripción de Yoclick',
-      default_return_url: this.config.portalReturnUrl,
-      'features[subscription_update][enabled]': 'true',
-      'features[subscription_update][default_allowed_updates][0]': 'price',
-      'features[subscription_update][proration_behavior]': 'create_prorations',
-      'features[payment_method_update][enabled]': 'true',
-      'features[invoice_history][enabled]': 'true',
-      'features[subscription_cancel][enabled]': 'true',
-      'features[subscription_cancel][mode]': 'at_period_end',
-      ...Object.fromEntries(productFields),
-    };
   }
 
   private async findPortalConfigurationId(): Promise<string | null> {
@@ -297,6 +314,15 @@ export class StripeBillingGateway implements BillingGateway {
       },
     });
     return { url: session.url };
+  }
+
+  async cancelSubscription(subscriptionId: string): Promise<void> {
+    try {
+      await this.stripe.delete(`/subscriptions/${subscriptionId}`, idSchema);
+    } catch (error) {
+      // Ya no existe o ya estaba cancelada: el objetivo (que no se cobre más) está cumplido.
+      if (!(error instanceof StripeRequestError) || !error.isMissingResource) throw error;
+    }
   }
 
   verifyWebhook(input: {

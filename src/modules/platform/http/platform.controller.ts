@@ -43,6 +43,7 @@ function serializeCenter(
     createdAt: center.createdAt.toISOString(),
     trialEndsAt: center.trialEndsAt?.toISOString() ?? null,
     lastBookingAt: center.lastBookingAt?.toISOString() ?? null,
+    closedAt: center.closedAt?.toISOString() ?? null,
     // Solo la ficha de un centro lleva la gracia; la lista no.
     ...('graceEndsAt' in center && { graceEndsAt: center.graceEndsAt?.toISOString() ?? null }),
   };

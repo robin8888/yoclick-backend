@@ -3,6 +3,9 @@ import {
   SweepSubscriptionsUseCase,
   SyncStripePlansUseCase,
 } from '../../src/modules/billing/application/billing.use-cases';
+import { PlanPaymentLinkService } from '../../src/modules/billing/application/plan-payment-link.service';
+import { SendPlanPaymentEmailsUseCase } from '../../src/modules/billing/application/plan-payment.use-cases';
+import { EMAIL_SENDER, type EmailSender } from '../../src/shared/email/email-sender';
 import { BILLING_GATEWAY } from '../../src/modules/billing/application/ports/billing-gateway';
 import { FakeBillingGateway } from '../../src/modules/billing/infrastructure/fake-billing-gateway';
 import { BookingWorld } from '../support/booking-world';
@@ -10,6 +13,7 @@ import {
   grantPlatformRoleAsOwner,
   resetTestDatabase,
   runStatementAsOwnerForUser,
+  setPlanClientLimitAsPlatform,
 } from '../support/test-database';
 import { createTestApplication } from './create-test-application';
 
@@ -395,6 +399,51 @@ describe('plan billing with Stripe', () => {
       expect(kinds).toEqual(expect.arrayContaining(['plan_changed', 'plan_subscribed']));
     });
 
+    describe('when the new plan admits fewer clients than the center has', () => {
+      const setBasicClientLimit = (limit: number) => setPlanClientLimitAsPlatform('basic', limit);
+
+      beforeEach(async () => {
+        await world.addMember(centerId, 'first-client', 'client');
+        await world.addMember(centerId, 'second-client', 'client');
+      });
+
+      it('warns the owner once, with the numbers, and does not touch any client', async () => {
+        await setBasicClientLimit(1);
+        await completeCheckout('pro');
+        await changePlanInPortal('basic');
+        await changePlanInPortal('basic');
+
+        const overLimitNotices = (await listOwnerNotices()).filter(
+          ({ kind }) => kind === 'plan_over_limit',
+        );
+
+        expect(overLimitNotices).toEqual([
+          expect.objectContaining({
+            data: { planId: 'basic', activeClientCount: '2', maxClients: '1' },
+          }),
+        ]);
+        expect(await readSubscription()).toMatchObject({ planId: 'basic', activeClientCount: 2 });
+      });
+
+      it('also warns when the first plan bought already admits fewer clients', async () => {
+        await setBasicClientLimit(1);
+        await completeCheckout('basic');
+
+        const kinds = (await listOwnerNotices()).map(({ kind }) => kind);
+
+        expect(kinds).toEqual(expect.arrayContaining(['plan_subscribed', 'plan_over_limit']));
+      });
+
+      it('says nothing when the clients still fit in the new plan', async () => {
+        await completeCheckout('pro');
+        await changePlanInPortal('basic');
+
+        const kinds = (await listOwnerNotices()).map(({ kind }) => kind);
+
+        expect(kinds).not.toContain('plan_over_limit');
+      });
+    });
+
     it('does not tell twice about the first plan when the portal notice arrives before the checkout', async () => {
       await changePlanInPortal('premium');
       await completeCheckout('premium');
@@ -641,6 +690,74 @@ describe('plan billing with Stripe', () => {
 
       expect(await sweep()).toEqual({ gracesOpened: 0, centersSuspended: 0 });
       expect((await readSubscription()).status).toBe('active');
+    });
+  });
+
+  describe('payment links in emails', () => {
+    const openLink = (url: string) => {
+      const { pathname, search } = new URL(url, 'https://api.yoclick.app');
+      return application.inject({ method: 'GET', url: `${pathname}${search}` });
+    };
+
+    const sendEmails = () => application.get(SendPlanPaymentEmailsUseCase).execute(new Date());
+
+    it('redirects an owner who opens the signed link to a fresh Stripe checkout, without a session', async () => {
+      await application.get(SyncStripePlansUseCase).execute();
+      const url = await application
+        .get(PlanPaymentLinkService)
+        .buildUrl({ centerId, planId: 'pro', period: 'annual' });
+
+      const response = await openLink(url);
+
+      expect(response.statusCode).toBe(302);
+      expect(response.headers.location).toContain('checkout');
+      expect(gateway.checkoutRequests[0]).toMatchObject({
+        centerId,
+        planId: 'pro',
+        priceId: 'price_fake_pro_annual',
+        customerId,
+      });
+    });
+
+    it('refuses a link that was not signed by the API', async () => {
+      const response = await openLink('/v1/billing/pay?token=not-a-token');
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json<{ code: string }>().code).toBe('PAYMENT_LINK_INVALID');
+      expect(gateway.checkoutRequests).toHaveLength(0);
+    });
+
+    it('emails the owner once per reminder when the trial is about to end, and never twice', async () => {
+      await application.get(SyncStripePlansUseCase).execute();
+      await setCenterColumns(`"trial_ends_at" = now() + interval '2 days'`);
+      const send = jest.spyOn(application.get<EmailSender>(EMAIL_SENDER), 'send');
+
+      const firstRun = await sendEmails();
+      const secondRun = await sendEmails();
+
+      expect(firstRun).toEqual({ emailsSent: 1, centersFailed: 0 });
+      expect(secondRun).toEqual({ emailsSent: 0, centersFailed: 0 });
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(send.mock.calls[0]?.[0].subject).toBe('Tu prueba de Yoclick acaba en 3 días');
+      send.mockRestore();
+    });
+
+    it('writes again when the trial has ended, but not to a center that already pays', async () => {
+      await application.get(SyncStripePlansUseCase).execute();
+      await setCenterColumns(`"trial_ends_at" = now() + interval '2 days'`);
+      await sendEmails();
+      await setCenterColumns(`"trial_ends_at" = now() - interval '1 hour'`);
+      const send = jest.spyOn(application.get<EmailSender>(EMAIL_SENDER), 'send');
+
+      await sendEmails();
+      await setCenterColumns(
+        `"trial_ends_at" = now() - interval '2 hours', "stripe_subscription_id" = 'sub_1'`,
+      );
+      await sendEmails();
+
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(send.mock.calls[0]?.[0].subject).toBe('Tu prueba de Yoclick ha terminado');
+      send.mockRestore();
     });
   });
 

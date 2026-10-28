@@ -127,6 +127,12 @@ const baseEnvironmentSchema = z.object({
   // Cada cuántos segundos se abre la gracia de las pruebas acabadas sin plan y se suspende a quien agota
   // la gracia; 0 (por defecto) lo apaga, para no suspender centros de pruebas sin querer.
   BILLING_SWEEP_INTERVAL_SECONDS: z.coerce.number().int().min(0).default(0),
+  // Dirección pública de la API: los correos de pago del plan llevan un enlace firmado que cuelga de ella.
+  // En producción tiene que ser https.
+  PUBLIC_API_URL: z.url().default('http://localhost:3000'),
+  // Cada cuántos segundos se envían los correos de pago del plan (avisos de fin de prueba a los 7, 3 y 1 días
+  // y al acabar); 0 (por defecto) los apaga, para no escribir a centros de pruebas sin querer.
+  PLAN_PAYMENT_EMAIL_INTERVAL_SECONDS: z.coerce.number().int().min(0).default(0),
   EMAIL_PROVIDER: z.enum(['console', 'brevo']).default('console'),
   // Solo hacen falta con EMAIL_PROVIDER=brevo (se exigen en ese caso, ver más abajo).
   BREVO_API_KEY: z.string().min(1).optional(),
@@ -169,6 +175,17 @@ function listProviderRequirements(environment: ParsedEnvironment): ProductionReq
   ];
 }
 
+/** Las direcciones que salen en correos y redirecciones: en producción tienen que ser https. */
+function listPublicUrlRequirements(environment: ParsedEnvironment): ProductionRequirement[] {
+  return [
+    {
+      isMet: environment.PUBLIC_API_URL.startsWith('https://'),
+      path: 'PUBLIC_API_URL',
+      message: 'must be an https URL in production: the payment links in emails point to it',
+    },
+  ];
+}
+
 /** Lo que en desarrollo se tolera y en producción hace que el proceso no arranque. */
 function listProductionRequirements(environment: ParsedEnvironment): ProductionRequirement[] {
   const sslMode = parseDatabaseUrl(environment.DATABASE_URL)?.searchParams.get('sslmode') ?? '';
@@ -199,6 +216,7 @@ function listProductionRequirements(environment: ParsedEnvironment): ProductionR
       message: 'must be enabled in production',
     },
     ...listProviderRequirements(environment),
+    ...listPublicUrlRequirements(environment),
     {
       isMet: !environment.ALLOW_DISPOSABLE_EMAILS,
       path: 'ALLOW_DISPOSABLE_EMAILS',

@@ -11,8 +11,16 @@ import {
 } from './application/billing.use-cases';
 import { BILLING_GATEWAY, type BillingGateway } from './application/ports/billing-gateway';
 import { BILLING_REPOSITORY } from './application/ports/billing.repository';
+import { CloseCenterUseCase } from './application/close-center.use-case';
+import { PlanPaymentEmailScheduler } from './application/plan-payment-email-scheduler';
+import { PlanPaymentLinkService } from './application/plan-payment-link.service';
+import {
+  OpenPlanPaymentLinkUseCase,
+  SendPlanPaymentEmailsUseCase,
+} from './application/plan-payment.use-cases';
 import { SubscriptionSweeper } from './application/subscription-sweeper';
 import { BillingController } from './http/billing.controller';
+import { PlanPaymentLinkController } from './http/plan-payment-link.controller';
 import { FakeBillingGateway } from './infrastructure/fake-billing-gateway';
 import { PrismaBillingRepository } from './infrastructure/prisma-billing.repository';
 import { StripeBillingGateway } from './infrastructure/stripe-billing-gateway';
@@ -36,7 +44,7 @@ function createBillingGateway(configService: ConfigService<Environment, true>): 
 
 /** El cobro de los planes a los centros con Stripe Billing (docs/spec/17, fase P5). */
 @Module({
-  controllers: [BillingController],
+  controllers: [BillingController, PlanPaymentLinkController],
   providers: [
     { provide: BILLING_GATEWAY, inject: [ConfigService], useFactory: createBillingGateway },
     { provide: BILLING_REPOSITORY, useClass: PrismaBillingRepository },
@@ -46,8 +54,18 @@ function createBillingGateway(configService: ConfigService<Environment, true>): 
     HandleBillingWebhookUseCase,
     SweepSubscriptionsUseCase,
     SyncStripePlansUseCase,
+    PlanPaymentLinkService,
+    OpenPlanPaymentLinkUseCase,
+    SendPlanPaymentEmailsUseCase,
+    PlanPaymentEmailScheduler,
     SubscriptionSweeper,
+    CloseCenterUseCase,
   ],
-  exports: [HandleBillingWebhookUseCase, SweepSubscriptionsUseCase, BILLING_GATEWAY],
+  exports: [
+    HandleBillingWebhookUseCase,
+    SweepSubscriptionsUseCase,
+    BILLING_GATEWAY,
+    CloseCenterUseCase,
+  ],
 })
 export class BillingModule {}

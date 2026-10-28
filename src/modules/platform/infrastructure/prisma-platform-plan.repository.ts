@@ -43,6 +43,7 @@ async function countCentersByPlanAndStatus(
 ): Promise<Map<string, number>> {
   const rows = await client.center.groupBy({
     by: ['planId', 'status'],
+    where: { closedAt: null },
     _count: { _all: true },
   });
   return new Map(rows.map((row) => [`${row.planId}:${row.status}`, row._count._all]));

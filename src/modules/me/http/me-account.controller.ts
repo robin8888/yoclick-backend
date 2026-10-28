@@ -86,13 +86,17 @@ export class MeAccountController {
   @ApiOperation({
     operationId: 'me_delete_account',
     summary:
-      'Elimina mi cuenta (Apple 5.1.1(v), RGPD art. 17). Pide la contraseña y escribir ELIMINAR. Irreversible.',
+      'Elimina mi cuenta (Apple 5.1.1(v), RGPD art. 17). Pide la contraseña y escribir ELIMINAR. Irreversible. Quien es la única propietaria de un centro debe enviar `closeOwnedCenters: true`: el centro se cierra (se cancela su suscripción y se avisa a quienes estaban dentro); sin ello responde 409 `ACCOUNT_OWNS_CENTER`.',
   })
   @ApiNoContentResponse()
   async deleteAccount(
     @CurrentUserId() userId: string,
     @Body() body: DeleteAccountRequestDto,
   ): Promise<void> {
-    await this.deleteMyAccount.execute(userId, body.password);
+    await this.deleteMyAccount.execute({
+      userId,
+      password: body.password,
+      closeOwnedCenters: body.closeOwnedCenters,
+    });
   }
 }

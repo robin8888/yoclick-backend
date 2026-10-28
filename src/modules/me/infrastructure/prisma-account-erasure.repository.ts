@@ -12,13 +12,6 @@ const ERASED_FULL_NAME = 'Usuario eliminado';
 export class PrismaAccountErasureRepository implements AccountErasureRepository {
   constructor(private readonly tenantPrismaService: TenantPrismaService) {}
 
-  async ownsActiveCenter(userId: string): Promise<boolean> {
-    const ownedCenterCount = await this.tenantPrismaService.runInUserContext(userId, (client) =>
-      client.membership.count({ where: { userId, role: 'owner', status: 'active' } }),
-    );
-    return ownedCenterCount > 0;
-  }
-
   async anonymize(userId: string, erasedAt: Date): Promise<string | null> {
     return this.tenantPrismaService.runInUserContext(userId, async (client) => {
       const { photoKey } = await client.user.findUniqueOrThrow({

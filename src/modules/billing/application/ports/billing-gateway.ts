@@ -91,6 +91,11 @@ export interface BillingGateway {
   configurePortal(plans: readonly SyncedPlan[]): Promise<void>;
   /** Portal de Stripe donde el propietario gestiona su suscripción; el enlace es de un solo uso. */
   createPortalSession(input: { customerId: string }): Promise<{ url: string }>;
+  /**
+   * Cancela la suscripción de inmediato (al cerrar el centro). Si Stripe ya no la tiene o ya estaba cancelada, no
+   * es un fallo: lo que se quiere es que no se vuelva a cobrar.
+   */
+  cancelSubscription(subscriptionId: string): Promise<void>;
   verifyWebhook(input: {
     rawBody: Buffer;
     signatureHeader: string | undefined;

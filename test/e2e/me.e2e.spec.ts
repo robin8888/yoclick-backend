@@ -1,5 +1,7 @@
 import { type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { BREACHED_PASSWORD_CHECKER } from '../../src/modules/auth/application/ports/breached-password.checker';
+import { BILLING_GATEWAY } from '../../src/modules/billing/application/ports/billing-gateway';
+import { FakeBillingGateway } from '../../src/modules/billing/infrastructure/fake-billing-gateway';
 import { FILE_STORAGE } from '../../src/modules/content/application/ports/file-storage';
 import { FakeFileStorage } from '../../src/modules/content/infrastructure/fake-file-storage';
 import { PrismaService } from '../../src/shared/database/prisma.service';
@@ -547,19 +549,137 @@ describe('the person own account (/v1/me)', () => {
       expect(consents).toBe(3);
     });
 
-    it('refuses an owner of an active center: it would leave it without a responsible person', async () => {
-      const session = await signIn();
-      const norte = await fixtures.createCenter('studio-norte', 'NORTE7');
-      await fixtures.createMembership({ centerId: norte, userId: session.user.id, role: 'owner' });
+    describe('an owner of a center', () => {
+      const OWNED_SUBSCRIPTION_ID = 'sub_owned_center_1';
 
-      const response = await deleteAccount(session.accessToken, {
-        password: PASSWORD,
-        confirmation: 'ELIMINAR',
+      async function createCenterWithAnOwnerAndAClient() {
+        const ownerSession = await signIn();
+        await createVerifiedAccount(OTHER_EMAIL);
+        const clientSession = await signIn(OTHER_EMAIL);
+        const centerId = await fixtures.createCenter('studio-norte', 'NORTE7');
+        const ownerMembershipId = await fixtures.createMembership({
+          centerId,
+          userId: ownerSession.user.id,
+          role: 'owner',
+        });
+        const clientMembershipId = await fixtures.createMembership({
+          centerId,
+          userId: clientSession.user.id,
+          role: 'client',
+        });
+        await tenantPrismaService.runInBillingContext((client) =>
+          client.center.update({
+            where: { id: centerId },
+            data: { stripeSubscriptionId: OWNED_SUBSCRIPTION_ID },
+          }),
+        );
+        return { ownerSession, clientSession, centerId, ownerMembershipId, clientMembershipId };
+      }
+
+      function readCenter(centerId: string) {
+        return tenantPrismaService.runInBillingContext((client) =>
+          client.center.findUniqueOrThrow({ where: { id: centerId } }),
+        );
+      }
+
+      function deleteAndCloseCenter(accessToken: string) {
+        return deleteAccount(accessToken, {
+          password: PASSWORD,
+          confirmation: 'ELIMINAR',
+          closeOwnedCenters: true,
+        });
+      }
+
+      it('is refused unless they confirm closing the center: nothing changes', async () => {
+        const { ownerSession, centerId } = await createCenterWithAnOwnerAndAClient();
+
+        const response = await deleteAccount(ownerSession.accessToken, {
+          password: PASSWORD,
+          confirmation: 'ELIMINAR',
+        });
+
+        expect(response.statusCode).toBe(409);
+        expect(response.json()).toMatchObject({ code: 'ACCOUNT_OWNS_CENTER' });
+        expect((await login()).statusCode).toBe(200);
+        expect((await readCenter(centerId)).closedAt).toBeNull();
+        const gateway = application.get<FakeBillingGateway>(BILLING_GATEWAY);
+        expect(gateway.cancelledSubscriptionIds).not.toContain(OWNED_SUBSCRIPTION_ID);
       });
 
-      expect(response.statusCode).toBe(409);
-      expect(response.json()).toMatchObject({ code: 'ACCOUNT_OWNS_CENTER' });
-      expect((await login()).statusCode).toBe(200);
+      it('deletes the account and closes the center when they confirm, cancelling the subscription', async () => {
+        const { ownerSession, centerId } = await createCenterWithAnOwnerAndAClient();
+
+        const response = await deleteAndCloseCenter(ownerSession.accessToken);
+
+        expect(response.statusCode).toBe(204);
+        expect((await login()).statusCode).toBe(401);
+        expect((await readCenter(centerId)).closedAt).not.toBeNull();
+        const gateway = application.get<FakeBillingGateway>(BILLING_GATEWAY);
+        expect(gateway.cancelledSubscriptionIds).toContain(OWNED_SUBSCRIPTION_ID);
+      });
+
+      it('takes everyone out of the closed center and makes it impossible to join', async () => {
+        const { ownerSession, clientSession, centerId } = await createCenterWithAnOwnerAndAClient();
+
+        await deleteAndCloseCenter(ownerSession.accessToken);
+
+        const memberships = await send('GET', '/v1/me/memberships', clientSession.accessToken);
+        expect(memberships.json<{ memberships: unknown[] }>().memberships).toEqual([]);
+        const joinByCode = await send('GET', '/v1/join/code/NORTE7', undefined);
+        expect(joinByCode.statusCode).toBe(404);
+        expect(joinByCode.json()).toMatchObject({ code: 'JOIN_CODE_INVALID' });
+        const stillInside = await tenantPrismaService.runInBillingContext((client) =>
+          client.membership.count({ where: { centerId, status: { not: 'left' } } }),
+        );
+        expect(stillInside).toBe(0);
+      });
+
+      it('tells the people who were in the center, but not the owner who closed it', async () => {
+        const { ownerSession, clientSession, centerId, ownerMembershipId, clientMembershipId } =
+          await createCenterWithAnOwnerAndAClient();
+
+        await deleteAndCloseCenter(ownerSession.accessToken);
+
+        const closedNotices = await tenantPrismaService.runInTenantContext(
+          {
+            userId: clientSession.user.id,
+            centerId,
+            membershipId: clientMembershipId,
+            role: 'client',
+            permissions: [],
+          },
+          (client) => client.notification.findMany({ where: { kind: 'center_closed' } }),
+        );
+        const recipients = closedNotices.map((notice) => notice.recipientMembershipId);
+        expect(recipients).toEqual([clientMembershipId]);
+        expect(recipients).not.toContain(ownerMembershipId);
+        expect(closedNotices[0]?.data).toEqual({ centerName: 'studio-norte' });
+      });
+
+      it('leaves an entry in the platform audit and keeps the data of the center', async () => {
+        const { ownerSession, centerId } = await createCenterWithAnOwnerAndAClient();
+
+        await deleteAndCloseCenter(ownerSession.accessToken);
+
+        const audit = await tenantPrismaService.runInPlatformContext(
+          { userId: ownerSession.user.id, role: 'admin' },
+          (client) =>
+            client.platformAuditEntry.findMany({ where: { centerId, action: 'center_closed' } }),
+        );
+        expect(audit).toHaveLength(1);
+        expect(audit[0]?.details).toEqual({ hadSubscription: true });
+        // No se borra nada: el centro sigue en la base de datos por el plazo legal de conservación.
+        expect((await readCenter(centerId)).name).toBe('studio-norte');
+      });
+
+      it('does not close a center when a member who is not its owner deletes the account', async () => {
+        const { clientSession, centerId } = await createCenterWithAnOwnerAndAClient();
+
+        const response = await deleteAndCloseCenter(clientSession.accessToken);
+
+        expect(response.statusCode).toBe(204);
+        expect((await readCenter(centerId)).closedAt).toBeNull();
+      });
     });
 
     it.each([

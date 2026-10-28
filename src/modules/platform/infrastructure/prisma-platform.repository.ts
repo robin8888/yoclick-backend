@@ -149,6 +149,7 @@ function toSummary(center: CenterRow, usage: CenterUsage): PlatformCenterSummary
     teamMemberCount: usage.teamMembers.get(center.id) ?? 0,
     bookingsLast30Days: usage.recentBookings.get(center.id) ?? 0,
     lastBookingAt: usage.lastBookingAt.get(center.id) ?? null,
+    closedAt: center.closedAt,
   };
 }
 
@@ -221,13 +222,21 @@ async function readCenterTotals(
   now: Date,
 ): Promise<Pick<PlatformOverview, 'centers' | 'centersBySector'>> {
   const [byStatus, newLast30Days, trialsEnding, sectors] = await Promise.all([
-    client.center.groupBy({ by: ['status'], _count: { _all: true } }),
-    client.center.count({ where: { createdAt: { gte: daysFrom(now, -RECENT_DAYS) } } }),
+    // Un centro cerrado ya no cuenta en ninguna cifra.
+    client.center.groupBy({ by: ['status'], where: { closedAt: null }, _count: { _all: true } }),
     client.center.count({
-      where: { status: 'trial', trialEndsAt: { gte: now, lte: daysFrom(now, TRIAL_WARNING_DAYS) } },
+      where: { closedAt: null, createdAt: { gte: daysFrom(now, -RECENT_DAYS) } },
+    }),
+    client.center.count({
+      where: {
+        closedAt: null,
+        status: 'trial',
+        trialEndsAt: { gte: now, lte: daysFrom(now, TRIAL_WARNING_DAYS) },
+      },
     }),
     client.center.groupBy({
       by: ['sectorId'],
+      where: { closedAt: null },
       _count: { _all: true },
       orderBy: { _count: { sectorId: 'desc' } },
     }),

@@ -34,6 +34,9 @@ export const NOTIFICATION_KINDS = [
   'schedule_updated',
   'plan_subscribed',
   'plan_changed',
+  'plan_over_limit',
+  'center_closed',
+  'message_reported',
 ] as const;
 export type NotificationKindName = (typeof NOTIFICATION_KINDS)[number];
 

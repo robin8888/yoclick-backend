@@ -35,14 +35,18 @@ export const ERROR_CATALOG = {
   },
   REAUTHENTICATION_FAILED: { title: 'La contraseña no es correcta' },
   ACCOUNT_OWNS_CENTER: {
-    title: 'Antes de eliminar tu cuenta, cierra o traspasa el centro del que eres propietario',
+    title:
+      'Eres propietario de un centro: si eliminas tu cuenta, el centro se cerrará y sus clientes y su equipo perderán el acceso. Confirma que quieres cerrarlo para continuar',
   },
   INVALID_CREDENTIALS: { title: 'Correo o contraseña incorrectos' },
   EMAIL_NOT_VERIFIED: { title: 'Confirma tu correo para poder entrar' },
   ACCOUNT_LOCKED: { title: 'Demasiados intentos. Espera unos minutos y vuelve a probar' },
   SESSION_INVALID: { title: 'Tu sesión ha caducado. Inicia sesión de nuevo' },
   JOIN_CODE_INVALID: { title: 'Ese código no corresponde a ningún centro' },
-  CLIENT_LIMIT_REACHED: { title: 'Este centro ha alcanzado su límite de clientes por ahora' },
+  // Neutro a propósito: quien intenta unirse no tiene por qué saber nada del plan ni de la facturación del centro.
+  CLIENT_LIMIT_REACHED: {
+    title: 'Este centro no admite altas nuevas ahora mismo. Ponte en contacto con el centro',
+  },
   MEMBERSHIP_BLOCKED: { title: 'El centro no permite que te unas' },
   CENTER_LIMIT_REACHED: { title: 'Has alcanzado el máximo de centros que puedes gestionar' },
   ALREADY_MEMBER: { title: 'Esa persona ya forma parte del centro' },
@@ -131,6 +135,8 @@ export const ERROR_CATALOG = {
   CHAT_MINOR_REQUIRES_GUARDIAN: {
     title: 'A los menores solo se les escribe a través de su tutor',
   },
+  CHAT_BLOCK_NOT_ALLOWED: { title: 'No puedes bloquear a esta persona' },
+  CHAT_CANNOT_REPORT_OWN_MESSAGE: { title: 'No puedes denunciar un mensaje tuyo' },
   CHAT_ATTACHMENT_UNSUPPORTED: { title: 'Solo se pueden enviar imágenes (JPEG, PNG, WebP) o PDF' },
   CHAT_ATTACHMENT_TOO_LARGE: {
     title: 'El archivo es demasiado grande. Máximo 5 MB en imágenes y 10 MB en PDF',
@@ -209,6 +215,10 @@ export const ERROR_CATALOG = {
       'Solo puedes opinar de una sesión que hayas tenido con esta persona, y una vez por sesión',
   },
   REVIEW_NOT_MODERABLE: { title: 'Esta opinión ya está revisada' },
+  PAYMENT_LINK_INVALID: {
+    title:
+      'Este enlace de pago ha caducado o no es válido. Pide uno nuevo desde tu correo de Yoclick',
+  },
   INTERNAL_ERROR: { title: 'Algo ha fallado de nuestro lado. Inténtalo de nuevo' },
 } as const;
 

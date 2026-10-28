@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PhotoUrlSigner } from '../../photos/application/photo-url-signer';
+import { type BlockedPersonView, type MessageReportView } from './ports/chat-moderation.repository';
 import {
   type ContactView,
   type ConversationView,
@@ -58,6 +59,31 @@ export class ChatPresenter {
       fullName: contact.fullName,
       role: contact.role,
       photoUrl: this.urlSigner.sign(contact.photoKey),
+    };
+  }
+
+  blockedPerson(person: BlockedPersonView): Record<string, unknown> {
+    return {
+      membershipId: person.membershipId,
+      fullName: person.fullName,
+      role: person.role,
+      photoUrl: this.urlSigner.sign(person.photoKey),
+      blockedAt: person.blockedAt.toISOString(),
+    };
+  }
+
+  report(report: MessageReportView): Record<string, unknown> {
+    return {
+      id: report.id,
+      reason: report.reason,
+      details: report.details,
+      status: report.status,
+      reporterName: report.reporterName,
+      reportedSenderName: report.reportedSenderName,
+      reportedBody: report.reportedBody,
+      reportedAttachmentName: report.reportedAttachmentName,
+      createdAt: report.createdAt.toISOString(),
+      reviewedAt: report.reviewedAt === null ? null : report.reviewedAt.toISOString(),
     };
   }
 

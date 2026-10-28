@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AuthIdentityModule } from '../auth/auth-identity.module';
+import { BillingModule } from '../billing/billing.module';
 import { DeleteMyAccountUseCase } from './application/delete-my-account.use-case';
 import { ExportMyDataUseCase } from './application/export-my-data.use-case';
 import { GetMyConsentsUseCase } from './application/get-my-consents.use-case';
@@ -15,7 +16,7 @@ import { PrismaAccountErasureRepository } from './infrastructure/prisma-account-
 import { PrismaProfileRepository } from './infrastructure/prisma-profile.repository';
 
 @Module({
-  imports: [AuthIdentityModule],
+  imports: [AuthIdentityModule, BillingModule],
   controllers: [MeController, MeAccountController],
   providers: [
     GetMyProfileUseCase,

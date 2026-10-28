@@ -6,6 +6,7 @@ import {
   type GroupBroadcastOutcome,
 } from '../application/ports/chat.repository';
 import { isMinor } from '../domain/chat-rules';
+import { findBlockPartnerIds } from './chat-blocks';
 import { appendMessageInTransaction } from './chat-messages';
 
 /**
@@ -136,6 +137,21 @@ async function planDeliveries(
 }
 
 /**
+ * Un profesor habla en persona, así que respeta los bloqueos: no escribe a quien le ha bloqueado ni a quien
+ * él ha bloqueado. La administración habla en nombre del centro y no tiene bloqueos.
+ */
+async function withoutBlockedRecipients(
+  client: TenantTransactionClient,
+  input: { actor: ActorContext; deliveries: readonly Delivery[] },
+): Promise<Delivery[]> {
+  if (input.actor.role !== 'staff') return [...input.deliveries];
+  const partnerIds = await findBlockPartnerIds(client, input.actor);
+  return input.deliveries.filter(
+    ({ recipientMembershipId }) => !partnerIds.has(recipientMembershipId),
+  );
+}
+
+/**
  * Manda el mismo mensaje a cada persona de un grupo o de una clase fija, cada una en su
  * conversación: así las respuestas vuelven por separado y nadie ve quién más lo ha recibido. Los
  * menores no tienen cuenta con la que hablar: el mensaje llega a su tutor y, si no tienen, se cuenta
@@ -149,7 +165,8 @@ export async function broadcastInTransaction(
   const audience = await findAudience(client, { target, today: sentAt, actor });
   if (audience === null) return { kind: 'group_not_found' };
   const plan = await planDeliveries(client, { candidates: audience.candidates, body, now: sentAt });
-  for (const delivery of plan.deliveries) {
+  const deliveries = await withoutBlockedRecipients(client, { actor, deliveries: plan.deliveries });
+  for (const delivery of deliveries) {
     const conversationId = await findOrCreateConversation(client, {
       actor,
       clientMembershipId: delivery.recipientMembershipId,
@@ -167,10 +184,8 @@ export async function broadcastInTransaction(
   }
   return {
     kind: 'sent',
-    sentCount: plan.deliveries.length,
+    sentCount: deliveries.length,
     skippedMinorCount: plan.skippedMinorCount,
-    recipientMembershipIds: plan.deliveries.map(
-      ({ recipientMembershipId }) => recipientMembershipId,
-    ),
+    recipientMembershipIds: deliveries.map(({ recipientMembershipId }) => recipientMembershipId),
   };
 }

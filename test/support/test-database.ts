@@ -40,6 +40,9 @@ export async function resetTestDatabase(): Promise<void> {
       from (values ('basic', 3900, 3200, 0), ('pro', 7900, 6500, 0), ('premium', 14900, 12400, 29000))
         as defaults(id, monthly, annual, setup)
       where plan."id" = defaults.id`);
+    await client.query(`
+      update "platform_plans"
+      set "max_clients" = case "id" when 'basic' then 150 when 'pro' then 500 else null end`);
     // Los ids de Stripe de los planes tampoco deben pasar de un test al siguiente.
     await client.query(`
       update "platform_plans" set "stripe_product_id" = null, "stripe_monthly_price_id" = null,
@@ -72,6 +75,24 @@ export async function runStatementAsOwnerForUser(
     const result = await client.query(statement);
     // Un UPDATE que no toca ninguna fila hace pasar o fallar un test por la razón equivocada.
     if (result.rowCount === 0) throw new Error(`Statement affected no rows: ${statement}`);
+  } finally {
+    await client.end();
+  }
+}
+
+/** Cambia el tope de clientes de un plan, en el contexto de plataforma. `resetTestDatabase` lo deja como estaba. */
+export async function setPlanClientLimitAsPlatform(planId: string, limit: number): Promise<void> {
+  const migrationUrl = readRequiredEnvironmentVariable('TEST_MIGRATION_DATABASE_URL');
+  assertIsTestDatabase(migrationUrl);
+  const client = new Client({ connectionString: migrationUrl });
+  await client.connect();
+  try {
+    await client.query("select set_config('app.platform_role', 'admin', false)");
+    const result = await client.query(
+      'update "platform_plans" set "max_clients" = $1 where "id" = $2',
+      [limit, planId],
+    );
+    if (result.rowCount === 0) throw new Error(`There is no plan ${planId}`);
   } finally {
     await client.end();
   }

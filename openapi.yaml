@@ -590,7 +590,7 @@ paths:
                 $ref: "#/components/schemas/ProblemDetailsDto"
       security:
         - bearer: []
-      summary: Elimina mi cuenta (Apple 5.1.1(v), RGPD art. 17). Pide la contraseña y escribir ELIMINAR. Irreversible.
+      summary: "Elimina mi cuenta (Apple 5.1.1(v), RGPD art. 17). Pide la contraseña y escribir ELIMINAR. Irreversible. Quien es la única propietaria de un centro debe enviar `closeOwnedCenters: true`: el centro se cierra (se cancela su suscripción y se avisa a quienes estaban dentro); sin ello responde 409 `ACCOUNT_OWNS_CENTER`."
       tags:
         - me
   /v1/me/memberships:
@@ -720,6 +720,137 @@ paths:
       summary: Descarga todos mis datos en JSON (RGPD arts. 15 y 20). Pide la contraseña.
       tags:
         - me
+  /v1/centers/{centerId}/subscription/plans:
+    get:
+      operationId: centers_list_subscription_plans
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanOffersResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Los planes que se pueden contratar, con su precio mensual y anual (sin IVA), la cuota de alta y lo que incluye cada uno.
+      tags:
+        - centers
+  /v1/centers/{centerId}/subscription/portal:
+    post:
+      operationId: centers_create_subscription_portal
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckoutResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Da el enlace al portal de Stripe para cambiar de plan o de periodicidad, cambiar la tarjeta, ver las facturas o cancelar. Solo si el centro ya ha pagado alguna vez; se abre en el navegador.
+      tags:
+        - centers
+  /v1/centers/{centerId}/subscription/checkout:
+    post:
+      operationId: centers_create_subscription_checkout
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckoutRequestDto"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckoutResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Da la página de pago de Stripe para contratar un plan. Si la prueba sigue en marcha, el primer cobro se aplaza hasta que acabe. El pago se hace en la web, no en la app.
+      tags:
+        - centers
+  /v1/billing/pay:
+    get:
+      operationId: billing_open_plan_payment_link
+      parameters:
+        - name: token
+          required: true
+          in: query
+          schema:
+            minLength: 1
+            maxLength: 2048
+            type: string
+      responses:
+        "302":
+          description: Redirige a la página de pago de Stripe
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      summary: "Enlace firmado de los correos de pago del plan: crea una página de pago de Stripe nueva y redirige a ella. 400 PAYMENT_LINK_INVALID si el enlace caducó o no es válido. No lo usa la app."
+      tags:
+        - billing
   /v1/join/code/{code}:
     get:
       operationId: join_find_center_by_code
@@ -4344,114 +4475,6 @@ paths:
       summary: El CSV de los cobros cobrados entre dos meses, para el gestor (separador «;» y coma decimal).
       tags:
         - platform
-  /v1/centers/{centerId}/subscription/plans:
-    get:
-      operationId: centers_list_subscription_plans
-      parameters:
-        - name: X-Center-Id
-          in: header
-          required: true
-          schema:
-            type: string
-        - name: centerId
-          required: true
-          in: path
-          schema:
-            format: uuid
-            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
-            type: string
-      responses:
-        "200":
-          description: ""
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PlanOffersResponseDto"
-        default:
-          description: Error RFC 9457
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetailsDto"
-      security:
-        - bearer: []
-      summary: Los planes que se pueden contratar, con su precio mensual y anual (sin IVA), la cuota de alta y lo que incluye cada uno.
-      tags:
-        - centers
-  /v1/centers/{centerId}/subscription/portal:
-    post:
-      operationId: centers_create_subscription_portal
-      parameters:
-        - name: X-Center-Id
-          in: header
-          required: true
-          schema:
-            type: string
-        - name: centerId
-          required: true
-          in: path
-          schema:
-            format: uuid
-            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
-            type: string
-      responses:
-        "200":
-          description: ""
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/CheckoutResponseDto"
-        default:
-          description: Error RFC 9457
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetailsDto"
-      security:
-        - bearer: []
-      summary: Da el enlace al portal de Stripe para cambiar de plan o de periodicidad, cambiar la tarjeta, ver las facturas o cancelar. Solo si el centro ya ha pagado alguna vez; se abre en el navegador.
-      tags:
-        - centers
-  /v1/centers/{centerId}/subscription/checkout:
-    post:
-      operationId: centers_create_subscription_checkout
-      parameters:
-        - name: X-Center-Id
-          in: header
-          required: true
-          schema:
-            type: string
-        - name: centerId
-          required: true
-          in: path
-          schema:
-            format: uuid
-            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CheckoutRequestDto"
-      responses:
-        "200":
-          description: ""
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/CheckoutResponseDto"
-        default:
-          description: Error RFC 9457
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetailsDto"
-      security:
-        - bearer: []
-      summary: Da la página de pago de Stripe para contratar un plan. Si la prueba sigue en marcha, el primer cobro se aplaza hasta que acabe. El pago se hace en la web, no en la app.
-      tags:
-        - centers
   /v1/centers/{centerId}/payments/status:
     get:
       operationId: payments_get_status
@@ -5703,6 +5726,116 @@ paths:
       summary: Quita de la lista un aviso propio (borrado lógico). 404 si no existe, ya estaba borrado o es de otra persona.
       tags:
         - notifications
+  /v1/centers/{centerId}/chat-blocks:
+    get:
+      operationId: chat_list_blocks
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BlockedPeopleResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Las personas a las que has bloqueado en el chat de este centro, de la más reciente a la más antigua.
+      tags:
+        - chat
+    post:
+      operationId: chat_block_person
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BlockPersonRequestDto"
+      responses:
+        "201":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BlockedPersonResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Bloquea a una persona (un alumno si eres profesor, un profesor si eres alumno). Bloquear a quien ya está bloqueado no falla. 404 si no existe; 403 CHAT_BLOCK_NOT_ALLOWED si eres tú, la administración o alguien de tu mismo rol.
+      tags:
+        - chat
+  /v1/centers/{centerId}/chat-blocks/{blockedMembershipId}:
+    delete:
+      operationId: chat_unblock_person
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: blockedMembershipId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "204":
+          description: ""
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Quita el bloqueo a una persona. Quitar uno que no existe no falla.
+      tags:
+        - chat
   /v1/centers/{centerId}/conversations:
     get:
       operationId: chat_list_conversations
@@ -5919,6 +6052,151 @@ paths:
       security:
         - bearer: []
       summary: Escribe a todas las personas de un grupo de clientes (`groupId`) o de una clase fija (`seriesId`). La administración lo hace en nombre del centro; un profesor, en persona y solo a lo suyo. Cada una lo recibe en su conversación y las respuestas vuelven por separado. Los menores no reciben. 404 si no existe o no es suyo.
+      tags:
+        - chat
+  /v1/centers/{centerId}/conversations/{conversationId}/messages/{messageId}/report:
+    post:
+      operationId: chat_report_message
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: conversationId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: messageId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportMessageRequestDto"
+      responses:
+        "201":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportMessageResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Denuncia un mensaje de una conversación en la que participas, con un motivo y, si quieres, unas líneas. Avisa a la administración. Denunciar dos veces el mismo mensaje no duplica la denuncia. 404 si el mensaje no existe o no es tuyo; 403 CHAT_CANNOT_REPORT_OWN_MESSAGE; 429 RATE_LIMITED.
+      tags:
+        - chat
+  /v1/centers/{centerId}/message-reports:
+    get:
+      operationId: chat_list_message_reports
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: status
+          required: false
+          in: query
+          schema:
+            type: string
+            enum:
+              - open
+              - reviewed
+        - name: limit
+          required: false
+          in: query
+          schema:
+            minimum: 1
+            maximum: 100
+            default: 50
+            type: integer
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageReportListResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: "Las denuncias de mensajes del centro, de la más reciente a la más antigua (`status` filtra). Solo dueño y administración. Cada una lleva una copia del mensaje denunciado: es la única forma de leer algo de una conversación privada, y solo porque quien denuncia decidió compartirlo."
+      tags:
+        - chat
+  /v1/centers/{centerId}/message-reports/{reportId}/review:
+    post:
+      operationId: chat_review_message_report
+      parameters:
+        - name: X-Center-Id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: centerId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+        - name: reportId
+          required: true
+          in: path
+          schema:
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageReportResponseDto"
+        default:
+          description: Error RFC 9457
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetailsDto"
+      security:
+        - bearer: []
+      summary: Marca una denuncia como revisada. Revisar una ya revisada la deja como estaba. 404 si no existe.
       tags:
         - chat
   /v1/centers/{centerId}/conversations/{conversationId}/messages:
@@ -9326,9 +9604,114 @@ components:
           type: string
           enum:
             - ELIMINAR
+        closeOwnedCenters:
+          default: false
+          type: boolean
       required:
         - password
         - confirmation
+      additionalProperties: false
+    PlanOffersResponseDto:
+      type: object
+      properties:
+        plans:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                enum:
+                  - basic
+                  - pro
+                  - premium
+              name:
+                type: string
+              monthlyPriceCents:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+              annualMonthlyPriceCents:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+              setupFeeCents:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+              maxClients:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+                nullable: true
+              documentStorageLimitBytes:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+              videoStorageLimitBytes:
+                type: integer
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+                nullable: true
+              features:
+                type: array
+                items:
+                  type: string
+                  enum:
+                    - reports
+                    - clientImport
+                    - routines
+                    - contentLibrary
+                    - groups
+                    - families
+                    - waitlist
+                    - rooms
+                    - customAppearance
+                    - videos
+                    - onlinePayments
+              isAvailable:
+                type: boolean
+            required:
+              - id
+              - name
+              - monthlyPriceCents
+              - annualMonthlyPriceCents
+              - setupFeeCents
+              - maxClients
+              - documentStorageLimitBytes
+              - videoStorageLimitBytes
+              - features
+              - isAvailable
+            additionalProperties: false
+      required:
+        - plans
+      additionalProperties: false
+    CheckoutResponseDto:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+      required:
+        - url
+      additionalProperties: false
+    CheckoutRequestDto:
+      type: object
+      properties:
+        planId:
+          type: string
+          enum:
+            - basic
+            - pro
+            - premium
+        period:
+          type: string
+          enum:
+            - monthly
+            - annual
+      required:
+        - planId
+        - period
       additionalProperties: false
     PublicCenterResponseDto:
       type: object
@@ -15586,6 +15969,11 @@ components:
                 format: date-time
                 pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
                 nullable: true
+              closedAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                nullable: true
             required:
               - id
               - name
@@ -15602,6 +15990,7 @@ components:
               - teamMemberCount
               - bookingsLast30Days
               - lastBookingAt
+              - closedAt
             additionalProperties: false
         nextCursor:
           type: string
@@ -15673,6 +16062,11 @@ components:
           format: date-time
           pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
           nullable: true
+        closedAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+          nullable: true
         timezone:
           type: string
         disabledModules:
@@ -15717,6 +16111,7 @@ components:
         - teamMemberCount
         - bookingsLast30Days
         - lastBookingAt
+        - closedAt
         - timezone
         - disabledModules
         - stripeChargesEnabled
@@ -16314,108 +16709,6 @@ components:
       required:
         - months
         - totals
-      additionalProperties: false
-    PlanOffersResponseDto:
-      type: object
-      properties:
-        plans:
-          type: array
-          items:
-            type: object
-            properties:
-              id:
-                type: string
-                enum:
-                  - basic
-                  - pro
-                  - premium
-              name:
-                type: string
-              monthlyPriceCents:
-                type: integer
-                minimum: -9007199254740991
-                maximum: 9007199254740991
-              annualMonthlyPriceCents:
-                type: integer
-                minimum: -9007199254740991
-                maximum: 9007199254740991
-              setupFeeCents:
-                type: integer
-                minimum: -9007199254740991
-                maximum: 9007199254740991
-              maxClients:
-                type: integer
-                minimum: -9007199254740991
-                maximum: 9007199254740991
-                nullable: true
-              documentStorageLimitBytes:
-                type: integer
-                minimum: -9007199254740991
-                maximum: 9007199254740991
-              videoStorageLimitBytes:
-                type: integer
-                minimum: -9007199254740991
-                maximum: 9007199254740991
-                nullable: true
-              features:
-                type: array
-                items:
-                  type: string
-                  enum:
-                    - reports
-                    - clientImport
-                    - routines
-                    - contentLibrary
-                    - groups
-                    - families
-                    - waitlist
-                    - rooms
-                    - customAppearance
-                    - videos
-                    - onlinePayments
-              isAvailable:
-                type: boolean
-            required:
-              - id
-              - name
-              - monthlyPriceCents
-              - annualMonthlyPriceCents
-              - setupFeeCents
-              - maxClients
-              - documentStorageLimitBytes
-              - videoStorageLimitBytes
-              - features
-              - isAvailable
-            additionalProperties: false
-      required:
-        - plans
-      additionalProperties: false
-    CheckoutResponseDto:
-      type: object
-      properties:
-        url:
-          type: string
-          format: uri
-      required:
-        - url
-      additionalProperties: false
-    CheckoutRequestDto:
-      type: object
-      properties:
-        planId:
-          type: string
-          enum:
-            - basic
-            - pro
-            - premium
-        period:
-          type: string
-          enum:
-            - monthly
-            - annual
-      required:
-        - planId
-        - period
       additionalProperties: false
     PaymentsStatusResponseDto:
       type: object
@@ -17901,6 +18194,9 @@ components:
                   - schedule_updated
                   - plan_subscribed
                   - plan_changed
+                  - plan_over_limit
+                  - center_closed
+                  - message_reported
               data:
                 type: object
                 additionalProperties:
@@ -17927,6 +18223,84 @@ components:
       required:
         - unreadCount
         - notifications
+      additionalProperties: false
+    BlockedPeopleResponseDto:
+      type: object
+      properties:
+        blocks:
+          type: array
+          items:
+            type: object
+            properties:
+              membershipId:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              fullName:
+                type: string
+              role:
+                type: string
+                enum:
+                  - owner
+                  - admin
+                  - staff
+                  - client
+              photoUrl:
+                type: string
+                nullable: true
+              blockedAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+            required:
+              - membershipId
+              - fullName
+              - role
+              - photoUrl
+              - blockedAt
+            additionalProperties: false
+      required:
+        - blocks
+      additionalProperties: false
+    BlockPersonRequestDto:
+      type: object
+      properties:
+        blockedMembershipId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+      required:
+        - blockedMembershipId
+      additionalProperties: false
+    BlockedPersonResponseDto:
+      type: object
+      properties:
+        membershipId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        fullName:
+          type: string
+        role:
+          type: string
+          enum:
+            - owner
+            - admin
+            - staff
+            - client
+        photoUrl:
+          type: string
+          nullable: true
+        blockedAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+      required:
+        - membershipId
+        - fullName
+        - role
+        - photoUrl
+        - blockedAt
       additionalProperties: false
     ConversationListResponseDto:
       type: object
@@ -18214,6 +18588,153 @@ components:
       required:
         - sentCount
         - skippedMinorCount
+      additionalProperties: false
+    ReportMessageRequestDto:
+      type: object
+      properties:
+        reason:
+          type: string
+          enum:
+            - spam
+            - harassment
+            - inappropriate
+            - other
+        details:
+          type: string
+          minLength: 1
+          maxLength: 500
+      required:
+        - reason
+      additionalProperties: false
+    ReportMessageResponseDto:
+      type: object
+      properties:
+        reportId:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        status:
+          type: string
+          enum:
+            - open
+            - reviewed
+      required:
+        - reportId
+        - status
+      additionalProperties: false
+    MessageReportListResponseDto:
+      type: object
+      properties:
+        reports:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              reason:
+                type: string
+                enum:
+                  - spam
+                  - harassment
+                  - inappropriate
+                  - other
+              details:
+                type: string
+                nullable: true
+              status:
+                type: string
+                enum:
+                  - open
+                  - reviewed
+              reporterName:
+                type: string
+              reportedSenderName:
+                type: string
+              reportedBody:
+                type: string
+                nullable: true
+              reportedAttachmentName:
+                type: string
+                nullable: true
+              createdAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+              reviewedAt:
+                type: string
+                format: date-time
+                pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+                nullable: true
+            required:
+              - id
+              - reason
+              - details
+              - status
+              - reporterName
+              - reportedSenderName
+              - reportedBody
+              - reportedAttachmentName
+              - createdAt
+              - reviewedAt
+            additionalProperties: false
+      required:
+        - reports
+      additionalProperties: false
+    MessageReportResponseDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+        reason:
+          type: string
+          enum:
+            - spam
+            - harassment
+            - inappropriate
+            - other
+        details:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum:
+            - open
+            - reviewed
+        reporterName:
+          type: string
+        reportedSenderName:
+          type: string
+        reportedBody:
+          type: string
+          nullable: true
+        reportedAttachmentName:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+        reviewedAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z))$
+          nullable: true
+      required:
+        - id
+        - reason
+        - details
+        - status
+        - reporterName
+        - reportedSenderName
+        - reportedBody
+        - reportedAttachmentName
+        - createdAt
+        - reviewedAt
       additionalProperties: false
     MessageListResponseDto:
       type: object

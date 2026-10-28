@@ -29,6 +29,7 @@ function productionEnvironment(overrides: Record<string, unknown> = {}): Record<
     BREVO_API_KEY: 'fake-api-key',
     EMAIL_FROM_ADDRESS: 'no-reply@yoclick.app',
     PUSH_PROVIDER: 'expo',
+    PUBLIC_API_URL: 'https://api.yoclick.app',
     VIDEO_PROVIDER: 'bunny',
     BUNNY_STREAM_LIBRARY_ID: '12345',
     BUNNY_STREAM_API_KEY: 'fake-bunny-api-key',
@@ -77,6 +78,20 @@ describe('parseEnvironment', () => {
   it('rejects verbose log levels in production because they can leak data', () => {
     expect(() => parseEnvironment(productionEnvironment({ LOG_LEVEL: 'debug' }))).toThrow(
       /LOG_LEVEL/,
+    );
+  });
+
+  it('rejects a public API address left at its development default in production', () => {
+    expect(captureErrorMessage(productionEnvironment({ PUBLIC_API_URL: undefined }))).toContain(
+      'PUBLIC_API_URL',
+    );
+  });
+
+  it('rejects a public API address that is not https in production', () => {
+    const insecureUrl = ['http', '://api.yoclick.app'].join('');
+
+    expect(captureErrorMessage(productionEnvironment({ PUBLIC_API_URL: insecureUrl }))).toContain(
+      'PUBLIC_API_URL',
     );
   });
 

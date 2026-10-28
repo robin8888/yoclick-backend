@@ -70,6 +70,8 @@ export interface ConversationAccess {
   readonly isBlockedByMinor: boolean;
   /** Las membresías que ven la conversación: la persona y la otra parte (o la administración). */
   readonly audienceMembershipIds: readonly string[];
+  /** La otra persona de una conversación entre dos personas, vista desde quien pregunta; nula si es con el centro. */
+  readonly otherPersonMembershipId: string | null;
 }
 
 export interface NewMessage {
@@ -129,6 +131,8 @@ export interface ChatRepository {
     actor: ActorContext,
     request: { conversationId: string; now: Date },
   ): Promise<ConversationAccess | null>;
+  /** Si alguna de las dos personas ha bloqueado a la otra. Solo se usa para impedir hablar: nunca se cuenta. */
+  hasChatBlockBetween(actor: ActorContext, otherMembershipId: string): Promise<boolean>;
   listMessages(
     actor: ActorContext,
     query: { conversationId: string; before: Date | null; limit: number },

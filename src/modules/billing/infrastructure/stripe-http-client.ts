@@ -37,6 +37,11 @@ export class StripeHttpClient {
     return this.call({ method: 'GET', path, schema });
   }
 
+  /** `DELETE`: cancelar una suscripción en el acto. */
+  delete<TSchema extends z.ZodType>(path: string, schema: TSchema): Promise<z.infer<TSchema>> {
+    return this.call({ method: 'DELETE', path, schema });
+  }
+
   post<TSchema extends z.ZodType>(input: {
     path: string;
     fields: StripeFields;
@@ -47,7 +52,7 @@ export class StripeHttpClient {
   }
 
   private async call<TSchema extends z.ZodType>(input: {
-    method: 'GET' | 'POST';
+    method: 'GET' | 'POST' | 'DELETE';
     path: string;
     schema: TSchema;
     fields?: StripeFields;

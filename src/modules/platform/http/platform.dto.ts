@@ -87,6 +87,8 @@ const centerSummaryShape = {
   teamMemberCount: z.number().int(),
   bookingsLast30Days: z.number().int(),
   lastBookingAt: z.iso.datetime().nullable(),
+  /** Cuándo se cerró el centro; `null` si sigue abierto. */
+  closedAt: z.iso.datetime().nullable(),
 };
 
 export class PlatformCenterListResponseDto extends createZodDto(

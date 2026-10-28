@@ -76,7 +76,7 @@ Cada plantilla incluye además: necesidades, objetivos del registro, grupos suge
 |---|---|---|---|---|
 | Básico | 39 € | 32 € | 150 | App compartida, reservas, cobros, 1 sede |
 | Pro | 79 € | 65 € | 500 | + grupos, familias, perfiles con vídeo, informes, importación |
-| Premium | 149 € | 124 € | Ilimitado | + app propia con su icono (pago único de alta 290 €) |
+| Premium | 149 € | 124 € | Ilimitado | + cobro online de bonos y alquileres (Stripe Connect del centro), vídeos del equipo, fondo y colmena de la marca. Sin cuota de alta; no incluye app propia |
 
 IVA no incluido. Prueba de 14 días sin tarjeta. En el código, los precios **nunca se escriben a mano**: vienen de la tabla `plans` y de los *Price* de Stripe.
 

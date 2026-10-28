@@ -5,6 +5,7 @@ import { DomainError } from '../../../shared/errors/domain-error';
 import { HTTP_STATUS } from '../../../shared/errors/http-status';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
 import { PhotoFileKeeper } from '../../photos/application/photo-file-keeper';
+import { findOtherPerson } from '../domain/chat-moderation-rules';
 import {
   buildChatAttachmentKey,
   decideAttachment,
@@ -57,11 +58,33 @@ export class OpenConversationUseCase {
     if (context === null) throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
     const decision = decideStartConversation(context.facts);
     if (decision.kind === 'denied') throw new DomainError(decision.code, HTTP_STATUS.forbidden);
+    await assertNoBlockWithOtherPerson(this.chat, actor, {
+      otherMembershipId: findOtherPerson({
+        viewerMembershipId: actor.membershipId,
+        memberMembershipId: context.memberMembershipId,
+        counterpartMembershipId: context.counterpartMembershipId,
+      }),
+    });
     const conversationId = await this.chat.findOrCreateConversation(actor, {
       memberMembershipId: context.memberMembershipId,
       counterpartMembershipId: context.counterpartMembershipId,
     });
     return { conversationId };
+  }
+}
+
+/**
+ * Si alguna de las dos personas ha bloqueado a la otra no se puede hablar. El error es el mismo de siempre
+ * cuando una conversación no está permitida: no dice quién bloqueó a quién ni que haya un bloqueo.
+ */
+async function assertNoBlockWithOtherPerson(
+  chat: ChatRepository,
+  actor: ActorContext,
+  input: { otherMembershipId: string | null },
+): Promise<void> {
+  if (input.otherMembershipId === null) return;
+  if (await chat.hasChatBlockBetween(actor, input.otherMembershipId)) {
+    throw new DomainError('CHAT_NOT_ALLOWED', HTTP_STATUS.forbidden);
   }
 }
 
@@ -75,6 +98,9 @@ async function loadWritableConversation(
   if (access.isBlockedByMinor) {
     throw new DomainError('CHAT_MINOR_REQUIRES_GUARDIAN', HTTP_STATUS.forbidden);
   }
+  await assertNoBlockWithOtherPerson(chat, actor, {
+    otherMembershipId: access.otherPersonMembershipId,
+  });
   return access;
 }
 

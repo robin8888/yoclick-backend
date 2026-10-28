@@ -3,6 +3,7 @@ import { DomainError } from '../../../shared/errors/domain-error';
 import { HTTP_STATUS } from '../../../shared/errors/http-status';
 import { PushDispatcher } from '../../push/application/push-dispatcher';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
+import { isOverClientLimit } from '../domain/client-limit';
 import {
   addGracePeriod,
   applyPaymentFailed,
@@ -13,11 +14,11 @@ import {
   isTrialExpiredWithoutPlan,
   type CenterBillingState,
 } from '../domain/subscription-rules';
+import { openCheckoutSession, type CheckoutChoice } from './open-checkout-session';
 import {
   BILLING_GATEWAY,
   type BillingEvent,
   type BillingGateway,
-  type BillingPeriod,
   type SyncedPlan,
 } from './ports/billing-gateway';
 import {
@@ -51,10 +52,7 @@ async function moveCenterTo(
   });
 }
 
-export interface CheckoutInput {
-  readonly planId: string;
-  readonly period: BillingPeriod;
-}
+export type CheckoutInput = CheckoutChoice;
 
 /** Los planes que el propietario puede contratar, con su precio mensual y anual. */
 @Injectable()
@@ -75,41 +73,12 @@ export class CreateCheckoutSessionUseCase {
   ) {}
 
   async execute(actor: ActorContext, input: CheckoutInput): Promise<{ url: string }> {
-    const facts = await this.billing.findCheckoutFacts(actor, input.planId);
-    if (facts === null) throw new DomainError('NOT_FOUND', HTTP_STATUS.notFound);
-    const { center, planPrices } = facts;
-    // Un plan sin precios en Stripe es un fallo de preparación nuestro, no del propietario.
-    if (planPrices === null) throw new DomainError('CONFLICT', HTTP_STATUS.conflict);
-    if (center.stripeSubscriptionId !== null && center.status === 'active') {
-      throw new DomainError('CONFLICT', HTTP_STATUS.conflict);
-    }
-    const customerId = await this.ensureCustomer(actor, facts);
-    const isTrialRunning =
-      center.status === 'trial' && center.trialEndsAt !== null && center.trialEndsAt > new Date();
-    return this.gateway.createCheckoutSession({
-      customerId,
-      centerId: center.id,
-      planId: input.planId,
-      period: input.period,
-      priceId: input.period === 'annual' ? planPrices.annualPriceId : planPrices.monthlyPriceId,
-      setupFeePriceId: planPrices.setupFeePriceId,
-      taxRateId: planPrices.taxRateId,
-      firstChargeAt: isTrialRunning ? center.trialEndsAt : null,
+    return openCheckoutSession({
+      gateway: this.gateway,
+      facts: await this.billing.findCheckoutFacts(actor, input.planId),
+      choice: input,
+      saveCustomerId: (customerId) => this.billing.saveCustomerId(actor, customerId),
     });
-  }
-
-  private async ensureCustomer(
-    actor: ActorContext,
-    facts: { center: BillingCenter; ownerEmail: string | null },
-  ): Promise<string> {
-    if (facts.center.stripeCustomerId !== null) return facts.center.stripeCustomerId;
-    const { customerId } = await this.gateway.createCustomer({
-      centerId: facts.center.id,
-      name: facts.center.name,
-      email: facts.ownerEmail,
-    });
-    await this.billing.saveCustomerId(actor, customerId);
-    return customerId;
   }
 }
 
@@ -157,6 +126,28 @@ async function handleBillingEvent(
   return [];
 }
 
+/**
+ * Si el plan nuevo deja al centro con más clientes que su tope, se avisa una vez al propietario. No se toca
+ * a nadie: solo se frenan las altas nuevas hasta que vuelva por debajo, o suba de plan.
+ */
+async function notifyIfOverClientLimit(
+  transaction: BillingTransaction,
+  center: BillingCenter,
+  planId: string,
+): Promise<ActorContext[]> {
+  const load = await transaction.readClientLoad(center.id);
+  if (!isOverClientLimit(load)) return [];
+  return transaction.notifyOwners({
+    centerId: center.id,
+    kind: 'plan_over_limit',
+    data: {
+      planId,
+      activeClientCount: String(load.activeClientCount),
+      maxClients: String(load.maxClients),
+    },
+  });
+}
+
 async function handleSubscriptionChanged(
   transaction: BillingTransaction,
   center: BillingCenter,
@@ -180,6 +171,10 @@ async function handleSubscriptionChanged(
         data: { planId: event.planId },
       });
     }
+    notifiedOwners = [
+      ...notifiedOwners,
+      ...(await notifyIfOverClientLimit(transaction, center, event.planId)),
+    ];
   }
   if (event.period !== null) {
     await transaction.updateCenter(center.id, { billingPeriod: event.period });
@@ -206,11 +201,13 @@ async function handleCheckoutCompleted(
     action: 'plan_subscribed',
     details: { planId: event.planId, period: event.period },
   });
-  return transaction.notifyOwners({
+  const subscribedOwners = await transaction.notifyOwners({
     centerId: center.id,
     kind: 'plan_subscribed',
     data: { planId: event.planId },
   });
+  const overLimitOwners = await notifyIfOverClientLimit(transaction, center, event.planId);
+  return [...subscribedOwners, ...overLimitOwners];
 }
 
 async function handleInvoicePaid(

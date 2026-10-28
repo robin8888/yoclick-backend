@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { type Prisma } from '../../../generated/prisma/client';
 import { v7 as generateUuidV7 } from 'uuid';
 import {
   type TenantTransactionClient,
@@ -17,7 +18,9 @@ import {
   type NewMessage,
   type StartConversationContext,
 } from '../application/ports/chat.repository';
+import { findOtherPerson } from '../domain/chat-moderation-rules';
 import { isMinor, MAX_CONVERSATIONS } from '../domain/chat-rules';
+import { findBlockPartnerIds, findIdsBlockedBy } from './chat-blocks';
 import { listContactsInTransaction } from './chat-contacts';
 import { buildPersonContext, toConversationView } from './chat-conversations';
 import { broadcastInTransaction } from './chat-broadcast';
@@ -75,6 +78,31 @@ async function findAudience(
   return [parties.memberMembershipId, ...administrators.map(({ id }) => id)];
 }
 
+/**
+ * Quien ha bloqueado a una persona deja de ver su conversación: ni en la bandeja ni en los no leídos. Solo
+ * aplica a las conversaciones entre dos personas (la bandeja del centro no tiene «otra persona»).
+ */
+function buildHideBlockedFilter(
+  actor: ActorContext,
+  blockedMembershipIds: readonly string[],
+): Prisma.ConversationWhereInput {
+  if (blockedMembershipIds.length === 0) return {};
+  return {
+    NOT: {
+      OR: [
+        {
+          memberMembershipId: actor.membershipId,
+          counterpartMembershipId: { in: [...blockedMembershipIds] },
+        },
+        {
+          counterpartMembershipId: actor.membershipId,
+          memberMembershipId: { in: [...blockedMembershipIds] },
+        },
+      ],
+    },
+  };
+}
+
 @Injectable()
 export class PrismaChatRepository implements ChatRepository {
   constructor(private readonly tenantPrismaService: TenantPrismaService) {}
@@ -82,6 +110,7 @@ export class PrismaChatRepository implements ChatRepository {
   async listConversations(actor: ActorContext): Promise<ConversationView[]> {
     return this.tenantPrismaService.runInTenantContext(actor, async (client) => {
       const conversations = await client.conversation.findMany({
+        where: buildHideBlockedFilter(actor, await findIdsBlockedBy(client, actor)),
         include: CONVERSATION_INCLUDE,
         orderBy: [{ lastMessageAt: 'desc' }, { id: 'desc' }],
         take: MAX_CONVERSATIONS,
@@ -155,8 +184,19 @@ export class PrismaChatRepository implements ChatRepository {
           memberMembershipId: member.id,
           counterpartMembershipId: conversation.counterpartMembershipId,
         }),
+        otherPersonMembershipId: findOtherPerson({
+          viewerMembershipId: actor.membershipId,
+          memberMembershipId: member.id,
+          counterpartMembershipId: conversation.counterpartMembershipId,
+        }),
       };
     });
+  }
+
+  async hasChatBlockBetween(actor: ActorContext, otherMembershipId: string): Promise<boolean> {
+    return this.tenantPrismaService.runInTenantContext(actor, async (client) =>
+      (await findBlockPartnerIds(client, actor)).has(otherMembershipId),
+    );
   }
 
   async listMessages(

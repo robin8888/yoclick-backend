@@ -38,6 +38,7 @@ export class FakeBillingGateway implements BillingGateway {
     return Promise.resolve({ url: `https://checkout.fake.test/pay/${input.centerId}` });
   }
 
+  readonly cancelledSubscriptionIds: string[] = [];
   readonly portalCustomerIds: string[] = [];
   portalConfigurations = 0;
 
@@ -49,6 +50,11 @@ export class FakeBillingGateway implements BillingGateway {
   createPortalSession(input: { customerId: string }): Promise<{ url: string }> {
     this.portalCustomerIds.push(input.customerId);
     return Promise.resolve({ url: `https://billing.fake.test/portal/${input.customerId}` });
+  }
+
+  cancelSubscription(subscriptionId: string): Promise<void> {
+    this.cancelledSubscriptionIds.push(subscriptionId);
+    return Promise.resolve();
   }
 
   verifyWebhook(input: {

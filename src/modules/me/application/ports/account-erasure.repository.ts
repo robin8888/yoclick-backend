@@ -1,6 +1,4 @@
 export interface AccountErasureRepository {
-  /** ¿Es propietaria activa de algún centro? Eliminarla dejaría el centro sin dueño. */
-  ownsActiveCenter(userId: string): Promise<boolean>;
   /**
    * Borra o anonimiza todo lo personal de la cuenta, en una sola transacción: el correo pasa a una
    * dirección inválida (queda libre para volver a registrarse), el nombre a "Usuario eliminado",

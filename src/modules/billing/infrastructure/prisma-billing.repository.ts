@@ -6,7 +6,14 @@ import {
   type TenantTransactionClient,
 } from '../../../shared/database/tenant-prisma.service';
 import { listPlanFeatures } from '../../../shared/centers/plan-features';
+import { MILLISECONDS_PER_DAY } from '../../../shared/time/time-units';
+import {
+  ENDED_REMINDER_WINDOW_DAYS,
+  MAX_REMINDER_LEAD_DAYS,
+  type PlanPaymentEmailKind,
+} from '../domain/plan-payment-reminders';
 import { type ActorContext } from '../../../shared/tenancy/actor-context';
+import { type ClientLoad } from '../domain/client-limit';
 import { type PlanPriceSpec, type SyncedPlan } from '../application/ports/billing-gateway';
 import {
   type BillingCenter,
@@ -15,9 +22,14 @@ import {
   type CheckoutFacts,
   type StripeChargeInput,
   type BillingCenterChanges,
+  type CenterClosedNotificationInput,
+  type CenterClosureFacts,
+  type CenterMemberRef,
+  type OwnedCenterRef,
   type PlanNotificationInput,
   type PlanOffer,
   type PlanStripePrices,
+  type TrialReminderCandidate,
 } from '../application/ports/billing.repository';
 
 type CenterRow = Prisma.CenterGetPayload<object>;
@@ -61,6 +73,22 @@ function toPlanPrices(plan: Prisma.PlatformPlanGetPayload<object>): PlanStripePr
     annualPriceId: stripeAnnualPriceId,
     setupFeePriceId: plan.stripeSetupFeePriceId,
     taxRateId: stripeTaxRateId,
+  };
+}
+
+function toPlanOffer(plan: Prisma.PlatformPlanGetPayload<object>): PlanOffer {
+  return {
+    id: plan.id,
+    name: plan.name,
+    monthlyPriceCents: plan.monthlyPriceCents,
+    annualMonthlyPriceCents: plan.annualMonthlyPriceCents,
+    setupFeeCents: plan.setupFeeCents,
+    maxClients: plan.maxClients,
+    documentStorageLimitBytes: Number(plan.documentStorageLimitBytes),
+    videoStorageLimitBytes:
+      plan.videoStorageLimitBytes === null ? null : Number(plan.videoStorageLimitBytes),
+    features: listPlanFeatures(plan.id),
+    isAvailable: toPlanPrices(plan) !== null,
   };
 }
 
@@ -134,6 +162,18 @@ class PrismaBillingTransaction implements BillingTransaction {
     });
   }
 
+  async readClientLoad(centerId: string): Promise<ClientLoad> {
+    const center = await this.client.center.findUniqueOrThrow({
+      where: { id: centerId },
+      select: { maxClients: true },
+    });
+    // Misma definición de «cliente activo» que la pantalla de suscripción.
+    const activeClientCount = await this.client.membership.count({
+      where: { centerId, role: 'client', isStudent: true, status: 'active' },
+    });
+    return { activeClientCount, maxClients: center.maxClients };
+  }
+
   async notifyOwners(input: PlanNotificationInput): Promise<ActorContext[]> {
     const owners = await this.client.membership.findMany({
       where: { centerId: input.centerId, role: 'owner', status: 'active' },
@@ -161,6 +201,8 @@ class PrismaBillingTransaction implements BillingTransaction {
   async listCentersToSweep(now: Date): Promise<BillingCenter[]> {
     const rows = await this.client.center.findMany({
       where: {
+        // Un centro cerrado no vuelve a pasar por gracia ni suspensión.
+        closedAt: null,
         OR: [
           { status: 'trial', stripeSubscriptionId: null, trialEndsAt: { lte: now } },
           { status: 'past_due', graceEndsAt: { lte: now } },
@@ -168,6 +210,139 @@ class PrismaBillingTransaction implements BillingTransaction {
       },
     });
     return rows.map(toBillingCenter);
+  }
+
+  async listCentersSolelyOwnedBy(userId: string): Promise<OwnedCenterRef[]> {
+    const ownerships = await this.client.membership.findMany({
+      where: { userId, role: 'owner', status: 'active', center: { closedAt: null } },
+      select: { center: { select: { id: true, name: true } } },
+    });
+    const centerIds = ownerships.map(({ center }) => center.id);
+    const otherOwners = await this.client.membership.findMany({
+      where: {
+        centerId: { in: centerIds },
+        role: 'owner',
+        status: 'active',
+        userId: { not: userId },
+      },
+      select: { centerId: true },
+    });
+    const centersWithOtherOwner = new Set(otherOwners.map(({ centerId }) => centerId));
+    return ownerships
+      .map(({ center }) => ({ centerId: center.id, name: center.name }))
+      .filter(({ centerId }) => !centersWithOtherOwner.has(centerId));
+  }
+
+  async findCenterForClosure(centerId: string): Promise<CenterClosureFacts | null> {
+    return this.client.center.findUnique({
+      where: { id: centerId },
+      select: { name: true, stripeSubscriptionId: true, closedAt: true },
+    });
+  }
+
+  async listActiveMembers(centerId: string): Promise<CenterMemberRef[]> {
+    const members = await this.client.membership.findMany({
+      where: { centerId, status: 'active' },
+      select: { id: true, userId: true, role: true },
+    });
+    return members.map((member) => ({
+      membershipId: member.id,
+      userId: member.userId,
+      role: member.role,
+    }));
+  }
+
+  async markCenterClosed(centerId: string, closedAt: Date): Promise<void> {
+    await this.client.center.update({ where: { id: centerId }, data: { closedAt } });
+  }
+
+  async notifyCenterClosed(input: CenterClosedNotificationInput): Promise<void> {
+    // `createMany` porque el contexto de cobro puede escribir avisos pero no leerlos.
+    await this.client.notification.createMany({
+      data: input.recipientMembershipIds.map((recipientMembershipId) => ({
+        id: generateUuidV7(),
+        centerId: input.centerId,
+        recipientMembershipId,
+        kind: 'center_closed' as const,
+        data: input.data,
+      })),
+    });
+  }
+
+  async endAllMemberships(centerId: string): Promise<void> {
+    await this.client.membership.updateMany({
+      where: { centerId, status: { not: 'left' } },
+      data: { status: 'left' },
+    });
+  }
+
+  async listTrialReminderCandidates(now: Date): Promise<TrialReminderCandidate[]> {
+    const rows = await this.client.center.findMany({
+      where: {
+        closedAt: null,
+        status: { in: ['trial', 'past_due'] },
+        stripeSubscriptionId: null,
+        trialEndsAt: {
+          gt: new Date(now.getTime() - ENDED_REMINDER_WINDOW_DAYS * MILLISECONDS_PER_DAY),
+          lte: new Date(now.getTime() + MAX_REMINDER_LEAD_DAYS * MILLISECONDS_PER_DAY),
+        },
+      },
+      include: {
+        planPaymentEmails: { select: { kind: true } },
+        memberships: {
+          where: { role: 'owner', status: 'active' },
+          select: { user: { select: { email: true, fullName: true } } },
+        },
+      },
+    });
+    return rows.map((row) => ({
+      center: toBillingCenter(row),
+      owners: row.memberships.map((membership) => membership.user),
+      // La columna solo admite los cuatro tipos del CHECK de la migración.
+      sentKinds: row.planPaymentEmails.map((sent) => sent.kind as PlanPaymentEmailKind),
+    }));
+  }
+
+  async listAvailablePlanOffers(): Promise<PlanOffer[]> {
+    const plans = await this.client.platformPlan.findMany({ orderBy: { sortOrder: 'asc' } });
+    return plans.map(toPlanOffer).filter((offer) => offer.isAvailable);
+  }
+
+  async claimPlanPaymentEmail(centerId: string, kind: PlanPaymentEmailKind): Promise<boolean> {
+    const result = await this.client.planPaymentEmail.createMany({
+      data: [{ centerId, kind }],
+      skipDuplicates: true,
+    });
+    return result.count > 0;
+  }
+
+  async findCheckoutFactsForCenter(
+    centerId: string,
+    planId: string,
+  ): Promise<CheckoutFacts | null> {
+    const [center, owner, plan] = await Promise.all([
+      this.client.center.findUnique({ where: { id: centerId } }),
+      this.client.membership.findFirst({
+        where: { centerId, role: 'owner', status: 'active' },
+        orderBy: { createdAt: 'asc' },
+        select: { user: { select: { email: true } } },
+      }),
+      this.client.platformPlan.findUnique({ where: { id: planId } }),
+    ]);
+    // Un centro cerrado no puede contratar nada: su enlace de pago deja de funcionar.
+    if (center === null || center.closedAt !== null || plan === null) return null;
+    return {
+      center: toBillingCenter(center),
+      ownerEmail: owner?.user.email ?? null,
+      planPrices: toPlanPrices(plan),
+    };
+  }
+
+  async saveCustomerIdForCenter(centerId: string, customerId: string): Promise<void> {
+    await this.client.center.update({
+      where: { id: centerId },
+      data: { stripeCustomerId: customerId },
+    });
   }
 }
 
@@ -186,19 +361,7 @@ export class PrismaBillingRepository implements BillingRepository {
   async listPlanOffers(actor: ActorContext): Promise<PlanOffer[]> {
     return this.tenantPrismaService.runInTenantContext(actor, async (client) => {
       const plans = await client.platformPlan.findMany({ orderBy: { sortOrder: 'asc' } });
-      return plans.map((plan) => ({
-        id: plan.id,
-        name: plan.name,
-        monthlyPriceCents: plan.monthlyPriceCents,
-        annualMonthlyPriceCents: plan.annualMonthlyPriceCents,
-        setupFeeCents: plan.setupFeeCents,
-        maxClients: plan.maxClients,
-        documentStorageLimitBytes: Number(plan.documentStorageLimitBytes),
-        videoStorageLimitBytes:
-          plan.videoStorageLimitBytes === null ? null : Number(plan.videoStorageLimitBytes),
-        features: listPlanFeatures(plan.id),
-        isAvailable: toPlanPrices(plan) !== null,
-      }));
+      return plans.map(toPlanOffer);
     });
   }
 

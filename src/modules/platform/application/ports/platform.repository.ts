@@ -51,6 +51,8 @@ export interface PlatformCenterSummary {
   readonly teamMemberCount: number;
   readonly bookingsLast30Days: number;
   readonly lastBookingAt: Date | null;
+  /** Cuándo se cerró el centro (su propietario eliminó la cuenta); `null` si sigue abierto. */
+  readonly closedAt: Date | null;
 }
 
 export interface PlatformCenterDetail extends PlatformCenterSummary {

@@ -358,7 +358,10 @@ describe('joining a center: lookup, search, branding and joining', () => {
       });
 
       expect(response.statusCode).toBe(409);
-      expect(response.json()).toMatchObject({ code: 'CLIENT_LIMIT_REACHED' });
+      expect(response.json()).toMatchObject({
+        code: 'CLIENT_LIMIT_REACHED',
+        title: 'Este centro no admite altas nuevas ahora mismo. Ponte en contacto con el centro',
+      });
     });
 
     it('does not count staff against the client limit', async () => {

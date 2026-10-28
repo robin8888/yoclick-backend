@@ -51,6 +51,14 @@ const COPY_BY_KIND: Readonly<Record<string, PushCopy>> = {
   schedule_updated: { title: 'Ha cambiado un horario tuyo', body: OPEN_APP_BODY },
   plan_subscribed: { title: 'Plan contratado', body: OPEN_APP_BODY },
   plan_changed: { title: 'Tu plan ha cambiado', body: OPEN_APP_BODY },
+  plan_over_limit: {
+    title: 'Tu plan admite menos clientes de los que tienes',
+    body: OPEN_APP_BODY,
+  },
+  // Genérico a propósito: ni el nombre del centro ni el motivo viajan en el push.
+  center_closed: { title: 'Un centro tuyo se ha cerrado', body: OPEN_APP_BODY },
+  // Genérico a propósito: ni el motivo ni el texto denunciado viajan en el push.
+  message_reported: { title: 'Han denunciado un mensaje', body: OPEN_APP_BODY },
 };
 
 const FALLBACK_COPY: PushCopy = { title: 'Tienes un aviso nuevo', body: OPEN_APP_BODY };

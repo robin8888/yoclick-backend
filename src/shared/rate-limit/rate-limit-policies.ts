@@ -33,6 +33,8 @@ export const RATE_LIMITS = {
   platformAdmin: { limit: 60, ttl: ONE_MINUTE },
   /** Subir el logo: se hace una vez al dar de alta el centro y rara vez después. */
   uploadCenterLogo: { limit: 10, ttl: MILLISECONDS_PER_HOUR },
+  /** Denunciar mensajes del chat: algo excepcional; un bucle de denuncias solo busca saturar a la administración. */
+  reportMessage: { limit: 10, ttl: ONE_MINUTE },
   /** Reservar: una persona normal reserva pocas citas por minuto; un bucle de reservas no. */
   createBooking: { limit: 20, ttl: ONE_MINUTE },
   /** Consultar huecos: la app lo pide al cambiar de día o de servicio. */

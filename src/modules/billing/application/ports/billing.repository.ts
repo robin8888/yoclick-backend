@@ -1,5 +1,10 @@
-import { type ActorContext } from '../../../../shared/tenancy/actor-context';
+import {
+  type ActorContext,
+  type MembershipRoleName,
+} from '../../../../shared/tenancy/actor-context';
 import { type PlanFeatureId } from '../../../../shared/centers/plan-features';
+import { type PlanPaymentEmailKind } from '../../domain/plan-payment-reminders';
+import { type ClientLoad } from '../../domain/client-limit';
 import { type CenterStatus } from '../../domain/subscription-rules';
 import { type BillingPeriod, type PlanPriceSpec, type SyncedPlan } from './billing-gateway';
 
@@ -41,7 +46,45 @@ export interface StripeChargeInput {
 
 export interface PlanNotificationInput {
   readonly centerId: string;
-  readonly kind: 'plan_subscribed' | 'plan_changed';
+  readonly kind: 'plan_subscribed' | 'plan_changed' | 'plan_over_limit';
+  readonly data: Readonly<Record<string, string>>;
+}
+
+/** Quién recibe los correos de pago de un centro: sus propietarios activos. */
+export interface PlanOwnerContact {
+  readonly email: string;
+  readonly fullName: string;
+}
+
+/** Un centro en prueba, sus propietarios y qué correos de pago ya se le enviaron. */
+export interface TrialReminderCandidate {
+  readonly center: BillingCenter;
+  readonly owners: readonly PlanOwnerContact[];
+  readonly sentKinds: readonly PlanPaymentEmailKind[];
+}
+
+/** Lo que hace falta saber de un centro para cerrarlo. */
+export interface CenterClosureFacts {
+  readonly name: string;
+  readonly stripeSubscriptionId: string | null;
+  /** Ya cerrado: cerrarlo otra vez no hace nada. */
+  readonly closedAt: Date | null;
+}
+
+export interface CenterMemberRef {
+  readonly membershipId: string;
+  readonly userId: string;
+  readonly role: MembershipRoleName;
+}
+
+export interface OwnedCenterRef {
+  readonly centerId: string;
+  readonly name: string;
+}
+
+export interface CenterClosedNotificationInput {
+  readonly centerId: string;
+  readonly recipientMembershipIds: readonly string[];
   readonly data: Readonly<Record<string, string>>;
 }
 
@@ -58,10 +101,31 @@ export interface BillingTransaction {
     action: string;
     details: Readonly<Record<string, unknown>>;
   }): Promise<void>;
+  /** Cuántos clientes activos tiene el centro y el tope de su plan actual. */
+  readClientLoad(centerId: string): Promise<ClientLoad>;
   /** Deja un aviso a cada propietario del centro y devuelve quiénes son, para enviarles el push. */
   notifyOwners(input: PlanNotificationInput): Promise<ActorContext[]>;
   /** Pruebas acabadas sin plan y gracias agotadas: los candidatos a cambiar de estado. */
   listCentersToSweep(now: Date): Promise<BillingCenter[]>;
+  /** Los centros cuyo único propietario activo es esta persona y que siguen abiertos. */
+  listCentersSolelyOwnedBy(userId: string): Promise<OwnedCenterRef[]>;
+  findCenterForClosure(centerId: string): Promise<CenterClosureFacts | null>;
+  /** Quienes están dentro del centro (membresías activas), con su rol. */
+  listActiveMembers(centerId: string): Promise<CenterMemberRef[]>;
+  markCenterClosed(centerId: string, closedAt: Date): Promise<void>;
+  /** Un aviso `center_closed` por destinatario; el contexto de cobro escribe avisos pero no los lee. */
+  notifyCenterClosed(input: CenterClosedNotificationInput): Promise<void>;
+  /** Saca a todos del centro (membresía `left`): desaparece de sus listas y nadie puede actuar en él. */
+  endAllMemberships(centerId: string): Promise<void>;
+  /** Centros sin suscripción cuya prueba acaba en pocos días o acabó hace poco: los que pueden necesitar un aviso. */
+  listTrialReminderCandidates(now: Date): Promise<TrialReminderCandidate[]>;
+  /** Los planes que ya se pueden contratar, para listarlos en el correo de pago. */
+  listAvailablePlanOffers(): Promise<PlanOffer[]>;
+  /** Apunta el envío; `false` si ese correo ya estaba apuntado (otra vuelta del barrido lo envió). */
+  claimPlanPaymentEmail(centerId: string, kind: PlanPaymentEmailKind): Promise<boolean>;
+  /** Lo que hace falta para abrir la página de pago de un centro sin sesión (enlace firmado de un correo). */
+  findCheckoutFactsForCenter(centerId: string, planId: string): Promise<CheckoutFacts | null>;
+  saveCustomerIdForCenter(centerId: string, customerId: string): Promise<void>;
 }
 
 /** Los ids de Stripe del plan que el propietario va a contratar. */

@@ -129,7 +129,7 @@ Prisma no gestiona RLS por sí mismo; se combina así:
 ## Marca blanca en la app
 
 - **Compartida (Básico/Pro):** al unirse, la app descarga `GET /v1/centers/{id}/branding` (nombre, logo, color, tipo de centro, vocabulario). `brand-engine` calcula `on-brand`, `brand-ink`, `brand-soft` para claro y oscuro y el `ThemeProvider` los inyecta. Se cachea por centro.
-- **Premium:** `app.config.ts` lee `APP_VARIANT` / `CENTER_SLUG` y fija `name`, `slug`, `ios.bundleIdentifier`, `android.package`, `icon`, `splash`, `scheme`, y `extra.lockedCenterId`. Un perfil EAS por centro. El código es el mismo.
+- **Una sola app:** no hay variante Premium ni app por centro (retirada el 27 oct).
 
 ## Entornos
 
